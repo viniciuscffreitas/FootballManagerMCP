@@ -7,8 +7,7 @@ namespace FootballManager.Plugin.Inspection;
 
 // Experiment: presses a button of the game's UI from inside the game, without a mouse, the way the game's own
 // keyboard and controller navigation does. The element is a /ui path; the button is it or its nearest SIButton
-// ancestor. "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit, "navsubmit" sends a
-// NavigationSubmitEvent to the element.
+// ancestor. "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
 internal static class ClickProbe
 {
     public static async Task<string> ClickAsync(string? path, string? how, bool confirmed, bool dryRun, TimeSpan timeout)
@@ -20,9 +19,9 @@ internal static class ClickProbe
 
         how ??= "simulate";
 
-        if (how is not ("simulate" or "submit" or "navsubmit"))
+        if (how is not ("simulate" or "submit"))
         {
-            throw new ArgumentException("how= is simulate, submit or navsubmit.");
+            throw new ArgumentException("how= is simulate or submit.");
         }
 
         if (!dryRun)
@@ -43,16 +42,8 @@ internal static class ClickProbe
                     case "simulate":
                         (button ?? throw new ArgumentException($"No SIButton at or above {path}.")).SimulateButtonClick(false);
                         break;
-                    case "submit":
-                        (button ?? throw new ArgumentException($"No SIButton at or above {path}.")).Submit();
-                        break;
                     default:
-                        using (var submit = NavigationSubmitEvent.GetPooled())
-                        {
-                            submit.target = element;
-                            element.SendEvent(submit);
-                        }
-
+                        (button ?? throw new ArgumentException($"No SIButton at or above {path}.")).Submit();
                         break;
                 }
             }
