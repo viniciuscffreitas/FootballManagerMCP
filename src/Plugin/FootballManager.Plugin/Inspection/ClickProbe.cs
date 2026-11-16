@@ -8,7 +8,8 @@ namespace FootballManager.Plugin.Inspection;
 // Experiment: presses a button of the game's UI from inside the game, without a mouse, the way the game's own
 // keyboard and controller navigation does. The element is a /ui path; the button is it or its nearest SIButton
 // ancestor, or else its nearest SIRadioButton (pressed through its own OnClickedOrSubmitted), SIDropdown (opened with
-// ShowDropdown, or set with index=) or SIFloatingPopupWidget (opened with ShowFloatingPart). "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
+// ShowDropdown, or set with index=), SIFloatingPopupWidget (opened with ShowFloatingPart) or, failing those, any
+// NavigatableVisualElement such as a NavigableLink (submitted as keyboard navigation does). "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
 internal static class ClickProbe
 {
     public static async Task<string> ClickAsync(string? path, string? how, bool confirmed, bool dryRun, TimeSpan timeout, int? index = null)
@@ -37,11 +38,14 @@ internal static class ClickProbe
             var radio = button is null ? FindRadio(element) : null;
             var dropdown = button is null && radio is null ? Find<SIDropdown>(element) : null;
             var popup = button is null && radio is null && dropdown is null ? Find<SIFloatingPopupWidget>(element) : null;
+            var navigable = button is null && radio is null && dropdown is null && popup is null
+                ? Find<SI.UI.NavigatableVisualElement>(element) : null;
             var target = button is not null
                 ? $"{button.GetIl2CppType().Name}#{button.name} '{button.text}'"
                 : radio is not null ? $"SIRadioButton#{radio.name} value={radio.value}"
                 : dropdown is not null ? $"SIDropdown#{dropdown.name} index={dropdown.SelectedIndex}"
-                : popup is not null ? $"SIFloatingPopupWidget#{popup.name}" : "none";
+                : popup is not null ? $"SIFloatingPopupWidget#{popup.name}"
+                : navigable is not null ? $"{navigable.GetIl2CppType().Name}#{navigable.name} canSubmit={navigable.CanSubmit}" : "none";
 
             if (!dryRun && radio is not null)
             {
@@ -63,6 +67,11 @@ internal static class ClickProbe
             else if (!dryRun && popup is not null)
             {
                 popup.ShowFloatingPart();
+            }
+            else if (!dryRun && navigable is not null)
+            {
+                // Any other control (a link, a tile): submitted as keyboard and controller navigation do.
+                navigable.Submit();
             }
             else if (!dryRun)
             {
