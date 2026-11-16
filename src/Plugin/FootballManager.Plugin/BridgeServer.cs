@@ -21,8 +21,8 @@ internal sealed class BridgeServer(int port, string investigationSave, ManualLog
 
     // Endpoints that change the game, or what it runs; and those of them whose dryRun=true only describes the change
     // (/set has no dry run: it always writes).
-    private static readonly HashSet<string> WritePaths = ["/set", "/event", "/native", "/move", "/pick", "/load", "/quit", "/continue", "/click"];
-    private static readonly HashSet<string> DryRunPaths = ["/event", "/native", "/move", "/pick", "/load", "/quit", "/continue", "/click"];
+    private static readonly HashSet<string> WritePaths = ["/set", "/event", "/native", "/move", "/pick", "/load", "/quit", "/continue", "/click", "/newsaction"];
+    private static readonly HashSet<string> DryRunPaths = ["/event", "/native", "/move", "/pick", "/load", "/quit", "/continue", "/click", "/newsaction"];
     private const string WriteHeader = "X-MCPFM-Write";
 
     private readonly HttpListener _listener = new();
@@ -198,6 +198,7 @@ internal sealed class BridgeServer(int port, string investigationSave, ManualLog
         "/set" => Json(() => SetAsync(query)),
         "/event" => Json(() => SendEventAsync(query)),
         "/native" => Json(() => SendNativeEventAsync(query)),
+        "/newsaction" => Json(() => OpenNewsActionAsync(query)),
         "/move" => Json(() => MoveAsync(query)),
         "/pick" => Json(() => PickAsync(query)),
         "/events" => Text(() => Events(query), "application/json; charset=utf-8"),
@@ -247,6 +248,20 @@ internal sealed class BridgeServer(int port, string investigationSave, ManualLog
         }
 
         return await EventSender.SendAsync(GetQuery(query), type, fields, query["template"] != "none", send, timeout);
+    }
+
+    private static async Task<string> OpenNewsActionAsync(NameValueCollection query)
+    {
+        var timeout = AnswerTimeout(query);
+        var send = query["dryRun"] != "true";
+
+        if (send)
+        {
+            await WriteGuard.EnsureAllowedAsync(query["confirm"] == "true", timeout);
+        }
+
+        var actionId = ParseOptionalInt(query["action"]) ?? throw new ArgumentException("Give action=<NewsAction id>, e.g. 6 to make an offer.");
+        return await NewsActionPanel.OpenAsync(GetQuery(query), actionId, Fields(query), send, timeout);
     }
 
     private static async Task<string> SendNativeEventAsync(NameValueCollection query)
