@@ -181,7 +181,7 @@ internal sealed class BridgeServer(int port, string investigationSave, ManualLog
         "/load" => Json(() => SaveSession.LoadAsync(investigationSave, SessionSend(query), query["supervised"] == "true", AnswerTimeout(query))),
         "/quit" => Json(() => SaveSession.QuitAsync(investigationSave, SessionSend(query), AnswerTimeout(query))),
         "/continue" => Json(() => ContinueButton.PressAsync(query["confirm"] == "true", query["dryRun"] == "true", AnswerTimeout(query))),
-        "/click" => Json(() => ClickProbe.ClickAsync(query["path"], query["how"], query["confirm"] == "true", query["dryRun"] == "true", AnswerTimeout(query))),
+        "/click" => Json(() => ClickProbe.ClickAsync(query["path"], query["how"], query["confirm"] == "true", query["dryRun"] == "true", AnswerTimeout(query), int.TryParse(query["index"], out var clickIndex) ? clickIndex : null)),
         "/status" => Text(GameStatus.Describe),
         "/ui" => Text(() => UiTreeDumper.Dump(query["visibleOnly"] != "false", ParseInt(query["maxDepth"], 500))),
         "/find" => Text(() => UiTreeDumper.Find(query["text"] ?? "")),

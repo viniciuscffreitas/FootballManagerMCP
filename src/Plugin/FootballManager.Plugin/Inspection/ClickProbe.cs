@@ -7,10 +7,11 @@ namespace FootballManager.Plugin.Inspection;
 
 // Experiment: presses a button of the game's UI from inside the game, without a mouse, the way the game's own
 // keyboard and controller navigation does. The element is a /ui path; the button is it or its nearest SIButton
-// ancestor, or else its nearest SIRadioButton, which is pressed through its own OnClickedOrSubmitted. "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
+// ancestor, or else its nearest SIRadioButton (pressed through its own OnClickedOrSubmitted), SIDropdown (opened with
+// ShowDropdown, or set with index=) or SIFloatingPopupWidget (opened with ShowFloatingPart). "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
 internal static class ClickProbe
 {
-    public static async Task<string> ClickAsync(string? path, string? how, bool confirmed, bool dryRun, TimeSpan timeout)
+    public static async Task<string> ClickAsync(string? path, string? how, bool confirmed, bool dryRun, TimeSpan timeout, int? index = null)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -34,13 +35,34 @@ internal static class ClickProbe
             var element = UiDocuments.Resolve(path);
             var button = FindButton(element);
             var radio = button is null ? FindRadio(element) : null;
+            var dropdown = button is null && radio is null ? Find<SIDropdown>(element) : null;
+            var popup = button is null && radio is null && dropdown is null ? Find<SIFloatingPopupWidget>(element) : null;
             var target = button is not null
                 ? $"{button.GetIl2CppType().Name}#{button.name} '{button.text}'"
-                : radio is not null ? $"SIRadioButton#{radio.name} value={radio.value}" : "none";
+                : radio is not null ? $"SIRadioButton#{radio.name} value={radio.value}"
+                : dropdown is not null ? $"SIDropdown#{dropdown.name} index={dropdown.SelectedIndex}"
+                : popup is not null ? $"SIFloatingPopupWidget#{popup.name}" : "none";
 
             if (!dryRun && radio is not null)
             {
                 radio.OnClickedOrSubmitted();
+            }
+            else if (!dryRun && dropdown is not null)
+            {
+                if (index is { } chosen)
+                {
+                    // Picks an item by its place in the list, as choosing it in the open list does.
+                    dropdown.SelectedIndex = chosen;
+                    dropdown.SetSelectedValueByIndex();
+                }
+                else
+                {
+                    dropdown.ShowDropdown();
+                }
+            }
+            else if (!dryRun && popup is not null)
+            {
+                popup.ShowFloatingPart();
             }
             else if (!dryRun)
             {
@@ -65,6 +87,21 @@ internal static class ClickProbe
                 ["pressed"] = !dryRun
             });
         });
+    }
+
+    private static T? Find<T>(VisualElement? element) where T : Il2CppSystem.Object
+    {
+        while (element is not null)
+        {
+            if (element.TryCast<T>() is { } found)
+            {
+                return found;
+            }
+
+            element = element.hierarchy.parent;
+        }
+
+        return null;
     }
 
     private static SIRadioButton? FindRadio(VisualElement? element)
