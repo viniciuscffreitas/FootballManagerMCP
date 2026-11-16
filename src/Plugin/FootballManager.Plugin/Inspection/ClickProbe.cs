@@ -21,9 +21,9 @@ internal static class ClickProbe
 
         how ??= "simulate";
 
-        if (how is not ("simulate" or "submit"))
+        if (how is not ("simulate" or "submit" or "link"))
         {
-            throw new ArgumentException("how= is simulate or submit.");
+            throw new ArgumentException("how= is simulate, submit or link.");
         }
 
         if (!dryRun)
@@ -34,12 +34,13 @@ internal static class ClickProbe
         return await MainThreadDispatcher.RunAsync(() =>
         {
             var element = UiDocuments.Resolve(path);
-            var button = FindButton(element);
+            var forcedLink = how == "link" ? Find<NavigableLink>(element) : null;
+            var button = forcedLink is null ? FindButton(element) : null;
             var radio = button is null ? FindRadio(element) : null;
             var dropdown = button is null && radio is null ? Find<SIDropdown>(element) : null;
             var popup = button is null && radio is null && dropdown is null ? Find<SIFloatingPopupWidget>(element) : null;
-            var navigable = button is null && radio is null && dropdown is null && popup is null
-                ? Find<SI.UI.NavigatableVisualElement>(element) : null;
+            var navigable = forcedLink ?? (button is null && radio is null && dropdown is null && popup is null
+                ? Find<SI.UI.NavigatableVisualElement>(element) : null);
             var target = button is not null
                 ? $"{button.GetIl2CppType().Name}#{button.name} '{button.text}'"
                 : radio is not null ? $"SIRadioButton#{radio.name} value={radio.value}"
