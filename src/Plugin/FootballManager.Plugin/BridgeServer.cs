@@ -21,8 +21,8 @@ internal sealed class BridgeServer(int port, string investigationSave, ManualLog
 
     // Endpoints that change the game, or what it runs; and those of them whose dryRun=true only describes the change
     // (/set has no dry run: it always writes).
-    private static readonly HashSet<string> WritePaths = ["/set", "/event", "/native", "/move", "/pick", "/load", "/quit", "/continue"];
-    private static readonly HashSet<string> DryRunPaths = ["/event", "/native", "/move", "/pick", "/load", "/quit", "/continue"];
+    private static readonly HashSet<string> WritePaths = ["/set", "/event", "/native", "/move", "/pick", "/load", "/quit", "/continue", "/click"];
+    private static readonly HashSet<string> DryRunPaths = ["/event", "/native", "/move", "/pick", "/load", "/quit", "/continue", "/click"];
     private const string WriteHeader = "X-MCPFM-Write";
 
     private readonly HttpListener _listener = new();
@@ -181,6 +181,7 @@ internal sealed class BridgeServer(int port, string investigationSave, ManualLog
         "/load" => Json(() => SaveSession.LoadAsync(investigationSave, SessionSend(query), query["supervised"] == "true", AnswerTimeout(query))),
         "/quit" => Json(() => SaveSession.QuitAsync(investigationSave, SessionSend(query), AnswerTimeout(query))),
         "/continue" => Json(() => ContinueButton.PressAsync(query["confirm"] == "true", query["dryRun"] == "true", AnswerTimeout(query))),
+        "/click" => Json(() => ClickProbe.ClickAsync(query["path"], query["how"], query["confirm"] == "true", query["dryRun"] == "true", AnswerTimeout(query))),
         "/status" => Text(GameStatus.Describe),
         "/ui" => Text(() => UiTreeDumper.Dump(query["visibleOnly"] != "false", ParseInt(query["maxDepth"], 500))),
         "/find" => Text(() => UiTreeDumper.Find(query["text"] ?? "")),
