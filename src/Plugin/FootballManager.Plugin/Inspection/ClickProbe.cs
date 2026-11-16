@@ -7,7 +7,7 @@ namespace FootballManager.Plugin.Inspection;
 
 // Experiment: presses a button of the game's UI from inside the game, without a mouse, the way the game's own
 // keyboard and controller navigation does. The element is a /ui path; the button is it or its nearest SIButton
-// ancestor. "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
+// ancestor, or else its nearest SIRadioButton, which is pressed through its own OnClickedOrSubmitted. "simulate" calls SIButton.SimulateButtonClick, "submit" calls SIButton.Submit.
 internal static class ClickProbe
 {
     public static async Task<string> ClickAsync(string? path, string? how, bool confirmed, bool dryRun, TimeSpan timeout)
@@ -33,9 +33,16 @@ internal static class ClickProbe
         {
             var element = UiDocuments.Resolve(path);
             var button = FindButton(element);
-            var target = button is null ? "none" : $"{button.GetIl2CppType().Name}#{button.name} '{button.text}'";
+            var radio = button is null ? FindRadio(element) : null;
+            var target = button is not null
+                ? $"{button.GetIl2CppType().Name}#{button.name} '{button.text}'"
+                : radio is not null ? $"SIRadioButton#{radio.name} value={radio.value}" : "none";
 
-            if (!dryRun)
+            if (!dryRun && radio is not null)
+            {
+                radio.OnClickedOrSubmitted();
+            }
+            else if (!dryRun)
             {
                 switch (how)
                 {
@@ -53,10 +60,26 @@ internal static class ClickProbe
                 ["element"] = $"{element.GetIl2CppType().Name}#{element.name}",
                 ["button"] = target,
                 ["canSubmit"] = button?.CanSubmit,
+                ["radioValue"] = radio?.value,
                 ["how"] = how,
                 ["pressed"] = !dryRun
             });
         });
+    }
+
+    private static SIRadioButton? FindRadio(VisualElement? element)
+    {
+        while (element is not null)
+        {
+            if (element.TryCast<SIRadioButton>() is { } radio)
+            {
+                return radio;
+            }
+
+            element = element.hierarchy.parent;
+        }
+
+        return null;
     }
 
     private static SIButton? FindButton(VisualElement? element)
