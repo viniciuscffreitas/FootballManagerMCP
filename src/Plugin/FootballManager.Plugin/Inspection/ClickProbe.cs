@@ -70,8 +70,16 @@ internal static class ClickProbe
             }
             else if (!dryRun && navigable is not null)
             {
-                // Any other control (a link, a tile): submitted as keyboard and controller navigation do.
-                navigable.Submit();
+                // A link follows itself through its own handler; any other control (a tile) is submitted as keyboard and
+                // controller navigation do.
+                if (navigable.TryCast<NavigableLink>() is { } link)
+                {
+                    link.OnClickedOrSubmitted(link);
+                }
+                else
+                {
+                    navigable.Submit();
+                }
             }
             else if (!dryRun)
             {
