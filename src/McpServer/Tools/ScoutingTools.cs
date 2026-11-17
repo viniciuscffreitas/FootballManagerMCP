@@ -49,7 +49,7 @@ public static class ScoutingTools
                  "shortlisted or being scouted, and the statuses the game shows for him (its status icons), each with " +
                  "the game's English key, label and details: FutureTransfer (a transfer agreed, with the club and " +
                  "date he joins), TransferListed and ListedForLoan (with the asking price), Wanted (the clubs watching " +
-                 "him), injured, free agent, work permit, and so on. With includeStats, also his club's league and his " +
+                 "him), injured, free agent, work permit, and so on. With includeStats, also his club's league and its nation, and his " +
                  "numbers this season for his club, all competitive matches together, totals and per 90: appearances, " +
                  "minutes, average rating, goals, assists, penalties, xG, non-penalty xG, xG overperformance, xG per " +
                  "shot, xA, shots and on target, conversion, key passes, chances created, passes and completion, " +
@@ -94,8 +94,9 @@ public static class ScoutingTools
         [Description("Include each player's league and season numbers (see above). About 2 KB more per player.")]
         bool includeStats = false,
         [Description("Keep only players whose club plays in one of these leagues, by the whole name the game gives " +
-                     "it in each player's 'league' (e.g. 'Brasileirão', 'Brasileirão Série B', 'Liga Profesional'); case " +
-                     "and accents don't matter. Turns on includeStats.")]
+                     "it in each player's 'league' (e.g. 'Brasileirão', 'Brasileirão Série B', 'Liga Profesional'), or " +
+                     "with its nation as the answer's 'leagues' lists it (e.g. 'Primera B (Chile)': names repeat across " +
+                     "nations); case and accents don't matter. Turns on includeStats.")]
         List<string>? leagues = null,
         [Description("Keep only players with at least these minutes this season. Turns on includeStats.")]
         int? minMinutes = null,

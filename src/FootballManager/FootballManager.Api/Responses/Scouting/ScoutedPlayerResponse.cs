@@ -10,6 +10,7 @@ public class ScoutedPlayerResponse
     public string? Club { get; set; }
     public string? Nation { get; set; }
     public string? League { get; set; }
+    public string? LeagueNation { get; set; }
     public string? Positions { get; set; }
 
     /// <summary>A position code, e.g. "DC".</summary>

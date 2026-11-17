@@ -10,6 +10,9 @@ internal static class PerformanceConstants
     // The competition his club plays its league in: a reference, read by its name.
     public const string League = "Division.Name";
 
+    // League names repeat across nations (Primera B is Chilean, Colombian and Argentinian).
+    public const string LeagueNation = "Division.Nation.Name";
+
     // Always among the paths read with the numbers: its presence says they were asked for.
     public const string Appearances = "ClubAppearancesThisSeason";
 
@@ -86,7 +89,7 @@ internal static class PerformanceConstants
         ("ConcededPer90", (p, v) => p.GoalsConcededPer90 = v)
     ];
 
-    public static IEnumerable<string> Paths => Stats.Select(stat => stat.Path).Append(League);
+    public static IEnumerable<string> Paths => Stats.Select(stat => stat.Path).Append(League).Append(LeagueNation);
 
     private static int? Whole(double? value)
     {

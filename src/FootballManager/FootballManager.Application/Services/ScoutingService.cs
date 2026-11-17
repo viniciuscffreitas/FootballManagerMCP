@@ -173,7 +173,7 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
                 Scanned = filtering ? page.Players.Count : null,
                 Complete = filtering ? page.Players.Count >= page.Total : null,
                 Leagues = filtering
-                    ? page.Players.GroupBy(p => p.League ?? "(no league)").OrderByDescending(g => g.Count()).ToDictionary(g => g.Key, g => g.Count())
+                    ? page.Players.GroupBy(LeagueLabel).OrderByDescending(g => g.Count()).ToDictionary(g => g.Key, g => g.Count())
                     : null,
                 UnmatchedLeagues = filtering && filter!.Leagues.Count > 0
                     ? filter.Leagues.Where(league => !page.Players.Any(p => SameLeague(p, league))).ToList()
@@ -200,9 +200,19 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
             && filter.Maximums.All(bound => Number(numbers, bound.Key) <= bound.Value);
     }
 
+    // A league is named alone ("Primera B": any nation's) or with its nation, as the answer's leagues list it ("Primera B (Chile)").
     private static bool SameLeague(ScoutedPlayer player, string league)
     {
-        return player.League is { } name && GameNames.Normalise(name) == GameNames.Normalise(league);
+        var wanted = GameNames.Normalise(league);
+        return player.League is { } name
+               && (GameNames.Normalise(name) == wanted || GameNames.Normalise(LeagueLabel(player)) == wanted);
+    }
+
+    private static string LeagueLabel(ScoutedPlayer player)
+    {
+        return player.League is not { } name ? "(no league)"
+            : player.LeagueNation is { } nation ? $"{name} ({nation})"
+            : name;
     }
 
     private static double? Number(PlayerPerformance? numbers, string name)

@@ -123,6 +123,21 @@ public class PerformanceFilterTests
     }
 
     [Fact]
+    public async Task A_league_named_with_its_nation_keeps_only_that_nations_league()
+    {
+        Returns(
+            Player(1, "Primera B", 1800, 7.1, nation: "Chile"),
+            Player(2, "Primera B", 1800, 7.1, nation: "Colombia"));
+
+        var result = await _service.GetPlayersAsync(
+            ScoutingSource.Search, filter: new PerformanceFilter { Leagues = ["primera b (chile)"] });
+
+        Assert.Equal(1, Assert.Single(result.Value.Players).Id);
+        Assert.Equal(new Dictionary<string, int> { ["Primera B (Chile)"] = 1, ["Primera B (Colombia)"] = 1 }, result.Value.Leagues);
+        Assert.Empty(result.Value.UnmatchedLeagues!);
+    }
+
+    [Fact]
     public async Task Without_a_league_filter_no_league_is_unmatched()
     {
         Returns(Player(1, "Série A", 1800, 7.1));
@@ -191,7 +206,7 @@ public class PerformanceFilterTests
             .Returns(new ScoutedPlayerPage { Players = players.ToList(), Total = total, Search = new PlayerSearchStatus() });
     }
 
-    private static ScoutedPlayer Player(int id, string? league, int? minutes, double? rating, Action<PlayerPerformance>? numbers = null)
+    private static ScoutedPlayer Player(int id, string? league, int? minutes, double? rating, Action<PlayerPerformance>? numbers = null, string? nation = null)
     {
         var performance = minutes is null ? null : new PlayerPerformance { Minutes = minutes, AverageRating = rating };
 
@@ -205,6 +220,7 @@ public class PerformanceFilterTests
             Id = id,
             Name = $"Player {id}",
             League = league,
+            LeagueNation = nation,
             Performance = performance
         };
     }
