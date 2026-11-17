@@ -15,6 +15,12 @@ internal sealed class TacticKeys
     public required IReadOnlyDictionary<ulong, string> InPossessionRoles { get; init; }
     public required IReadOnlyDictionary<ulong, string> OutOfPossessionRoles { get; init; }
 
+    /// <summary>
+    /// The duty flags the in-possession role enum also carries, by bit, named without "Duty" (SupportDuty is Support).
+    /// The game adds one to a role's mask where it pairs a role with a duty, as in its opposition reports.
+    /// </summary>
+    public IReadOnlyDictionary<ulong, string> InPossessionDuties { get; init; } = new Dictionary<ulong, string>();
+
     public IReadOnlyDictionary<ulong, string> Roles(bool inPossession)
     {
         return inPossession ? InPossessionRoles : OutOfPossessionRoles;
@@ -34,7 +40,8 @@ internal sealed class TacticKeys
             Formations = Signed(Enum(TacticConstants.FormationsEnum), name => Trim(name, TacticConstants.FormationPrefix)),
             InPossessionRoles = Roles(Enum(TacticConstants.InPossessionRolesEnum), name => name),
             OutOfPossessionRoles = Roles(Enum(TacticConstants.OutOfPossessionRolesEnum),
-                name => Trim(name, TacticConstants.OutOfPossessionRolePrefix))
+                name => Trim(name, TacticConstants.OutOfPossessionRolePrefix)),
+            InPossessionDuties = Duties(Enum(TacticConstants.InPossessionRolesEnum))
         };
     }
 
@@ -84,6 +91,21 @@ internal sealed class TacticKeys
         }
 
         return keys;
+    }
+
+    private static Dictionary<ulong, string> Duties(Dictionary<string, JsonElement> values)
+    {
+        var duties = new Dictionary<ulong, string>();
+
+        foreach (var (name, value) in values)
+        {
+            if (name.EndsWith(TacticConstants.DutySuffix, StringComparison.Ordinal) && value.TryGetUInt64(out var bit) && bit != 0)
+            {
+                duties.TryAdd(bit, name[..^TacticConstants.DutySuffix.Length]);
+            }
+        }
+
+        return duties;
     }
 
     private static string Trim(string name, string prefix)

@@ -73,6 +73,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_live_match` | The match being played: minute, score, goals, xG, shots, possession, players on the pitch with rating, condition and cards, substitutions made and left, the tactic and mentality in use |
 | League | `get_league_table` | Your league's table: every team's position, games, wins, draws, losses, goals, goal difference and points, your line marked, and where the press expects you to finish |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
+| | `get_opposition_report` | The game's own opposition report: expected formation and eleven with positions and roles, its tactic summary, the analysis' points, and the threat level of your next opponent |
 | Scouting | `get_scouting` | Your recruitment set-up: scouts, focuses, budget |
 | | `get_scouted_players` | Players from a scouting list (recommendations, shortlist, a focus, the player search) |
 | | `run_player_search` | Runs the game's player search with filters (age, positions, grade, quick filters, interest) |

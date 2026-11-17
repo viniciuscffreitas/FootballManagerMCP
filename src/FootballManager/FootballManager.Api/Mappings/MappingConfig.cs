@@ -4,6 +4,7 @@ using FootballManager.Api.Responses.Standings;
 using FootballManager.Api.Responses.Board;
 using FootballManager.Api.Responses.Contracts;
 using FootballManager.Api.Responses.Injuries;
+using FootballManager.Api.Responses.Opposition;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
@@ -26,6 +27,7 @@ using FootballManager.Domain.Availability;
 using FootballManager.Domain.Standings;
 using FootballManager.Domain.Board;
 using FootballManager.Domain.Contracts;
+using FootballManager.Domain.Opposition;
 using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
@@ -92,6 +94,10 @@ public class MappingConfig
             .Map(dest => dest.History, src => src.History.Count > 0 ? src.History : null);
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
+
+        config.NewConfig<OppositionReport, OppositionReportResponse>();
+        config.NewConfig<ExpectedPlayer, ExpectedPlayerResponse>();
+        config.NewConfig<ReportPoint, ReportPointResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
         config.NewConfig<PlayerTalk, PlayerTalkResponse>()
             .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)

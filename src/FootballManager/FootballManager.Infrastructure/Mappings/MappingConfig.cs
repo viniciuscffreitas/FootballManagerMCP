@@ -10,6 +10,7 @@ using FootballManager.Domain.DressingRoom;
 using FootballManager.Domain.Injuries;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
+using FootballManager.Domain.Opposition;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
 using FootballManager.Domain.Standings;
@@ -30,6 +31,7 @@ using FootballManager.Infrastructure.Dtos.DressingRoom;
 using FootballManager.Infrastructure.Dtos.Injuries;
 using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
+using FootballManager.Infrastructure.Dtos.Opposition;
 using FootballManager.Infrastructure.Dtos.Players;
 using FootballManager.Infrastructure.Dtos.Scouting;
 using FootballManager.Infrastructure.Dtos.Standings;
@@ -52,6 +54,12 @@ public class MappingConfig
 
     /// <summary>The Mapster parameter giving the game's names for a player's status flags (GameVocabulary.StatusKeysAsync).</summary>
     public const string StatusKeysParameter = "statusKeys";
+
+    /// <summary>
+    /// The Mapster parameter giving a team's players by their record's index (Dictionary of int to BridgePlayerDto), for
+    /// the players an opposition report names by reference.
+    /// </summary>
+    public const string PlayersByRecordParameter = "playersByRecord";
 
     private const string UnknownAmount = "-";
 
@@ -92,6 +100,69 @@ public class MappingConfig
         RegisterContracts(config);
         RegisterSquadDynamics(config);
         RegisterInjuries(config);
+        RegisterOpposition(config);
+    }
+
+    // An opposition report. Players come by reference, named through PlayersByRecordParameter; role keys need the
+    // game's role names (TacticKeys), passed as TacticKeysParameter. The game marks an expected tactic it has nothing
+    // for as not valid.
+    private static void RegisterOpposition(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeOppositionReportDto, OppositionReport>()
+            .Map(dest => dest.TeamId, src => src.Id ?? 0)
+            .Map(dest => dest.TeamName, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Formation, src => src.ExpectedTactic != null && src.ExpectedTactic.IsValid != false ? Text(src.ExpectedTactic.Formation) : null)
+            .Map(dest => dest.TacticSummary, src => src.ExpectedTactic != null ? Text(src.ExpectedTactic.Summary) : null)
+            .Map(dest => dest.ExpectedLineup, src => src.ExpectedTactic != null && src.ExpectedTactic.IsValid != false
+                ? (src.ExpectedTactic.Players ?? new List<BridgeExpectedPlayerDto>()).Select(place => ExpectedPlayer(place)).ToList()
+                : new List<ExpectedPlayer>())
+            .Map(dest => dest.Points, src => (src.Visuals ?? new List<BridgeReportVisualDto>())
+                .Select(visual => visual.ObservationData)
+                .Where(observation => observation != null && !string.IsNullOrWhiteSpace(observation.GraphType))
+                .Select(observation => ReportPoint(observation!))
+                .ToList())
+            // Set by the service, which knows whether the team is the next opponent.
+            .Ignore(dest => dest.IsNextOpponent)
+            .Ignore(dest => dest.ThreatLevel);
+    }
+
+    // The role mask carries the duty's bit beside the role's; the role's key is the mask without it.
+    private static ExpectedPlayer ExpectedPlayer(BridgeExpectedPlayerDto place)
+    {
+        var keys = MapContext.Current?.Parameters.TryGetValue(TacticKeysParameter, out var names) == true ? names as TacticKeys : null;
+        var duties = keys?.InPossessionDuties ?? new Dictionary<ulong, string>();
+        var dutyBits = duties.Keys.Aggregate(0UL, (all, bit) => all | bit);
+        var player = RecordPlayer(place.Player?.Index);
+
+        return new ExpectedPlayer
+        {
+            PlayerId = player?.Id,
+            Name = player?.Name,
+            Position = place.Position is { } position ? PositionMasks.ToPosition(position) : null,
+            RoleKey = place.Role is { } role ? keys?.InPossessionRoles.GetValueOrDefault(role & ~dutyBits) : null,
+            Duty = place.Role is { } mask ? duties.Where(duty => (mask & duty.Key) != 0).Select(duty => duty.Value).FirstOrDefault() : null
+        };
+    }
+
+    private static ReportPoint ReportPoint(BridgeObservationDto observation)
+    {
+        return new ReportPoint
+        {
+            Topic = observation.GraphType!,
+            Summary = Text(observation.PerformanceSummary),
+            TimeFrame = Text(observation.TimeFrame),
+            // The team's own record when the point is about the team: no player then.
+            PlayerName = RecordPlayer(observation.SubjectRecordId?.Index)?.Name
+        };
+    }
+
+    private static BridgePlayerDto? RecordPlayer(int? index)
+    {
+        return index is { } record
+               && MapContext.Current?.Parameters.TryGetValue(PlayersByRecordParameter, out var players) == true
+               && players is Dictionary<int, BridgePlayerDto> byRecord
+            ? byRecord.GetValueOrDefault(record)
+            : null;
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
