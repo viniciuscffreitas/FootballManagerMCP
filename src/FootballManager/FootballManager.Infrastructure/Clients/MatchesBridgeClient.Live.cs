@@ -67,7 +67,7 @@ internal sealed partial class MatchesBridgeClient
             Away = new MatchSide { TeamId = live.AwayTeamId ?? 0, TeamName = live.AwayTeamName ?? string.Empty, Goals = Score(live.LiveAwayScore, live.AwayScore) },
             HomeStats = homeSide.Stats.Adapt<TeamMatchStats?>(),
             AwayStats = awaySide.Stats.Adapt<TeamMatchStats?>(),
-            Goals = Goals(new BridgeMatchEventsDto { Incidents = live.Incidents }, isHome, names),
+            Goals = Goals(new BridgeMatchEventsDto { Incidents = live.Incidents }, isHome, names, live: true),
             Players = ourPlayers.Select(line => LivePlayer(line, members, ourCondition)).ToList(),
             Tactic = new LiveTactic { Name = played.Name, Formation = played.Formation, Mentality = played.Mentality },
             SubstitutionsRemaining = Number(ourSide.SubstitutionsRemaining),

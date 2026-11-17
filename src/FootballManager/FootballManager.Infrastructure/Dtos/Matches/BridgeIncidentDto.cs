@@ -1,6 +1,6 @@
 namespace FootballManager.Infrastructure.Dtos.Matches;
 
-/// <summary>Something that happened in a match; type 0 is a goal, with the scorer as Player and the assister as Player2.</summary>
+/// <summary>Something that happened in a match; a goal (see MatchIncidents) has the scorer as Player and the assister as Player2.</summary>
 internal sealed class BridgeIncidentDto
 {
     public int? IncidentType { get; set; }
