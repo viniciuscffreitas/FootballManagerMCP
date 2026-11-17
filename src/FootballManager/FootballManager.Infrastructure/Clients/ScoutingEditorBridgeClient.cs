@@ -32,9 +32,9 @@ internal sealed class ScoutingEditorBridgeClient(
 
     private const int MaxStarSteps = 20;
 
-    // What a write needs to know of a player, and shows of him after.
+    // What a write needs to know of a player (his club, for an offer), and shows of him after.
     private static readonly string[] PlayerFlags =
-        [GameConstants.UniqueId, GameConstants.Name, ScoutingConstants.IsShortlisted, ScoutingConstants.IsBeingScouted];
+        [GameConstants.UniqueId, GameConstants.Name, ScoutingConstants.ClubName, ScoutingConstants.IsShortlisted, ScoutingConstants.IsBeingScouted];
 
     // Where each player was found, by id: a path to him through a list holding him (a scouting list, a team's squad, a
     // competition's stats table), from the user's manager (Human) or, for one found through the game's search, the game;
@@ -406,6 +406,19 @@ internal sealed class ScoutingEditorBridgeClient(
         // Read where he was found first: looking through every list takes far longer.
         await Task.Delay(SettlePoll, cancellationToken);
         return await ReadAtAsync(playerId, player, cancellationToken) ?? await FindPlayerAsync(playerId, cancellationToken);
+    }
+
+    // An entry that opens a panel sends no event of its own (EventFmxDoAction opens nothing): the plugin's /newsaction
+    // opens the panel with the references the entry carries, as the click does.
+    public async Task OpenPanelAsync(int playerId, PlayerMenuAction action, int newsAction, CancellationToken cancellationToken = default)
+    {
+        var player = await PlaceAsync(playerId, cancellationToken);
+
+        await bridge.WriteAsync<JsonElement>(
+            OnAction(player, ScoutingConstants.ActionIdOf(action)).ToWrite("/newsaction",
+                ("action", Format(newsAction)),
+                ("field", $"References:@{ScoutingConstants.MenuItems}[0].ActionData.ActionDataReferences")),
+            cancellationToken);
     }
 
     public async Task<TeamPlayers?> GetTeamPlayersAsync(int teamId, CancellationToken cancellationToken = default)

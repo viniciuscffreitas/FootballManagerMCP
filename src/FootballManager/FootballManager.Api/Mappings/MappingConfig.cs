@@ -3,6 +3,7 @@ using FootballManager.Api.Responses.Availability;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
+using FootballManager.Api.Responses.Transfers;
 using FootballManager.Api.Requests.Tactics.Editing;
 using FootballManager.Api.Requests.Training;
 using FootballManager.Api.Responses.Database;
@@ -18,6 +19,7 @@ using FootballManager.Domain.Availability;
 using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
+using FootballManager.Domain.Transfers;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
@@ -54,6 +56,10 @@ public class MappingConfig
         config.NewConfig<PlayerTalk, PlayerTalkResponse>()
             .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)
             .Map(dest => dest.Lines, src => src.Lines.Count > 0 ? src.Lines : null)
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
+        config.NewConfig<TransferOffer, TransferOfferResponse>()
+            .Map(dest => dest.Advice, src => src.Advice.Count > 0 ? src.Advice : null)
+            .Map(dest => dest.Response, src => src.Response.Count > 0 ? src.Response : null)
             .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
 
         // Scores and positions as FM writes them: "17" or "15-17", "DCL". Mapster inlines these, null sources included.

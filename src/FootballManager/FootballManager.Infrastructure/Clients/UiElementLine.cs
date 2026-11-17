@@ -1,11 +1,17 @@
+using System.Globalization;
+
 namespace FootballManager.Infrastructure.Clients;
 
 /// <summary>
 /// An element of the game's UI as the plugin's /ui lists it, one per line: its path (what /click takes), its type
-/// with its name ("SIButton#buttons-controls-pc-default"), its classes and its text, then its bounds.
+/// with its name ("SIButton#buttons-controls-pc-default"), its classes and its text, then its bounds. Listed with hidden
+/// elements too (visibleOnly=false), <see cref="IsShown"/> tells those on screen.
 /// </summary>
-internal sealed record UiElementLine(string Path, string Type, IReadOnlyList<string> Classes, string? Text)
+internal sealed record UiElementLine(string Path, string Type, IReadOnlyList<string> Classes, string? Text, bool IsShown = true)
 {
+    // The game parks closed panels far off screen (@-50000,0) rather than hiding them.
+    private const float OffScreen = -10000;
+
     // e.g. `  0/3/5/1 SIButton#name .suggestion-button .other "Seu treino está excelente." @120,300 400x40`
     public static UiElementLine? Parse(string line)
     {
@@ -37,7 +43,18 @@ internal sealed record UiElementLine(string Path, string Type, IReadOnlyList<str
         }
 
         return new UiElementLine(tokens[0], tokens[1],
-            tokens.Skip(2).Where(token => token.StartsWith('.')).Select(token => token[1..]).ToList(), text);
+            tokens.Skip(2).Where(token => token.StartsWith('.')).Select(token => token[1..]).ToList(), text,
+            IsOnScreen(trimmed[(bounds + 2)..]));
+    }
+
+    // "120,300 400x40": a place on screen and a size.
+    private static bool IsOnScreen(string bounds)
+    {
+        var values = bounds.Split([',', ' ', 'x'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : float.NaN)
+            .ToList();
+
+        return values is [> OffScreen, > OffScreen, > 0, > 0];
     }
 
     /// <summary>Whether this element is <paramref name="ancestor"/> or lies under it.</summary>

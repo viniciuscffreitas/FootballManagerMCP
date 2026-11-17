@@ -189,6 +189,9 @@ internal static class ScoutingConstants
     // "End trial" (PersonTerminateTrial), a single entry, on a player on trial at the club.
     public const uint EndTrialAction = 1299399024;
 
+    // "Make offer" (PersonMakeOfferForPlayer): its first entry opens the transfer offer panel (NewsAction 6).
+    public const uint MakeOfferAction = 1933656696;
+
     public static uint ActionIdOf(PlayerMenuAction action)
     {
         return action switch
@@ -198,6 +201,7 @@ internal static class ScoutingConstants
             PlayerMenuAction.OfferTrial => OfferTrialAction,
             PlayerMenuAction.WithdrawOffer => WithdrawOfferAction,
             PlayerMenuAction.EndTrial => EndTrialAction,
+            PlayerMenuAction.MakeOffer => MakeOfferAction,
             _ => AssignScoutAction
         };
     }

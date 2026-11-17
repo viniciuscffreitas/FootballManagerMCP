@@ -76,6 +76,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_competition_stats` | A league's players ranked by any stat of its stats screen (xG, tackles won, passes completed, headers won, saves...), filtered by position, age and minutes, each cross-checked with your scouting and his contract |
 | Trials | `offer_trials` | Offers trials of 1 to 4 weeks to up to 50 players at once (free agents found with the player search, say) |
 | | `end_trials` | Ends trials, or withdraws offers not yet answered, for up to 50 players at once |
+| Transfers | `make_transfer_offer` | Bids a fee for a player through the game's offer panel, its fee moved with the panel's +/− buttons to exactly the one asked; the club's answer comes in the inbox |
 | Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
 | | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
 | Training | `get_training` | This week's and next week's sessions, and each player's training position, role, additional focus, intensity and rating |
@@ -99,7 +100,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
 - **Reads don't change your game.** Two small exceptions: `search_database` types its text into the game's search box,
   and `get_team` briefly makes the team it reads the game's current team, then puts yours back. The API handles one
   request at a time, so nothing else reads or writes while another team is the current one.
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`) only
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`) only
   check and describe the change unless they're called with `apply: true`. Their descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
@@ -108,6 +109,9 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
 - **A conversation is spent once opened.** The game takes a conversation off the player's menu as soon as its card
   opens, answered or not, so `talk_to_player`'s dry run opens nothing and says so; it refuses conversations the menu
   doesn't offer.
+- **An offer goes at the fee agreed, or not at all.** `make_transfer_offer` moves the panel's fee with its own buttons
+  and sends the offer only when the panel shows exactly the fee asked; a fee the buttons can't reach is refused with
+  nothing sent.
 - **A restore can be undone too.** `restore_save` only runs when you ask, and only while your career save is closed in
   the game (no tool closes a save): an open save would be written back over the restored file. It first keeps the save
   as it is as `<club>-antes-de-restaurar-<yyyyMMdd-HHmm>.fm` in the backup folder, which the rotation never removes,
@@ -115,7 +119,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
 - **Only plain replies.** `reply_to_message` sends only the answers a message's button sends straight away. An option
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game.
 - **Your career is checked and copied before a change.** Before any change to your career applies (`set_tactic`,
-  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
   the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
   Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
   club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on
