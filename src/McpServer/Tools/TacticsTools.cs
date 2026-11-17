@@ -132,8 +132,8 @@ public static class TacticsTools
     [McpServerTool(Name = "create_tactic")]
     [Description("Create a tactic in an empty tactic slot of the running game, through the game's own tactic creator: " +
                  "a tactical style, then a formation in possession and one out of possession, by key (see " +
-                 "get_tactic_options; get_tactics shows which slots hold a tactic). A slot that already holds a tactic " +
-                 "is refused: change it with set_tactic instead. By default this is a dry run: it checks the keys and " +
+                 "get_tactic_options; get_tactics shows which slots hold a tactic). The game fills the first empty slot, " +
+                 "so only that one is taken; a slot that already holds a tactic is refused: change it with set_tactic instead. By default this is a dry run: it checks the keys and " +
                  "returns the creator's planned steps without changing anything. Show the user the plan, and only call " +
                  "again with apply=true once they have agreed. The first failed step stops the rest, and the answer " +
                  "reports each step as Done, Failed or Skipped, and once created what the slot holds. Effects to tell " +
@@ -142,7 +142,7 @@ public static class TacticsTools
                  "mentality and instructions. Refused while a match is being played.")]
     public static async Task<string> CreateTactic(
         IHttpClientFactory httpFactory,
-        [Description("The empty slot to create the tactic in, 1 to 3.")]
+        [Description("The slot to create the tactic in, 1 to 3: the first empty one.")]
         int slot,
         [Description("Tactical style key, e.g. Gegenpress or BlankSlate.")]
         string style,
