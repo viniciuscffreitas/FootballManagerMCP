@@ -43,9 +43,11 @@ public static class TransferTools
     }
 
     [McpServerTool(Name = "negotiate_contract")]
-    [Description("Take the contract negotiation of a player whose club accepted the user's offer, through the game's " +
-                 "contract panel and its own buttons, without the mouse. The panel opens from the acceptance's message " +
-                 "(e.g. \"Proposta Santos por X aceita\", found in the inbox by the player's name) and has two pages: the " +
+    [Description("Take the contract negotiation of a player whose club accepted the user's offer, or a new contract " +
+                 "for one of the club's own players, through the game's contract panel and its own buttons, without the " +
+                 "mouse. For a signing the panel opens from the acceptance's message (e.g. \"Proposta Santos por X " +
+                 "aceita\", found in the inbox by the player's name); for an own player, from his menu (\"Iniciar " +
+                 "negociação de contrato\"). It has two pages: the " +
                  "agent's promises (\"Finalizar Promessas\" agrees to them), then the contract (reached with the panel's " +
                  "\"Negociar Contrato\", not the game's Continue), whose \"Fechar Acordo\" offers the deal at the terms " +
                  "it shows. By default a dry run that opens and presses nothing: with the panel already on the contract's " +

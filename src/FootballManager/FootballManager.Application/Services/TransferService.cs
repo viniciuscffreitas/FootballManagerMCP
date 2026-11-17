@@ -196,6 +196,7 @@ public class TransferService(ITransferGameClient game, IInboxGameClient inbox, I
             var negotiation = new ContractNegotiation { PlayerId = player.Id, PlayerName = player.Name, Club = player.Club, Applied = apply };
             var panel = await game.ReadContractPanelAsync(cancellationToken);
             (MessageOptions Message, MessageOption Option)? opening = null;
+            var fromMenu = false;
 
             if (panel is not null)
             {
@@ -207,6 +208,11 @@ public class TransferService(ITransferGameClient game, IInboxGameClient inbox, I
                 }
 
                 Show(negotiation, panel);
+            }
+            else if (player.CanNegotiateContract)
+            {
+                // One of the club's own players: his menu opens the negotiation, with no message to answer.
+                fromMenu = true;
             }
             else if (await FindOpeningAsync(player.Name, cancellationToken) is { } found)
             {
@@ -224,9 +230,9 @@ public class TransferService(ITransferGameClient game, IInboxGameClient inbox, I
             if (!apply)
             {
                 negotiation.Notes.Add(panel is null
-                    ? $"Applying opens the contract negotiation from '{opening!.Value.Message.Title}' and stops on the " +
-                      "promises the agent asks for, to show the user; a next apply agrees to them and stops on the " +
-                      "contract's terms (salary, length, bonuses), and the one after offers the deal at them."
+                    ? $"Applying opens the contract negotiation from {(fromMenu ? "the player's menu (\"Iniciar negociação de contrato\")" : $"'{opening!.Value.Message.Title}'")} " +
+                      "and stops on the promises the agent asks for, to show the user; a next apply agrees to them and " +
+                      "stops on the contract's terms (salary, length, bonuses), and the one after offers the deal at them."
                     : panel.Steps.Contains(ContractStep.CloseDeal)
                         ? "Applying offers the deal at these terms (\"Fechar Acordo\"): show the user the salary and length first."
                         : "Applying goes on through the panel's pages to the contract and stops there, to show its terms.");
@@ -244,7 +250,9 @@ public class TransferService(ITransferGameClient game, IInboxGameClient inbox, I
 
             if (panel is null)
             {
-                panel = await game.OpenContractPanelAsync(opening!.Value.Message.MessageId, opening.Value.Option.Index, cancellationToken);
+                panel = fromMenu
+                    ? await game.OpenRenewalPanelAsync(player.Id, cancellationToken)
+                    : await game.OpenContractPanelAsync(opening!.Value.Message.MessageId, opening.Value.Option.Index, cancellationToken);
 
                 if (panel is null)
                 {

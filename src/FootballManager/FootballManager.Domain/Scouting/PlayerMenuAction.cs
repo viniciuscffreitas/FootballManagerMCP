@@ -18,5 +18,8 @@ public enum PlayerMenuAction
     EndTrial,
 
     /// <summary>Make a transfer offer for the player: opens the game's transfer offer panel.</summary>
-    MakeOffer
+    MakeOffer,
+
+    /// <summary>Start a contract negotiation with one of the club's own players: opens the contract negotiation panel.</summary>
+    NegotiateContract
 }

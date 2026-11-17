@@ -421,6 +421,20 @@ internal sealed class ScoutingEditorBridgeClient(
             cancellationToken);
     }
 
+    // As the menu's click does: the plugin's /contextaction runs the entry through PluginContextMenuContributor with the
+    // entry's ActionData (EventFmxDoAction and OpenNewsActionPanelEvent open nothing for these).
+    public async Task RunMenuClickAsync(int playerId, PlayerMenuAction action, CancellationToken cancellationToken = default)
+    {
+        var player = await PlaceAsync(playerId, cancellationToken);
+        var actionId = ScoutingConstants.ActionIdOf(action);
+
+        await bridge.WriteAsync<JsonElement>(
+            OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
+                ("action", actionId.ToString(CultureInfo.InvariantCulture)),
+                ("field", $"Data:@{ScoutingConstants.MenuItems}[0].ActionData")),
+            cancellationToken);
+    }
+
     public async Task<TeamPlayers?> GetTeamPlayersAsync(int teamId, CancellationToken cancellationToken = default)
     {
         if (await teams.LocateAsync(teamId, cancellationToken) is not { } team)

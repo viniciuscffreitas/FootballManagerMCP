@@ -64,4 +64,10 @@ public interface IScoutingEditorGameClient
     /// <paramref name="newsAction"/>, e.g. 6 for the transfer offer panel), as a click on it does.
     /// </summary>
     Task OpenPanelAsync(int playerId, PlayerMenuAction action, int newsAction, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Runs the menu's first entry for <paramref name="action"/> the way a click on the menu does, for an entry that
+    /// opens a panel with no NewsAction of its own (e.g. a contract negotiation with one of the club's players).
+    /// </summary>
+    Task RunMenuClickAsync(int playerId, PlayerMenuAction action, CancellationToken cancellationToken = default);
 }

@@ -35,7 +35,8 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
             Id = player.Id,
             Name = player.Name,
             Club = player.Club,
-            CanMakeOffer = offered.Contains(PlayerMenuAction.MakeOffer)
+            CanMakeOffer = offered.Contains(PlayerMenuAction.MakeOffer),
+            CanNegotiateContract = offered.Contains(PlayerMenuAction.NegotiateContract)
         };
     }
 
@@ -141,6 +142,17 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
                     ("field", $"References:@{InboxConstants.Actions}.ActionsForButtonsList[{option.ToString(CultureInfo.InvariantCulture)}].ActionDataReferences")),
             cancellationToken);
 
+        return await WaitForContractPanelAsync(cancellationToken);
+    }
+
+    public async Task<ContractPanel?> OpenRenewalPanelAsync(int playerId, CancellationToken cancellationToken = default)
+    {
+        await players.RunMenuClickAsync(playerId, PlayerMenuAction.NegotiateContract, cancellationToken);
+        return await WaitForContractPanelAsync(cancellationToken);
+    }
+
+    private async Task<ContractPanel?> WaitForContractPanelAsync(CancellationToken cancellationToken)
+    {
         for (var check = 0; check < OpenChecks; check++)
         {
             await Task.Delay(Poll, cancellationToken);
