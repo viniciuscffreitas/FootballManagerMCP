@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Competitions;
+using FootballManager.Domain.Contracts;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
@@ -15,6 +16,7 @@ using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
 using FootballManager.Infrastructure.Dtos.Competitions;
+using FootballManager.Infrastructure.Dtos.Contracts;
 using FootballManager.Infrastructure.Dtos.Database;
 using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterContracts(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,37 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The first team's contracts. Money stays as the game writes it; a release clause of 0 ("-") is none, and a contract
+    // without an end date (dated 1900) has no end.
+    private static void RegisterContracts(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeSquadContractDto, SquadPlayerContract>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Wage, src => src.Wage == null ? null : Text(src.Wage.DisplayValue))
+            .Map(dest => dest.EndDate, src => ContractEnd(src.HasEndDate, src.EndDate))
+            .Map(dest => dest.TimeRemaining, src => Text(src.TimeRemaining))
+            .Map(dest => dest.Type, src => src.Type == null ? null : Text(src.Type.DisplayValue))
+            .Map(dest => dest.AgreedPlayingTime, src => src.AgreedPlayingTime == null ? null : Text(src.AgreedPlayingTime.DisplayValue))
+            .Map(dest => dest.ReleaseClause,
+                src => src.ReleaseClause != null && src.ReleaseClause.SortValue > 0 ? Text(src.ReleaseClause.DisplayValue) : null)
+            .Map(dest => dest.ClausesCount, src => src.ClausesCount ?? 0)
+            .Map(dest => dest.HasRenewalOffer, src => src.HasRenewalOffer ?? false)
+            .Map(dest => dest.StaffAdvice, src => Text(src.StaffAdvice));
+    }
+
+    private static DateOnly? ContractEnd(bool? hasEndDate, string? date)
+    {
+        if (hasEndDate != true || IsBlankDate(date))
+        {
+            return null;
+        }
+
+        return DateOnly.TryParseExact(date, MatchConstants.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            ? day
+            : null;
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
