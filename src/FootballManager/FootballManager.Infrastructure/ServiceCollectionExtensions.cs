@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMatchesGameClient, MatchesBridgeClient>();
         services.AddScoped<TeamsBridgeClient>();
         services.AddScoped<ITeamsGameClient>(provider => provider.GetRequiredService<TeamsBridgeClient>());
+        services.AddScoped<IOppositionGameClient, OppositionBridgeClient>();
         services.AddScoped<IScoutingGameClient, ScoutingBridgeClient>();
         services.AddScoped<IScoutingEditorGameClient, ScoutingEditorBridgeClient>();
         services.AddScoped<IPlayerSearchGameClient, PlayerSearchBridgeClient>();

@@ -65,6 +65,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | Matches | `get_matches` | Your season so far, match by match, with the shape you played |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
+| | `get_opposition_report` | The game's own opposition report: expected formation and eleven with positions and roles, its tactic summary, the analysis' points, and the threat level of your next opponent |
 | Scouting | `get_scouting` | Your recruitment set-up: scouts, focuses, budget |
 | | `get_scouted_players` | Players from a scouting list (recommendations, shortlist, a focus, the player search) |
 | | `run_player_search` | Runs the game's player search with filters (age, positions, grade, quick filters, interest) |
