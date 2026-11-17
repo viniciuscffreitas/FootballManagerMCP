@@ -2,6 +2,7 @@ using FootballManager.Application.Interfaces;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
 using FootballManager.Infrastructure.Constants;
+using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Scouting;
 using FootballManager.Infrastructure.Mappings;
 using Mapster;
@@ -15,6 +16,9 @@ internal sealed class ScoutingBridgeClient(
     GameBridge bridge, GameVocabulary vocabulary, RemovedFocusLog removed, SearchPositions searchPositions) : IScoutingGameClient
 {
     private const int SearchSteps = 10;
+
+    // A long read goes a page at a time, each well inside the bridge's timeout (about 50 players a second with numbers).
+    private const int PageSize = 250;
     private static readonly TimeSpan SearchStepPause = TimeSpan.FromMilliseconds(300);
 
     public async Task<ScoutingOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
@@ -97,8 +101,8 @@ internal sealed class ScoutingBridgeClient(
         bool includeStats = false,
         CancellationToken cancellationToken = default)
     {
-        var query = List(source, focusId, pool).WithHumanAndTeam()
-            .Props(PlayerPaths(attributes, includeAbility, includeReport, includeStats));
+        var paths = PlayerPaths(attributes, includeAbility, includeReport, includeStats);
+        BridgeQuery Query() => List(source, focusId, pool).WithHumanAndTeam().Props(paths);
 
         if (source == ScoutingSource.Search)
         {
@@ -107,10 +111,7 @@ internal sealed class ScoutingBridgeClient(
 
         var keys = vocabulary.KeysAsync(cancellationToken);
         var statusKeys = vocabulary.StatusKeysAsync(cancellationToken);
-        var players = bridge.GetListAsync<BridgeScoutedPlayerDto>(
-            take is { } count ? query.Take(count) : query,
-            cancellationToken,
-            gapsExpected: true);
+        var players = ReadAsync(Query, take, cancellationToken);
         var search = source == ScoutingSource.Search
             ? SearchStatusAsync(cancellationToken)
             : Task.FromResult<PlayerSearchStatus?>(null);
@@ -137,6 +138,36 @@ internal sealed class ScoutingBridgeClient(
             Total = list.Total ?? list.Count,
             Search = await search
         };
+    }
+
+    // The list's first take players (all of it without one), page by page in the list's order, with the list's size.
+    private async Task<BridgeListDto<BridgeScoutedPlayerDto>> ReadAsync(
+        Func<BridgeQuery> query, int? take, CancellationToken cancellationToken)
+    {
+        if (take is not { } count)
+        {
+            return await bridge.GetListAsync<BridgeScoutedPlayerDto>(query(), cancellationToken, gapsExpected: true);
+        }
+
+        var first = await bridge.GetListAsync<BridgeScoutedPlayerDto>(
+            query().Take(Math.Min(count, PageSize)), cancellationToken, gapsExpected: true);
+        var total = first.Total ?? first.Count;
+        var items = first.Items;
+
+        while (items.Count < Math.Min(count, total))
+        {
+            var page = await bridge.GetListAsync<BridgeScoutedPlayerDto>(
+                query().Skip(items.Count).Take(Math.Min(PageSize, count - items.Count)), cancellationToken, gapsExpected: true);
+
+            if (page.Items.Count == 0)
+            {
+                break;
+            }
+
+            items.AddRange(page.Items);
+        }
+
+        return new BridgeListDto<BridgeScoutedPlayerDto> { Count = items.Count, Total = total, Items = items };
     }
 
     // The game runs a search in steps, as its screen reads the results: each read of the list takes it further. Reading

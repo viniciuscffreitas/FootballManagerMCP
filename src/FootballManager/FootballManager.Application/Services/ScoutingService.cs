@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentResults;
 using FootballManager.Application.Exceptions;
 using FootballManager.Application.Interfaces;
@@ -37,9 +38,14 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
     public const int DefaultSearchLimit = 50;
     public const int MaxLimit = 200;
 
-    // With a performance filter the search is read further than the answer goes, then cut on the players' numbers.
-    public const int DefaultScan = 300;
-    public const int MaxScan = 1000;
+    // With a performance filter the search is read whole (up to this many), then cut on the players' numbers.
+    public const int MaxScan = 3000;
+
+    // The numbers a filter can bound, by name, case ignored.
+    private static readonly Dictionary<string, PropertyInfo> PerformanceFields = typeof(PlayerPerformance)
+        .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+        .Where(p => Nullable.GetUnderlyingType(p.PropertyType) is { } type && (type == typeof(int) || type == typeof(double)))
+        .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
 
     public async Task<Result<ScoutingOverview>> GetOverviewAsync(CancellationToken cancellationToken = default)
     {
@@ -91,6 +97,13 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
             return Fail("scan", "The scan only goes with the search source and a performance filter.");
         }
 
+        if (filter is not null
+            && filter.Minimums.Keys.Concat(filter.Maximums.Keys).FirstOrDefault(name => !PerformanceFields.ContainsKey(name)) is { } unknown)
+        {
+            var known = string.Join(", ", PerformanceFields.Keys.Select(name => char.ToLowerInvariant(name[0]) + name[1..]));
+            return Fail("minimums", $"No number '{unknown}' to cut on. The numbers: {known}.");
+        }
+
         // The cuts need the numbers.
         var filtering = filter is { IsEmpty: false };
         includeStats |= filtering;
@@ -133,7 +146,7 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
 
             // The search is read a page at a time, in its own order; the other lists are short, sorted whole, then cut.
             var take = source != ScoutingSource.Search ? (int?)null
-                : filtering ? scan ?? DefaultScan
+                : filtering ? scan ?? MaxScan
                 : limit ?? DefaultSearchLimit;
             var page = await gameClient.GetPlayersAsync(
                 source, focusId, pool, attributes, includeHidden, includeReport, take, includeStats, cancellationToken);
@@ -158,6 +171,13 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
                 Search = page.Search,
                 Total = page.Total,
                 Scanned = filtering ? page.Players.Count : null,
+                Complete = filtering ? page.Players.Count >= page.Total : null,
+                Leagues = filtering
+                    ? page.Players.GroupBy(p => p.League ?? "(no league)").OrderByDescending(g => g.Count()).ToDictionary(g => g.Key, g => g.Count())
+                    : null,
+                UnmatchedLeagues = filtering && filter!.Leagues.Count > 0
+                    ? filter.Leagues.Where(league => !page.Players.Any(p => SameLeague(p, league))).ToList()
+                    : null,
                 Players = players,
                 HiddenDataMasked = includeHidden && players.Count > 0 && !players.Any(p => p.HasHiddenValues)
             });
@@ -168,13 +188,36 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
         }
     }
 
+    // A player without a number fails any bound on it. Numbers are compared as the answer shows them, to 2 decimals.
     private static bool Passes(ScoutedPlayer player, PerformanceFilter filter)
     {
         var numbers = player.Performance;
 
-        return (filter.Leagues.Count == 0 || filter.Leagues.Any(league => player.League is { } name && GameNames.Normalise(name) == GameNames.Normalise(league)))
+        return (filter.Leagues.Count == 0 || filter.Leagues.Any(league => SameLeague(player, league)))
             && (filter.MinMinutes is not { } minutes || numbers?.Minutes >= minutes)
-            && (filter.MinAverageRating is not { } rating || numbers?.AverageRating >= rating);
+            && (filter.MinAverageRating is not { } rating || Shown(numbers?.AverageRating) >= rating)
+            && filter.Minimums.All(bound => Number(numbers, bound.Key) >= bound.Value)
+            && filter.Maximums.All(bound => Number(numbers, bound.Key) <= bound.Value);
+    }
+
+    private static bool SameLeague(ScoutedPlayer player, string league)
+    {
+        return player.League is { } name && GameNames.Normalise(name) == GameNames.Normalise(league);
+    }
+
+    private static double? Number(PlayerPerformance? numbers, string name)
+    {
+        return numbers is null ? null : Shown(PerformanceFields[name].GetValue(numbers) switch
+        {
+            int whole => whole,
+            double value => value,
+            _ => null
+        });
+    }
+
+    private static double? Shown(double? value)
+    {
+        return value is { } number ? Math.Round(number, 2) : null;
     }
 
     private static Result<ScoutedPlayerList> Fail(string property, string message)

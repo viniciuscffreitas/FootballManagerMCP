@@ -56,10 +56,13 @@ public static class ScoutingTools
                  "progressive passes, crosses, dribbles, tackles and their success, interceptions, pressures attempted " +
                  "and completed, headers and their success, clearances, blocks, mistakes leading to goals, possession " +
                  "won and lost, distance, sprints; for keepers saves, save % and expected save %, xG prevented, clean " +
-                 "sheets and goals conceded. The game's search can't filter on league or minutes: leagues, minMinutes " +
-                 "and minAverageRating cut the list here (moneyball), reading the search's first 'scan' results and " +
-                 "reporting how many it read in 'scanned'; narrow the search first with run_player_search (positions, " +
-                 "age, interest). Text values are in the game's display language. " +
+                 "sheets and goals conceded. The game's search can't filter on league or minutes: leagues, minMinutes, " +
+                 "minAverageRating, minimums and maximums cut the list here (moneyball). A cut reads the whole search " +
+                 "(up to 3000 players, or the first 'scan'), and reports how many it read in 'scanned', whether that was " +
+                 "every player in 'complete', each league the players read play in with how many in 'leagues', and in " +
+                 "'unmatchedLeagues' the leagues asked for that none of them plays in: a name there is most likely " +
+                 "misspelt, so take the right one from 'leagues' and ask again. Narrow the search first with " +
+                 "run_player_search (positions, age, interest). Text values are in the game's display language. " +
                  "Fails with a 503 when the game isn't running or no save is loaded.")]
     public static async Task<string> GetScoutedPlayers(
         IHttpClientFactory httpFactory,
@@ -98,8 +101,15 @@ public static class ScoutingTools
         int? minMinutes = null,
         [Description("Keep only players with at least this average rating this season (e.g. 6.9). Turns on includeStats.")]
         double? minAverageRating = null,
-        [Description("With a filter on the search: how many of its results to read before cutting, 1-1000 (300 by " +
-                     "default). Reading takes about a second per 20 players with their numbers.")]
+        [Description("Keep only players whose season numbers are at least these, by their names in 'performance' " +
+                     "(e.g. {\"goalsPer90\": 0.33, \"savePercentage\": 70}), compared as shown, to 2 decimals. A player " +
+                     "without the number is cut. An unknown name is refused with the list of names. Turns on includeStats.")]
+        Dictionary<string, double>? minimums = null,
+        [Description("Keep only players whose season numbers are at most these (e.g. {\"mistakesLeadingToGoal\": 0, " +
+                     "\"possessionLostPer90\": 6}). Same rules as minimums.")]
+        Dictionary<string, double>? maximums = null,
+        [Description("With a filter on the search: how many of its results to read before cutting, 1-3000 (the whole " +
+                     "search by default). Reading takes about a second per 50 players with their numbers.")]
         int? scan = null)
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
@@ -117,10 +127,19 @@ public static class ScoutingTools
                     (minAverageRating is { } rating
                         ? $"&minAverageRating={rating.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
                         : string.Empty) +
+                    Bounds("minimums", minimums) +
+                    Bounds("maximums", maximums) +
                     (scan is { } read ? $"&scan={read}" : string.Empty);
 
         var response = await http.GetAsync($"/api/v1/scouting/players?{query}");
         return await response.ReadContentOrError();
+    }
+
+    // A dictionary in the query, as ASP.NET binds it: name[key]=value.
+    private static string Bounds(string name, Dictionary<string, double>? bounds)
+    {
+        return string.Concat((bounds ?? []).Select(bound =>
+            $"&{name}[{Uri.EscapeDataString(bound.Key)}]={bound.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
     }
 
     [McpServerTool(Name = "run_player_search")]

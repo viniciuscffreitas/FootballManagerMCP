@@ -20,6 +20,15 @@ public class ScoutedPlayerList
     /// <summary>With a performance filter: how many players were read and cut down to <see cref="Players"/>.</summary>
     public int? Scanned { get; set; }
 
+    /// <summary>With a performance filter: true when every player of the list was read, false when some were left unread.</summary>
+    public bool? Complete { get; set; }
+
+    /// <summary>With a performance filter: each league the players read play in, with how many of them do.</summary>
+    public Dictionary<string, int>? Leagues { get; set; }
+
+    /// <summary>With a league filter: the leagues asked for that no player read plays in (a misspelt name, most likely).</summary>
+    public List<string>? UnmatchedLeagues { get; set; }
+
     public List<ScoutedPlayer> Players { get; set; } = [];
 
     /// <summary>True when hidden data was asked for but the game masked all of it (no In-Game Editor).</summary>
