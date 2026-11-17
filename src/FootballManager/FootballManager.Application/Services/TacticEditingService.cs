@@ -14,13 +14,17 @@ public interface ITacticEditingService
 
     /// <summary>Checks and plans the changes; writes them to the game only when <paramref name="apply"/> is set.</summary>
     Task<Result<TacticEdit>> SetTacticAsync(TacticChanges changes, bool apply, CancellationToken cancellationToken = default);
+
+    /// <summary>Checks and plans a new tactic in an empty slot; creates it in the game only when <paramref name="apply"/> is set.</summary>
+    Task<Result<TacticEdit>> CreateTacticAsync(NewTactic tactic, bool apply, CancellationToken cancellationToken = default);
 }
 
 // Edits a tactic slot the way a user would in the game, in the game's order: switch to the slot, then style (which
 // resets the mentality and team instructions), mentality, team instructions, formations (which redo the lineup), and
 // last the lineup: picks, position moves, roles, player instructions. Each stage plans from what the game holds after
 // the one before, so a dry run can only plan what it can see. The first failed write stops the edit. An apply goes
-// through the save guard first, which checks the open save and copies it.
+// through the save guard first, which checks the open save and copies it. A slot with no tactic is filled through the
+// game's tactic creator instead, as its tactics screen does.
 public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveGuard) : ITacticEditingService
 {
     public const int SlotCount = 3;
@@ -64,38 +68,114 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
                 return Result.Fail<TacticEdit>(errors);
             }
 
-            var edit = new TacticEdit { Slot = changes.Slot, Applied = apply };
-
-            if (apply)
-            {
-                var clearance = await saveGuard.PrepareWriteAsync(cancellationToken);
-
-                if (clearance.IsFailed)
-                {
-                    return Result.Fail<TacticEdit>(clearance.Errors);
-                }
-
-                edit.Notes.Add(SaveNote(clearance.Value));
-            }
-
-            try
-            {
-                await new EditRun(game, options, roles, edit, apply, cancellationToken).RunAsync(changes, tactic);
-            }
-            catch (GameUnavailableException exception) when (edit.Steps.Any(step => step.Status == EditStepStatus.Done))
-            {
-                // Some writes went through before a read between them failed: say which, rather than lose them behind
-                // the error.
-                edit.Notes.Add($"The game stopped answering partway ({exception.Message}). The steps marked Done were " +
-                               "applied, the others weren't: check get_tactics before trying again.");
-            }
-
-            return Result.Ok(edit);
+            return await EditAsync(changes.Slot, apply, run => run.RunAsync(changes, tactic), options, roles, cancellationToken);
         }
         catch (GameUnavailableException exception)
         {
             return Result.Fail<TacticEdit>(new GameUnavailableError(exception.Message));
         }
+    }
+
+    public async Task<Result<TacticEdit>> CreateTacticAsync(
+        NewTactic tactic, bool apply, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var options = await game.GetOptionsAsync(cancellationToken);
+            var current = await game.GetTacticAsync(cancellationToken);
+            var errors = ValidateNew(tactic, options, current);
+
+            // A creator someone left partway would take the style as another step's choice.
+            if (await game.GetCreatorStageAsync(cancellationToken) is var stage and not 0)
+            {
+                errors.Add(new ValidationError("slot", [$"The game's tactic creator is on step {stage + 1}, where it was " +
+                                                        "left: go back to its first step, or cancel it, in the game."]));
+            }
+
+            if (errors.Count > 0)
+            {
+                return Result.Fail<TacticEdit>(errors);
+            }
+
+            return await EditAsync(tactic.Slot, apply, run => run.CreateAsync(tactic, current), options,
+                new RoleLookup(game, cancellationToken), cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            return Result.Fail<TacticEdit>(new GameUnavailableError(exception.Message));
+        }
+    }
+
+    // Runs a checked edit: an apply goes through the save guard first, and nothing is written when it refuses.
+    private async Task<Result<TacticEdit>> EditAsync(
+        int slot, bool apply, Func<EditRun, Task> run, TacticOptions options, RoleLookup roles, CancellationToken cancellationToken)
+    {
+        var edit = new TacticEdit { Slot = slot, Applied = apply };
+
+        if (apply)
+        {
+            var clearance = await saveGuard.PrepareWriteAsync(cancellationToken);
+
+            if (clearance.IsFailed)
+            {
+                return Result.Fail<TacticEdit>(clearance.Errors);
+            }
+
+            edit.Notes.Add(SaveNote(clearance.Value));
+        }
+
+        try
+        {
+            await run(new EditRun(game, options, roles, edit, apply, cancellationToken));
+        }
+        catch (GameUnavailableException exception) when (edit.Steps.Any(step => step.Status == EditStepStatus.Done))
+        {
+            // Some writes went through before a read between them failed: say which, rather than lose them behind
+            // the error.
+            edit.Notes.Add($"The game stopped answering partway ({exception.Message}). The steps marked Done were " +
+                           "applied, the others weren't: check get_tactics before trying again.");
+        }
+
+        return Result.Ok(edit);
+    }
+
+    private static List<IError> ValidateNew(NewTactic tactic, TacticOptions options, EditableTactic current)
+    {
+        var errors = new List<IError>();
+
+        void Check(string property, string what, string? key, IEnumerable<TacticOption> choices)
+        {
+            var keys = choices.Select(choice => choice.Key).ToList();
+
+            if (key is null)
+            {
+                errors.Add(new ValidationError(property, [$"Give the {what}. Use one of: {string.Join(", ", keys)}."]));
+            }
+            else if (!keys.Contains(key))
+            {
+                errors.Add(new ValidationError(property, [$"Unknown key '{key}'. Use one of: {string.Join(", ", keys)}."]));
+            }
+        }
+
+        if (tactic.Slot is < 1 or > SlotCount)
+        {
+            errors.Add(new ValidationError("slot", [$"Must be 1 to {SlotCount}."]));
+        }
+        else if (current.Slots.Contains(tactic.Slot))
+        {
+            errors.Add(new ValidationError("slot", [$"Slot {tactic.Slot} already holds a tactic: change it with set_tactic, " +
+                                                    "or pick an empty slot."]));
+        }
+
+        Check("style", "tactical style", tactic.Style, options.Styles);
+
+        foreach (var inPossession in Phases)
+        {
+            Check($"formation.{PhaseProperty(inPossession)}", $"formation {PhaseName(inPossession)}",
+                tactic.Formation.For(inPossession), options.Formations.For(inPossession) ?? []);
+        }
+
+        return errors;
     }
 
     private static string SaveNote(SaveClearance save)
@@ -516,6 +596,73 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
 
             // Picks into the eleven can move players between it and the bench: the bench is read again after them.
             await BenchAsync(changes.Bench, await RefreshAsync(tactic), lineupUnseen, picksPlanned: !apply && changes.Lineup.Count > 0);
+        }
+
+        // The game's tactic creator, the steps its screen walks through for a slot with no tactic: a style, a formation
+        // with the ball, one without it, each picked and moved on from, then a confirm. The creator fills the active
+        // slot, so an empty slot is switched to first. The game then reads the slot back as holding a tactic.
+        public async Task CreateAsync(NewTactic tactic, EditableTactic current)
+        {
+            if (tactic.Slot != current.ActiveSlot)
+            {
+                await WriteAsync(Step("Switch slot", null, $"slot {current.ActiveSlot}", $"slot {tactic.Slot}"), async () =>
+                {
+                    await game.SwitchSlotAsync(tactic.Slot, cancellationToken);
+                    return null;
+                });
+
+                edit.Notes.Add($"Slot {tactic.Slot} becomes the tactic the team plays, and stays so.");
+            }
+
+            await WriteAsync(Step("Style", null, null, tactic.Style),
+                () => PickAndMoveOnAsync(game.SetCreatorStyleAsync(tactic.Style!, cancellationToken), tactic.Style!));
+
+            await WriteAsync(Step("Formation", PhaseName(true), null, tactic.Formation.InPossession),
+                () => PickAndMoveOnAsync(
+                    game.SetCreatorFormationAsync(tactic.Formation.InPossession!, cancellationToken), tactic.Formation.InPossession!));
+
+            await WriteAsync(Step("Formation", PhaseName(false), null, tactic.Formation.OutOfPossession),
+                async () => (await game.SetCreatorFormationAsync(tactic.Formation.OutOfPossession!, cancellationToken)).After);
+
+            var create = Step("Create", $"slot {tactic.Slot}", null, null);
+
+            await WriteAsync(create, async () =>
+            {
+                await game.ConfirmCreatorAsync(cancellationToken);
+                return null;
+            });
+
+            if (create.Status != EditStepStatus.Done)
+            {
+                return;
+            }
+
+            var created = await game.GetTacticAsync(cancellationToken);
+
+            if (!created.Slots.Contains(tactic.Slot))
+            {
+                create.Status = EditStepStatus.Failed;
+                create.Detail = $"The game took the confirm, but slot {tactic.Slot} still holds no tactic: check get_tactics.";
+                return;
+            }
+
+            create.Detail = $"Slot {tactic.Slot} holds a {created.Style} tactic, {created.Formation.InPossession} " +
+                            $"{PhaseName(true)} and {created.Formation.OutOfPossession} {PhaseName(false)}.";
+            edit.Notes.Add("The game picks the starting eleven for the new tactic and leaves the bench empty: name the " +
+                           "substitutes, mentality and instructions with set_tactic.");
+        }
+
+        // A creator step's choice, then on to the next step; a choice the game didn't take stays, and fails the step.
+        private async Task<string?> PickAndMoveOnAsync(Task<WriteOutcome> pick, string key)
+        {
+            var after = (await pick).After;
+
+            if (after is null || after == key)
+            {
+                await game.NextCreatorStageAsync(cancellationToken);
+            }
+
+            return after;
         }
 
         // Fills the bench's places in order. A pick of a player from elsewhere in the matchday squad swaps him with the

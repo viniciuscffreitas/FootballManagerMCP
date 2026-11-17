@@ -72,4 +72,20 @@ public class TacticsController(ITacticsService tacticsService, ITacticEditingSer
         var result = await tacticEditingService.SetTacticAsync(request.Adapt<TacticChanges>(), apply, cancellationToken);
         return result.ToGetResult<TacticEdit, TacticEditResponse>(e => e.Adapt<TacticEditResponse>());
     }
+
+    /// <summary>
+    /// Creates a tactic in an empty slot through the game's tactic creator: checks the choices and plans its steps, and
+    /// with <paramref name="apply"/> walks them, the slot becoming the one the team plays.
+    /// </summary>
+    /// <param name="request">The slot, the style and a formation for each phase, by key.</param>
+    /// <param name="apply">False (the default) changes nothing in the game; true creates it, once the user has agreed.</param>
+    [HttpPost("new")]
+    public async Task<Results<Ok<TacticEditResponse>, BadRequest, NotFound, ProblemHttpResult>> CreateAsync(
+        [FromBody] CreateTacticRequest request,
+        [FromQuery] bool apply = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await tacticEditingService.CreateTacticAsync(request.Adapt<NewTactic>(), apply, cancellationToken);
+        return result.ToGetResult<TacticEdit, TacticEditResponse>(e => e.Adapt<TacticEditResponse>());
+    }
 }

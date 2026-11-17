@@ -71,6 +71,9 @@ public class MappingConfig
             .Map(dest => dest.TeamInstructions, src => src.TeamInstructions ?? new Dictionary<string, string>())
             .Map(dest => dest.Lineup, src => src.Lineup ?? new List<LineupChangeRequest>());
 
+        config.NewConfig<CreateTacticRequest, NewTactic>()
+            .Map(dest => dest.Formation, src => src.Formation ?? new ByPhaseRequest<string>());
+
         RegisterMatches(config);
         RegisterScouting(config);
         RegisterMessages(config);

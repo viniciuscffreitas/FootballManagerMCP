@@ -23,9 +23,9 @@ internal sealed class TacticEditorBridgeClient(
     private const int LineupSize = 11;
     private const string NoInstruction = "None";
 
-    // A slot switch shows a few frames after its event.
-    private static readonly TimeSpan SwitchTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan SwitchPoll = TimeSpan.FromMilliseconds(250);
+    // A slot switch or a tactic creator's step shows a few frames after its event.
+    private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan WaitPoll = TimeSpan.FromMilliseconds(250);
 
     private Task<BridgeListDto<BridgeRoleFitPlayerDto>>? _squad;
 
@@ -196,18 +196,10 @@ internal sealed class TacticEditorBridgeClient(
                 "/native", ("event", TacticConstants.SwitchSlotEvent), ("field", $"Data:{slot - 1}"), ("template", "none")),
             cancellationToken);
 
-        var deadline = DateTime.UtcNow + SwitchTimeout;
-
-        while ((await bridge.GetRecordAsync<BridgeTacticSettingsDto>(
-                   OnTactic().Props([TacticConstants.CurrentSlot]), cancellationToken)).Values.CurrentSlot != slot - 1)
-        {
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new GameRejectedException($"The game didn't switch to slot {slot}.");
-            }
-
-            await Task.Delay(SwitchPoll, cancellationToken);
-        }
+        await WaitAsync(
+            async () => (await ValuesAsync<BridgeTacticSettingsDto>(
+                OnTactic().Props([TacticConstants.CurrentSlot]), cancellationToken)).CurrentSlot == slot - 1,
+            $"The game didn't switch to slot {slot}.", cancellationToken);
     }
 
     public async Task<WriteOutcome> SetStyleAsync(string style, CancellationToken cancellationToken = default)
@@ -354,6 +346,80 @@ internal sealed class TacticEditorBridgeClient(
             TacticConstants.SelectedPlayerInstruction, Format(choice), cancellationToken);
 
         return new WriteOutcome(PlayerInstructionKey(entry, ValueOf(result.Before)), PlayerInstructionKey(entry, ValueOf(result.After)));
+    }
+
+    public async Task<int> GetCreatorStageAsync(CancellationToken cancellationToken = default)
+    {
+        var creator = await ValuesAsync<BridgeTacticCreatorDto>(OnTactic().Props([TacticConstants.CreatorStage]), cancellationToken);
+        return creator.Stage ?? 0;
+    }
+
+    // The creator's controls bind to the tactic itself, with the ids the tactics screen's own dropdowns use.
+    public async Task<WriteOutcome> SetCreatorStyleAsync(string style, CancellationToken cancellationToken = default)
+    {
+        var names = (await vocabulary.KeysAsync(cancellationToken)).Styles;
+        var id = IdOf(names, style, "style");
+
+        return Outcome(await SetAsync(OnTacticForWrite(), TacticConstants.CreatorStyle, Format(id), cancellationToken), names);
+    }
+
+    // One binding for both formation steps: the step the creator is on says which phase it sets.
+    public async Task<WriteOutcome> SetCreatorFormationAsync(string formation, CancellationToken cancellationToken = default)
+    {
+        var names = (await vocabulary.KeysAsync(cancellationToken)).Formations;
+        var id = IdOf(names, formation, "formation");
+
+        return Outcome(await SetAsync(OnTacticForWrite(), TacticConstants.CreatorFormation, Format(id), cancellationToken), names);
+    }
+
+    public async Task NextCreatorStageAsync(CancellationToken cancellationToken = default)
+    {
+        var stage = await GetCreatorStageAsync(cancellationToken);
+
+        await SendCreatorEventAsync(TacticConstants.CreatorNextStageEvent, cancellationToken);
+        await WaitAsync(async () => await GetCreatorStageAsync(cancellationToken) > stage,
+            "The tactic creator didn't move on to its next step.", cancellationToken);
+    }
+
+    public async Task ConfirmCreatorAsync(CancellationToken cancellationToken = default)
+    {
+        await SendCreatorEventAsync(TacticConstants.CreatorConfirmEvent, cancellationToken);
+        await WaitAsync(async () =>
+            {
+                var slots = await ValuesAsync<BridgeTacticSettingsDto>(
+                    OnTactic().Props([
+                        TacticConstants.CurrentSlot, TacticConstants.Slot1Valid, TacticConstants.Slot2Valid, TacticConstants.Slot3Valid
+                    ]),
+                    cancellationToken);
+                bool?[] valid = [slots.Slot1Valid, slots.Slot2Valid, slots.Slot3Valid];
+
+                return valid[slots.CurrentSlot ?? 0] == true;
+            },
+            "The game didn't create the tactic.", cancellationToken);
+    }
+
+    // The creator's events carry no data, as its buttons send them.
+    private Task<JsonElement> SendCreatorEventAsync(string name, CancellationToken cancellationToken)
+    {
+        return bridge.WriteAsync<JsonElement>(
+            OnTacticForWrite().ToWrite("/native", ("event", name), ("data", "null"), ("template", "none")),
+            cancellationToken);
+    }
+
+    // Polls until the game shows a write that takes a few frames.
+    private static async Task WaitAsync(Func<Task<bool>> done, string failure, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + WaitTimeout;
+
+        while (!await done())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new GameRejectedException(failure);
+            }
+
+            await Task.Delay(WaitPoll, cancellationToken);
+        }
     }
 
     private static BridgeQuery OnTactic()

@@ -61,6 +61,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_tactic_options` | Every style, mentality, formation and instruction a tactic can take |
 | | `set_tactic` | Builds or changes a tactic in a slot: shape, roles, lineup, instructions |
 | | `suggest_rotation` | Swaps injured, banned or tired starters (condition under 85) for fit reserves (92+, match-sharp first), each with the reason; slots keep their position and role |
+| | `create_tactic` | Creates a tactic in an empty slot through the game's tactic creator: style and a formation for each phase |
 | Matches | `get_matches` | Your season so far, match by match, with the shape you played |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
@@ -98,9 +99,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
 - **Reads don't change your game.** Two small exceptions: `search_database` types its text into the game's search box,
   and `get_team` briefly makes the team it reads the game's current team, then puts yours back. The API handles one
   request at a time, so nothing else reads or writes while another team is the current one.
-- **Every change is a dry run first.** The tools that change something (`set_tactic`, `run_player_search`,
-  `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`, `reply_to_message`) only
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`) only
   check and describe the change unless they're called with `apply: true`. Their descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
@@ -126,6 +125,14 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   then copies the chosen copy over it.
 - **Only plain replies.** `reply_to_message` sends only the answers a message's button sends straight away. An option
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game.
+- **Your career is checked and copied before a change.** Before `set_tactic` or `create_tactic` applies, the API
+  checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+  the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
+  Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
+  club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on
+  its own) keeps your save read-only until it's released: write the build, e.g. `27.0.1.2494769`, in
+  `released-version.txt` in the backup folder. The investigation save takes changes without a copy or a version check.
+  The API reads the saves as local files, so in Docker every change to another save is refused.
 - **No changes during a match.** The plugin refuses every change while a match is being played, and when it can't
   tell whether one is.
 - **Web pages can't change your game.** The plugin only takes a change as a POST with its own header, which a page

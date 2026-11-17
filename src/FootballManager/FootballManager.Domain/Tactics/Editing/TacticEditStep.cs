@@ -3,7 +3,7 @@ namespace FootballManager.Domain.Tactics.Editing;
 /// <summary>One write of a tactic edit, e.g. a team instruction's new option or a player's move.</summary>
 public class TacticEditStep
 {
-    /// <summary>What it changes: "Switch slot", "Style", "Mentality", "Team instruction", "Formation", "Pick", "Move", "Role", "Player instruction".</summary>
+    /// <summary>What it changes: "Switch slot", "Style", "Mentality", "Team instruction", "Formation", "Pick", "Move", "Role", "Player instruction", "Bench", or "Create" for a new tactic.</summary>
     public required string Action { get; set; }
 
     /// <summary>Which instruction, phase or player it applies to.</summary>
