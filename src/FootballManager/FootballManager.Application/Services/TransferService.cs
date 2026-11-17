@@ -224,9 +224,9 @@ public class TransferService(ITransferGameClient game, IInboxGameClient inbox, I
             if (!apply)
             {
                 negotiation.Notes.Add(panel is null
-                    ? $"Applying opens the contract negotiation from '{opening!.Value.Message.Title}', agrees to the promises " +
-                      "the agent asks for, goes on to the contract and stops there: its terms (salary, length, bonuses) " +
-                      "come back to show the user, and a next apply offers the deal at them."
+                    ? $"Applying opens the contract negotiation from '{opening!.Value.Message.Title}' and stops on the " +
+                      "promises the agent asks for, to show the user; a next apply agrees to them and stops on the " +
+                      "contract's terms (salary, length, bonuses), and the one after offers the deal at them."
                     : panel.Steps.Contains(ContractStep.CloseDeal)
                         ? "Applying offers the deal at these terms (\"Fechar Acordo\"): show the user the salary and length first."
                         : "Applying goes on through the panel's pages to the contract and stops there, to show its terms.");
@@ -259,6 +259,14 @@ public class TransferService(ITransferGameClient game, IInboxGameClient inbox, I
                 }
 
                 Show(negotiation, panel);
+
+                // The promises the agent asks for are a commitment: the first apply only opens them to show the user.
+                if (panel.Steps.Contains(ContractStep.FinalisePromises))
+                {
+                    negotiation.Notes.Add("These are the promises the agent asks for: show them to the user, and apply " +
+                                          "again to agree to them and go on to the contract's terms.");
+                    return Result.Ok(negotiation);
+                }
             }
 
             await StepAsync(negotiation, panel, cancellationToken);

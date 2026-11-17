@@ -135,8 +135,20 @@ public class ContractNegotiationTests
     }
 
     [Fact]
-    public async Task Applying_opens_the_negotiation_goes_through_the_promises_and_stops_at_the_contracts_terms()
+    public async Task Applying_from_the_message_opens_the_panel_and_shows_the_promises_before_agreeing_to_them()
     {
+        var negotiation = (await _transfers.NegotiateContractAsync(Walter, apply: true)).Value;
+
+        Assert.Empty(negotiation.Steps);
+        Assert.Contains(negotiation.Notes, note => note.Contains("promises", StringComparison.Ordinal));
+        await _game.DidNotReceiveWithAnyArgs().PressAsync(default);
+    }
+
+    [Fact]
+    public async Task Applying_on_the_promises_page_goes_through_them_and_stops_at_the_contracts_terms()
+    {
+        _game.ReadContractPanelAsync(Arg.Any<CancellationToken>()).Returns(Promises);
+
         var negotiation = (await _transfers.NegotiateContractAsync(Walter, apply: true)).Value;
 
         Assert.Equal([ContractStep.FinalisePromises, ContractStep.NegotiateContract], negotiation.Steps);
@@ -162,6 +174,7 @@ public class ContractNegotiationTests
     [Fact]
     public async Task A_step_the_game_does_not_take_stops_the_run()
     {
+        _game.ReadContractPanelAsync(Arg.Any<CancellationToken>()).Returns(Promises);
         _game.PressAsync(ContractStep.FinalisePromises, Arg.Any<CancellationToken>()).Returns(Promises);
 
         var negotiation = (await _transfers.NegotiateContractAsync(Walter, apply: true)).Value;

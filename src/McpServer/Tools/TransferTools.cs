@@ -51,8 +51,8 @@ public static class TransferTools
                  "it shows. By default a dry run that opens and presses nothing: with the panel already on the contract's " +
                  "page it shows its terms (salary, length, bonuses, release clause as the panel words them), otherwise " +
                  "the message it would open from. With apply=true the API first checks and copies the save (see the " +
-                 "README's Safety), then opens the panel if needed, agrees to the promises and goes on to the contract, " +
-                 "and stops there with its terms: show the user the salary and length, and once they agree call again " +
+                 "README's Safety). From the message it opens the panel and stops on the agent's promises, to show the " +
+                 "user; the next apply agrees to them, goes on to the contract and stops there with its terms: show the user the salary and length, and once they agree call again " +
                  "with apply=true to offer the deal (\"Fechar Acordo\" is only pressed when the panel was on the " +
                  "contract's page as the call began). Returns steps (the buttons pressed), terms, buttons, response (what " +
                  "the agent said), and closed once the deal was offered and the panel no longer asks for it. Changing " +
