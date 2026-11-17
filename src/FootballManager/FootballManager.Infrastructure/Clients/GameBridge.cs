@@ -15,10 +15,14 @@ internal sealed class GameBridge(IHttpClientFactory httpClientFactory, ILogger<G
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<BridgeRecordDto<TValues>> GetRecordAsync<TValues>(BridgeQuery query, CancellationToken cancellationToken)
-        where TValues : new()
+    /// <param name="rejectionThrows">
+    /// Set when the game refusing the query has a meaning for the caller, e.g. a base path selecting a list item by
+    /// value ([UniqueId=7]) that no item has: it then throws <see cref="GameRejectedException"/>.
+    /// </param>
+    public async Task<BridgeRecordDto<TValues>> GetRecordAsync<TValues>(
+        BridgeQuery query, CancellationToken cancellationToken, bool rejectionThrows = false) where TValues : new()
     {
-        var record = await GetAsync<BridgeRecordDto<TValues>>(query.ToString(), cancellationToken);
+        var record = await GetAsync<BridgeRecordDto<TValues>>(query.ToString(), cancellationToken, rejectionThrows);
         LogUnanswered([record]);
         return record;
     }

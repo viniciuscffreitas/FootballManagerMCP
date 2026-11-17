@@ -84,6 +84,8 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
 | | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |
 | | `release_game_version` | Clears a new game version for changes on your career save, after the short test on the investigation save |
+| | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
+| | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
 
 Names and labels come in the game's display language. Settings and roles also come as the game's English keys
 (`CentreForward`, `MuchHigherTempo`), which is what `set_tactic` takes.
@@ -98,7 +100,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   request at a time, so nothing else reads or writes while another team is the current one.
 - **Every change is a dry run first.** The tools that change something (`set_tactic`, `run_player_search`,
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`) only
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`, `reply_to_message`) only
   check and describe the change unless they're called with `apply: true`. Their descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
@@ -109,6 +111,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   doesn't offer.
 - **Your career is checked and copied before a change.** Before `set_tactic` (`suggest_rotation` applies
   through it) or `talk_to_player` applies, the API checks the open save
+- **Your career is checked and copied before a change.** Before `set_tactic` or `reply_to_message` applies, the API checks the open save
   against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks the game's version
   against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
   to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that club's two newest such
@@ -121,6 +124,8 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   the game (no tool closes a save): an open save would be written back over the restored file. It first keeps the save
   as it is as `<club>-antes-de-restaurar-<yyyyMMdd-HHmm>.fm` in the backup folder, which the rotation never removes,
   then copies the chosen copy over it.
+- **Only plain replies.** `reply_to_message` sends only the answers a message's button sends straight away. An option
+  that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game.
 - **No changes during a match.** The plugin refuses every change while a match is being played, and when it can't
   tell whether one is.
 - **Web pages can't change your game.** The plugin only takes a change as a POST with its own header, which a page
