@@ -11,6 +11,7 @@ using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
 using FootballManager.Domain.Training;
+using FootballManager.Domain.Transfers;
 using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
@@ -24,6 +25,7 @@ using FootballManager.Infrastructure.Dtos.Tactics;
 using FootballManager.Infrastructure.Dtos.Tactics.Editing;
 using FootballManager.Infrastructure.Dtos.Tactics.Effectiveness;
 using FootballManager.Infrastructure.Dtos.Training;
+using FootballManager.Infrastructure.Dtos.Transfers;
 using Mapster;
 
 namespace FootballManager.Infrastructure.Mappings;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterTransferActivity(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -613,6 +616,41 @@ public class MappingConfig
     private static string RuleText(JsonElement rule)
     {
         return rule.ValueKind == JsonValueKind.String ? rule.GetString() ?? string.Empty : rule.GetRawText();
+    }
+
+    // The transfer activity screen. A count the game didn't answer is 0; its texts, money included, stay as it shows them.
+    private static void RegisterTransferActivity(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeTransferActivityDto, TransferOfferCounts>()
+            .Map(dest => dest.All, src => src.OffersAll ?? 0)
+            .Map(dest => dest.In, src => src.OffersIn ?? 0)
+            .Map(dest => dest.Out, src => src.OffersOut ?? 0)
+            .Map(dest => dest.AwaitingResponseAll, src => src.AwaitingResponseAll ?? 0)
+            .Map(dest => dest.AwaitingResponseIn, src => src.AwaitingResponseIn ?? 0)
+            .Map(dest => dest.AwaitingResponseOut, src => src.AwaitingResponseOut ?? 0)
+            .Map(dest => dest.Trades, src => src.Trades ?? 0);
+
+        config.NewConfig<BridgeTransferActivityDto, TransferActivityReadout>()
+            .Map(dest => dest.Counts, src => src)
+            .Map(dest => dest.IncomingValue, src => Text(src.IncomingValue))
+            .Map(dest => dest.OutgoingValue, src => Text(src.OutgoingValue))
+            .Ignore(dest => dest.Players);
+
+        config.NewConfig<BridgeTransferActivityPlayerDto, TransferActivityPlayer>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Status, src => Text(src.Status))
+            .Map(dest => dest.Wage, src => Text(src.Wage))
+            .Ignore(dest => dest.Direction)
+            .Ignore(dest => dest.Offers);
+
+        config.NewConfig<BridgeTransferActivityOfferDto, TransferActivityOffer>()
+            .Map(dest => dest.BuyingClub, src => Text(src.BuyingClub))
+            .Map(dest => dest.SellingClub, src => Text(src.SellingClub))
+            .Map(dest => dest.Type, src => Text(src.Type))
+            .Map(dest => dest.Fee, src => Text(src.Fee))
+            .Map(dest => dest.Status, src => Text(src.Status))
+            .Map(dest => dest.RequiresResponse, src => src.RequiresResponse ?? false);
     }
 
     private static string? Text(string? value)

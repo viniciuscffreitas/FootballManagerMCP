@@ -78,6 +78,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `end_trials` | Ends trials, or withdraws offers not yet answered, for up to 50 players at once |
 | Transfers | `make_transfer_offer` | Bids a fee for a player through the game's offer panel, its fee moved with the panel's +/− buttons to exactly the one asked; the club's answer comes in the inbox |
 | | `negotiate_contract` | Once the club accepts, opens the contract negotiation from its message, agrees to the agent's promises, shows the contract's salary and length, and offers the deal at them on a second call |
+| | `get_transfer_activity` | Your transfers under way and the offers received, as the transfer activity screen shows them: the counts, what the deals would spend and bring in, and each offer's player, other club, type, fee and status, those awaiting your answer first |
 | Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
 | | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
 | Training | `get_training` | This week's and next week's sessions, and each player's training position, role, additional focus, intensity and rating |
