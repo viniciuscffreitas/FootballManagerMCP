@@ -14,6 +14,7 @@ using FootballManager.Api.Responses.Matches;
 using FootballManager.Api.Responses.Messages;
 using FootballManager.Api.Responses.Players;
 using FootballManager.Api.Responses.Scouting;
+using FootballManager.Api.Responses.Staff;
 using FootballManager.Api.Responses.Teams;
 using FootballManager.Api.Responses.Trials;
 using FootballManager.Api.Responses.Tactics.Effectiveness;
@@ -31,6 +32,7 @@ using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
+using FootballManager.Domain.Staff;
 using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
@@ -66,6 +68,12 @@ public class MappingConfig
         config.NewConfig<BoardConfidence, BoardConfidenceResponse>();
         config.NewConfig<SupporterConfidence, SupporterConfidenceResponse>();
         config.NewConfig<VisionObjective, VisionObjectiveResponse>();
+
+        config.NewConfig<TeamStaff, StaffResponse>();
+        config.NewConfig<StaffAttribute, StaffAttributeResponse>();
+        config.NewConfig<StaffMember, StaffMemberResponse>()
+            .Map(dest => dest.CoachingAttributes, src => src.CoachingAttributes.Count > 0 ? src.CoachingAttributes : null)
+            .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes.Count > 0 ? src.MedicalAttributes : null);
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
