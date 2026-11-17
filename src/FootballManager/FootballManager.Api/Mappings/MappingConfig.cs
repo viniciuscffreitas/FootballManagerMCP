@@ -1,5 +1,6 @@
 using FootballManager.Api.Requests.Scouting;
 using FootballManager.Api.Responses.Availability;
+using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Requests.Tactics.Editing;
 using FootballManager.Api.Requests.Training;
@@ -13,6 +14,7 @@ using FootballManager.Api.Responses.Trials;
 using FootballManager.Api.Responses.Tactics.Effectiveness;
 using FootballManager.Api.Responses.Training;
 using FootballManager.Domain.Availability;
+using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Matches;
@@ -44,6 +46,9 @@ public class MappingConfig
         config.NewConfig<PlayerBan, SuspendedPlayerResponse>();
         config.NewConfig<PlayerAvailability, PlayerAvailabilityResponse>()
             .Map(dest => dest.Absences, src => src.Absences.Count > 0 ? src.Absences : null);
+
+        config.NewConfig<RotationPlan, RotationPlanResponse>();
+        config.NewConfig<RotationSwap, RotationSwapResponse>();
 
         // Scores and positions as FM writes them: "17" or "15-17", "DCL". Mapster inlines these, null sources included.
         config.NewConfig<Rating, string?>()

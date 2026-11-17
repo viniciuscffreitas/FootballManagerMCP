@@ -60,6 +60,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_role_fit` | Every role at a position, and how each of your players rates in it |
 | | `get_tactic_options` | Every style, mentality, formation and instruction a tactic can take |
 | | `set_tactic` | Builds or changes a tactic in a slot: shape, roles, lineup, instructions |
+| | `suggest_rotation` | Swaps injured, banned or tired starters (condition under 85) for fit reserves (92+, match-sharp first), each with the reason; slots keep their position and role |
 | Matches | `get_matches` | Your season so far, match by match, with the shape you played |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
@@ -92,15 +93,15 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   request at a time, so nothing else reads or writes while another team is the current one.
 - **Every change is a dry run first.** The tools that change something (`set_tactic`, `run_player_search`,
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`) only check and describe the change unless they're called with
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `suggest_rotation`) only check and describe the change unless they're called with
   `apply: true`. Their descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
   confirmation message, and the game's warnings block the change. `scout_team`, `offer_trials` and `end_trials` only
   apply with the number of players you agreed to: if the plan has changed since the dry run, nothing is sent.
-- **Your career is checked and copied before a change.** Before `set_tactic` applies, the API checks the open save
-  against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks the game's version
-  against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
+- **Your career is checked and copied before a change.** Before `set_tactic` applies (`suggest_rotation` applies
+  through it), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the
+  game's date, and checks the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
   to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that club's two newest such
   copies; files named any other way are never removed. A new game version (Game Pass updates on its own) keeps your
   save read-only until it's released: write the build, e.g. `27.0.1.2494769`, in `released-version.txt` in the backup
