@@ -101,8 +101,12 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
 - **Reads don't change your game.** Two small exceptions: `search_database` types its text into the game's search box,
   and `get_team` briefly makes the team it reads the game's current team, then puts yours back. The API handles one
   request at a time, so nothing else reads or writes while another team is the current one.
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`, `negotiate_contract`) only
-  check and describe the change unless they're called with `apply: true`. Their descriptions tell the AI to ask you before applying.
+- **Every change is a dry run first.** The tools that change something (`set_tactic`, `run_player_search`,
+  `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`,
+  `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`,
+  `negotiate_contract`) only check and describe the change unless they're called with `apply: true`. Their
+  descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
   confirmation message, and the game's warnings block the change. `scout_team`, `offer_trials` and `end_trials` only
