@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScoutingEditorGameClient, ScoutingEditorBridgeClient>();
         services.AddScoped<IPlayerSearchGameClient, PlayerSearchBridgeClient>();
         services.AddScoped<IInboxGameClient, InboxBridgeClient>();
+        services.AddScoped<INewsGameClient, NewsBridgeClient>();
         services.AddScoped<ITrainingGameClient, TrainingBridgeClient>();
         services.AddScoped<ISaveSessionGameClient, SaveSessionBridgeClient>();
         services.AddScoped<IConversationGameClient, ConversationBridgeClient>();

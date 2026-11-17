@@ -215,6 +215,13 @@ public class MappingConfig
             .Map(dest => dest.Source, src => src.IsForwarded == true ? Text(src.Source) : null)
             .Map(dest => dest.Article, src => src.IsForwarded == true ? Text(src.Article) : null);
 
+        config.NewConfig<BridgeNewsStoryDto, NewsStory>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Title, src => src.Title ?? string.Empty)
+            .Map(dest => dest.Subtitle, src => Text(src.Subtitle))
+            .Map(dest => dest.Source, src => Text(src.Source))
+            .Map(dest => dest.Body, src => Text(src.Body));
+
         // A button's fields, from its RowData when the game nests them there. NewsAction -1 opens no panel. Index and
         // the recommendation come from the button's place in the list (InboxBridgeClient).
         config.NewConfig<BridgeSpeakToActionDto, MessageOption>()
