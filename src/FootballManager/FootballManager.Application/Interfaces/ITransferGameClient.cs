@@ -4,7 +4,8 @@ namespace FootballManager.Application.Interfaces;
 
 /// <summary>
 /// Transfers in the running game, through its own panels: the player's menu opens the transfer offer panel, whose fee
-/// moves with its +/− buttons and goes with its "make offer" button. Throws
+/// moves with its +/− buttons and goes with its "make offer" button; the message of an accepted offer opens the contract
+/// negotiation panel, which moves on with its own buttons. Throws
 /// <see cref="Exceptions.GameUnavailableException"/> when the game doesn't answer, and
 /// <see cref="Exceptions.GameRejectedException"/> when it refuses a write.
 /// </summary>
@@ -27,4 +28,16 @@ public interface ITransferGameClient
 
     /// <summary>Presses the panel's "make offer" button; the panel after it, or null if it closed.</summary>
     Task<OfferPanel?> SendOfferAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>The contract negotiation panel open in the game, or null when none is.</summary>
+    Task<ContractPanel?> ReadContractPanelAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Opens the contract negotiation panel with the message's button at <paramref name="option"/> (one that opens it,
+    /// NewsAction 7); the panel once it shows, or null if it didn't.
+    /// </summary>
+    Task<ContractPanel?> OpenContractPanelAsync(int messageId, int option, CancellationToken cancellationToken = default);
+
+    /// <summary>Presses the panel's button for <paramref name="step"/>; the panel once it changed, or null if it closed.</summary>
+    Task<ContractPanel?> PressAsync(ContractStep step, CancellationToken cancellationToken = default);
 }

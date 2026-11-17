@@ -28,4 +28,19 @@ public class TransfersController(ITransferService transferService) : ControllerB
         var result = await transferService.MakeOfferAsync(request.PlayerId, request.Fee, apply, cancellationToken);
         return result.ToGetResult<TransferOffer, TransferOfferResponse>(offer => offer.Adapt<TransferOfferResponse>());
     }
+
+    /// <summary>
+    /// Takes the contract negotiation of a player whose club accepted the offer through the game's contract panel:
+    /// promises, then the contract's terms, where it stops; on those terms, offers the deal. Only with apply=true.
+    /// </summary>
+    [HttpPost("contract")]
+    public async Task<Results<Ok<ContractNegotiationResponse>, BadRequest, NotFound, ProblemHttpResult>> NegotiateContractAsync(
+        [FromBody] NegotiateContractRequest request,
+        [FromQuery] bool apply = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await transferService.NegotiateContractAsync(request.PlayerId, apply, cancellationToken);
+        return result.ToGetResult<ContractNegotiation, ContractNegotiationResponse>(
+            negotiation => negotiation.Adapt<ContractNegotiationResponse>());
+    }
 }

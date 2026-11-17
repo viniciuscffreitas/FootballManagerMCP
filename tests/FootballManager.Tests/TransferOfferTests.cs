@@ -14,6 +14,7 @@ public class TransferOfferTests
     private const long Step = 10_000;
 
     private readonly ITransferGameClient _game = Substitute.For<ITransferGameClient>();
+    private readonly IInboxGameClient _inbox = Substitute.For<IInboxGameClient>();
     private readonly ISaveGuard _saveGuard = Substitute.For<ISaveGuard>();
     private readonly TransferService _transfers;
 
@@ -23,7 +24,7 @@ public class TransferOfferTests
 
     public TransferOfferTests()
     {
-        _transfers = new TransferService(_game, _saveGuard);
+        _transfers = new TransferService(_game, _inbox, _saveGuard);
         _game.FindPlayerAsync(Borges, Arg.Any<CancellationToken>())
             .Returns(new TransferTarget { Id = Borges, Name = "Daniel Borges", Club = "Mirassol", CanMakeOffer = true });
         _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())

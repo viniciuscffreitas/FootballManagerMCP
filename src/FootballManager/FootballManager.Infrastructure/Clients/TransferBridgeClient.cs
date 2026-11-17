@@ -15,9 +15,11 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
 {
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(300);
 
-    // The panel showed within a few seconds in the game; a press within a frame or two.
+    // The panel showed within a few seconds in the game; a press within a frame or two, the agent's answer to a
+    // negotiation's step within a few seconds.
     private const int OpenChecks = 30;
     private const int PressChecks = 10;
+    private const int AnswerChecks = 20;
 
     public async Task<TransferTarget?> FindPlayerAsync(int playerId, CancellationToken cancellationToken = default)
     {
@@ -110,6 +112,123 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
         }
 
         return now;
+    }
+
+    public async Task<ContractPanel?> ReadContractPanelAsync(CancellationToken cancellationToken = default)
+    {
+        return ContractPanel(await PanelElementsAsync(TransferConstants.ContractPanel, cancellationToken));
+    }
+
+    // As the message's button does: the panel event with the references the button carries, on the message.
+    public async Task<ContractPanel?> OpenContractPanelAsync(int messageId, int option, CancellationToken cancellationToken = default)
+    {
+        await bridge.WriteAsync<JsonElement>(
+            BridgeQuery.FromHuman()
+                .Base(string.Format(CultureInfo.InvariantCulture, InboxConstants.MessageById, messageId))
+                .Context(InboxConstants.Tab, InboxConstants.AllMessagesTab)
+                .Context(InboxConstants.SearchText, string.Empty)
+                .WithHumanAndTeam()
+                .ToWrite("/newsaction",
+                    ("action", TransferConstants.ContractPanelAction.ToString(CultureInfo.InvariantCulture)),
+                    ("field", $"References:@{InboxConstants.Actions}.ActionsForButtonsList[{option.ToString(CultureInfo.InvariantCulture)}].ActionDataReferences")),
+            cancellationToken);
+
+        for (var check = 0; check < OpenChecks; check++)
+        {
+            await Task.Delay(Poll, cancellationToken);
+
+            if (await ReadContractPanelAsync(cancellationToken) is { } panel)
+            {
+                return panel;
+            }
+        }
+
+        return null;
+    }
+
+    // The panel's own button for the step: the game's Continue button can carry the same text ("Negociar Contrato") but
+    // lies outside the panel.
+    public async Task<ContractPanel?> PressAsync(ContractStep step, CancellationToken cancellationToken = default)
+    {
+        var elements = await PanelElementsAsync(TransferConstants.ContractPanel, cancellationToken)
+            ?? throw new GameRejectedException("No contract negotiation panel is open.");
+        var text = TextOf(step);
+        var button = PanelButton(elements, text)
+                     ?? throw new GameRejectedException($"The contract panel has no '{text}' button now.");
+        var before = ContractPanel(elements)!;
+
+        await ClickAsync(button.Path, cancellationToken);
+
+        ContractPanel? now = before;
+
+        for (var check = 0; check < AnswerChecks && now is not null && now.Texts.SequenceEqual(before.Texts); check++)
+        {
+            await Task.Delay(Poll, cancellationToken);
+            now = await ReadContractPanelAsync(cancellationToken);
+        }
+
+        return now;
+    }
+
+    private static ContractPanel? ContractPanel(List<UiElementLine>? elements)
+    {
+        if (elements is null)
+        {
+            return null;
+        }
+
+        var buttons = elements
+            .Where(element => element.Type == TransferConstants.PanelButton && element.IsShown)
+            .Select(button => string.Join(" ", elements.Where(element => element.IsWithin(button.Path) && element.IsShown && element.Text is not null)
+                .Select(element => element.Text).Distinct()))
+            .Where(text => text.Length > 0)
+            .ToList();
+
+        return new ContractPanel
+        {
+            Club = TextOf(elements, TransferConstants.ContractClub),
+            Player = TextOf(elements, TransferConstants.ContractPlayer),
+            Terms = Terms(elements),
+            Steps = Enum.GetValues<ContractStep>().Where(step => buttons.Contains(TextOf(step))).ToList(),
+            Buttons = buttons,
+            Lines = SpeakerLines(elements),
+            Texts = Texts(elements)
+        };
+    }
+
+    // Each line's label and the texts of its row but the label: "R$65.000 p/s | 65000".
+    private static List<NegotiationTerm> Terms(List<UiElementLine> elements)
+    {
+        var terms = new List<NegotiationTerm>();
+
+        foreach (var label in elements.Where(element => element.Type == TransferConstants.TermLabel
+                                                       && element.Classes.Contains(TransferConstants.TermLabelClass)
+                                                       && element.IsShown
+                                                       && !string.IsNullOrWhiteSpace(element.Text)))
+        {
+            var segments = label.Path.Split('/');
+            var row = string.Join('/', segments.Take(Math.Max(1, segments.Length - TransferConstants.TermRowLevels)));
+            var values = elements
+                .Where(element => element.IsWithin(row) && element != label && !string.IsNullOrWhiteSpace(element.Text))
+                .Select(element => element.Text!)
+                .Distinct()
+                .ToList();
+
+            terms.Add(new NegotiationTerm { Label = label.Text!, Value = values.Count > 0 ? string.Join(" | ", values) : null });
+        }
+
+        return terms;
+    }
+
+    private static string TextOf(ContractStep step)
+    {
+        return step switch
+        {
+            ContractStep.FinalisePromises => TransferConstants.FinalisePromises,
+            ContractStep.NegotiateContract => TransferConstants.NegotiateContract,
+            ContractStep.CloseDeal => TransferConstants.CloseDeal,
+            _ => throw new ArgumentOutOfRangeException(nameof(step), step, null)
+        };
     }
 
     // The panel's elements on screen, the panel first, or null when it isn't open.
