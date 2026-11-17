@@ -63,6 +63,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `suggest_rotation` | Swaps injured, banned or tired starters (condition under 85) for fit reserves (92+, match-sharp first), each with the reason; slots keep their position and role |
 | | `create_tactic` | Creates a tactic in an empty slot through the game's tactic creator: style and a formation for each phase |
 | Matches | `get_matches` | Your season so far, match by match, with the shape you played |
+| | `get_fixtures` | Your calendar: the next matches (20 by default, up to 50) in every competition, with date, venue and opponent |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
 | | `get_live_match` | The match being played: minute, score, goals, xG, shots, possession, players on the pitch with rating, condition and cards, substitutions made and left, the tactic and mentality in use |
 | League | `get_league_table` | Your league's table: every team's position, games, wins, draws, losses, goals, goal difference and points, your line marked, and where the press expects you to finish |

@@ -14,11 +14,15 @@ public interface IMatchesService
     Task<Result<MatchDetail>> GetMatchAsync(string date, CancellationToken cancellationToken = default);
 
     Task<Result<LiveMatch>> GetLiveMatchAsync(CancellationToken cancellationToken = default);
+
+    Task<Result<TeamFixtures>> GetUpcomingAsync(int count = MatchesService.DefaultUpcoming, CancellationToken cancellationToken = default);
 }
 
 public class MatchesService(IMatchesGameClient gameClient) : IMatchesService
 {
     public const string DateFormat = "yyyy-MM-dd";
+    public const int DefaultUpcoming = 20;
+    public const int MaxUpcoming = 50;
 
     public async Task<Result<SeasonMatches>> GetMatchesAsync(
         bool includeFriendlies = false, CancellationToken cancellationToken = default)
@@ -140,5 +144,30 @@ public class MatchesService(IMatchesGameClient gameClient) : IMatchesService
                 };
             })
             .ToList();
+    }
+
+    public async Task<Result<TeamFixtures>> GetUpcomingAsync(int count = DefaultUpcoming, CancellationToken cancellationToken = default)
+    {
+        if (count is < 1 or > MaxUpcoming)
+        {
+            return Result.Fail<TeamFixtures>(new ValidationError(nameof(count), [$"The count runs from 1 to {MaxUpcoming}."]));
+        }
+
+        TeamFixtures fixtures;
+
+        try
+        {
+            fixtures = await gameClient.GetUpcomingFixturesAsync(count, cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            return Result.Fail<TeamFixtures>(new GameUnavailableError(exception.Message));
+        }
+
+        return Result.Ok(new TeamFixtures
+        {
+            TeamName = fixtures.TeamName,
+            Fixtures = fixtures.Fixtures.Where(f => !f.IsPlayed).Take(count).ToList()
+        });
     }
 }
