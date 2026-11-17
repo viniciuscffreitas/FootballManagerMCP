@@ -381,6 +381,7 @@ public class MappingConfig
             .Map(dest => dest.Attributes, src => AttributeBoundsMapper.ToAttributes(src.AttributeBounds))
             .Map(dest => dest.Performance, src => PerformanceMapper.ToPerformance(src.AttributeBounds))
             .Map(dest => dest.League, src => PerformanceMapper.League(src.AttributeBounds))
+            .Map(dest => dest.LeagueNation, src => PerformanceMapper.LeagueNation(src.AttributeBounds))
             // The report's date always comes back when the report was asked for; a player never scouted has a blank one.
             .Map(dest => dest.Report, src => IsBlankDate(src.ReportDate) ? null : src);
 

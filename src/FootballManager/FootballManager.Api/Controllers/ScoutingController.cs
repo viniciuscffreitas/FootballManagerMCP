@@ -40,7 +40,9 @@ public class ScoutingController(
     /// <param name="leagues">Keep only players whose club plays in one of these leagues (whole names, as each player's league reads).</param>
     /// <param name="minMinutes">Keep only players with at least these minutes this season.</param>
     /// <param name="minAverageRating">Keep only players with at least this average rating this season.</param>
-    /// <param name="scan">With a filter on the search: how many results to read before cutting (300 by default, up to 1000).</param>
+    /// <param name="minimums">The least each named season number may be, e.g. minimums[goalsPer90]=0.33.</param>
+    /// <param name="maximums">The most each named season number may be, e.g. maximums[mistakesLeadingToGoal]=0.</param>
+    /// <param name="scan">With a filter on the search: how many results to read before cutting (the whole search by default, up to 3000).</param>
     [HttpGet("players")]
     public async Task<Results<Ok<ScoutedPlayerListResponse>, BadRequest, NotFound, ProblemHttpResult>> GetPlayersAsync(
         [FromQuery] ScoutingSource source = ScoutingSource.Recommendations,
@@ -54,6 +56,9 @@ public class ScoutingController(
         [FromQuery] List<string>? leagues = null,
         [FromQuery] int? minMinutes = null,
         [FromQuery] double? minAverageRating = null,
+        // Named, so a missing dictionary binds empty instead of from the whole query string.
+        [FromQuery(Name = "minimums")] Dictionary<string, double>? minimums = null,
+        [FromQuery(Name = "maximums")] Dictionary<string, double>? maximums = null,
         [FromQuery] int? scan = null,
         CancellationToken cancellationToken = default)
     {
@@ -61,7 +66,9 @@ public class ScoutingController(
         {
             Leagues = leagues?.Where(league => !string.IsNullOrWhiteSpace(league)).ToList() ?? [],
             MinMinutes = minMinutes,
-            MinAverageRating = minAverageRating
+            MinAverageRating = minAverageRating,
+            Minimums = minimums ?? [],
+            Maximums = maximums ?? []
         };
         var result = await scoutingService.GetPlayersAsync(
             source, focusId, pool, includeAttributes, includeHidden, includeReport, limit, includeStats, filter, scan,

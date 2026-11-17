@@ -28,8 +28,18 @@ internal static class PerformanceMapper
 
     public static string? League(Dictionary<string, JsonElement> values)
     {
-        return values.TryGetValue(PerformanceConstants.League, out var league) && league.ValueKind == JsonValueKind.String
-            ? Blank(league.GetString())
+        return Text(values, PerformanceConstants.League);
+    }
+
+    public static string? LeagueNation(Dictionary<string, JsonElement> values)
+    {
+        return Text(values, PerformanceConstants.LeagueNation);
+    }
+
+    private static string? Text(Dictionary<string, JsonElement> values, string path)
+    {
+        return values.TryGetValue(path, out var text) && text.ValueKind == JsonValueKind.String
+            ? Blank(text.GetString())
             : null;
     }
 

@@ -19,6 +19,9 @@ public class ScoutedPlayer
     /// <summary>The league his club plays in, only filled with his season numbers.</summary>
     public string? League { get; set; }
 
+    /// <summary>The nation of <see cref="League"/>.</summary>
+    public string? LeagueNation { get; set; }
+
     /// <summary>Positions as FM abbreviates them, e.g. "D (C)" or "M/MO (G)".</summary>
     public string? Positions { get; set; }
 

@@ -51,10 +51,25 @@ dele, não lido no save. IDs entre parênteses são vídeos do YouTube.
 ## Com as tools
 1. `run_player_search` (dry run, depois `apply`): posição natural, idade, interesse em vir (`interestType`/`interestLevel`).
    A busca do jogo não tem regra de liga, minutos nem valor.
-2. `get_scouted_players source=search` com `leagues` (nome inteiro da liga como vem no campo `league`, sem acento; "Brasileirão" não pega a Série B), `minMinutes` e `minAverageRating`:
-   lê os primeiros `scan` resultados (300 por padrão, até 1000) com os números da temporada e corta na API;
-   `scanned` diz quantos leu. `includeStats` sozinho traz os números sem cortar (vale para shortlist e focos).
-3. Aplicar os cortes por posição acima nos campos de `performance` (totais e por 90; goleiro: `savePercentage`,
-   `expectedGoalsPrevented`).
-4. Limites: os números somam todas as competições do clube na temporada (estadual e copa entram); valor e salário
-   vêm só como texto, então o teto de preço é conferido à mão.
+2. `get_scouted_players source=search` com os cortes. Sem `scan`, lê a busca inteira (até 3000) em páginas,
+   cerca de 50 jogadores por segundo. Confira sempre na resposta:
+   - `complete: true`: leu todos. Se vier `false`, estreite a busca ou aumente o `scan`.
+   - `unmatchedLeagues` vazio. Um nome ali está errado; pegue o certo em `leagues`, que lista cada liga lida com o
+     país e quantos jogadores tem, e peça de novo.
+3. Ligas: nome inteiro como o jogo escreve, sem acento ("Brasileirão" não pega a Série B). Nomes se repetem entre
+   países; use o país para separar: `Primera B (Chile)`. Ligas do Allan neste save: `Brasileirão`,
+   `Brasileirão Série B`, `Liga Profesional`, `1ª División (Uruguay)`, `Primera A (Colombia)`, `Serie A de Ecuador`,
+   `Liga de Primera (Chile)`.
+4. Cortes do Allan em `minimums`/`maximums`, pelo nome do campo em `performance`, comparado como aparece (2 casas).
+   Jogador sem o número cai. Nome desconhecido é recusado com a lista dos válidos.
+   - Geral: `minMinutes: 1000` (2000 para goleiro, zagueiro e atacante), `minAverageRating: 6.9`.
+   - Atacante: `minimums {goalsPer90: 0.33, expectedGoalsOverperformance: 0, goalsPerShotPercentage: 15, shotsOnTargetPercentage: 40}`.
+   - Atacante de pressão: `minimums {pressuresAttemptedPer90: 8}`.
+   - Ponta e lateral ofensivo: `minimums {expectedAssistsPer90: 0.15, distanceCoveredKmPer90: 12}`; somar xG+xA sem
+     pênalti (0.2/90) ainda é conta à mão.
+   - Zagueiro: `minimums {headerCompletionPercentage: 70, passCompletionPercentage: 85}`,
+     `maximums {mistakesLeadingToGoal: 0, possessionLostPer90: 6}`.
+   - Goleiro: `minimums {savePercentage: 70, expectedGoalsPrevented: 0.01}`.
+5. Limites: os números somam todas as competições do clube na temporada. Em abril, o Brasil ainda soma o estadual,
+   que infla os números. Valor e salário vêm só como texto e só para quem o olheiro conhece; o teto de preço é
+   conferido à mão.
