@@ -27,6 +27,21 @@ internal static class InboxConstants
     public const string IsForwarded = "IsForwarded";
     public const string Source = "NewsMediaSource.Name";
 
+    // A message's answers, read from the message in the portal's list: read from its SpeakTo record as the base, they
+    // stay pending until the message is opened. The buttons are the answers the message shows.
+    public const string MessageById = "HumanPortalFilteredMessages[UniqueId={0}]";
+    public const string Actions = "SpeakTo.Actions";
+    public const string RequiredResponses = "ManagerResponseRequiredCount";
+
+    // A plain answer: the native event a reply button sends, to the message's SpeakTo record, with the record the
+    // button carries (the sender, the answer's id and value, no action of its own).
+    public const string ReplyEvent = "EventFmxNewsResponseAction";
+    public const string ReplyTarget = "Target:@SpeakTo";
+    public const string ReplySender = "@NewsPersonSender";
+    public const string NoActionId = "u:0";
+
+    public static readonly string[] OptionProperties = [GameConstants.UniqueId, Title, CanReply, HasReplied, Actions];
+
     // A forwarded message attaches the article; any other attaches itself.
     public const string Article = "AttachmentsNewsItem.NewsBodyString";
 

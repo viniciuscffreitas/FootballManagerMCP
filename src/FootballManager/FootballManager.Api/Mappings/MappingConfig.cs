@@ -123,6 +123,10 @@ public class MappingConfig
             .Map(dest => dest.CanReply, src => src.CanReply ? true : (bool?)null)
             .Map(dest => dest.HasReplied, src => src.HasReplied ? true : (bool?)null)
             .Map(dest => dest.IsForwarded, src => src.IsForwarded ? true : (bool?)null);
+
+        config.NewConfig<MessageOption, MessageOptionResponse>()
+            .Map(dest => dest.IsDisabled, src => src.IsDisabled ? true : (bool?)null)
+            .Map(dest => dest.IsRecommended, src => src.IsRecommended ? true : (bool?)null);
     }
 
     // Flags and empty lists that only repeat the usual case are left out, keeping long player lists short.

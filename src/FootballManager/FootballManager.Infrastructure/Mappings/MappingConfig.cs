@@ -214,6 +214,35 @@ public class MappingConfig
             .Map(dest => dest.IsForwarded, src => src.IsForwarded == true)
             .Map(dest => dest.Source, src => src.IsForwarded == true ? Text(src.Source) : null)
             .Map(dest => dest.Article, src => src.IsForwarded == true ? Text(src.Article) : null);
+
+        // A button's fields, from its RowData when the game nests them there. NewsAction -1 opens no panel. Index and
+        // the recommendation come from the button's place in the list (InboxBridgeClient).
+        config.NewConfig<BridgeSpeakToActionDto, MessageOption>()
+            .Map(dest => dest.Title, src => ActionFields(src).ActionTitle ?? string.Empty)
+            .Map(dest => dest.Event, src => ActionFields(src).Event ?? 0)
+            .Map(dest => dest.ResponseId, src => ActionFields(src).ActionResponseId)
+            .Map(dest => dest.ResponseValue, src => ActionFields(src).ActionResponseValue)
+            .Map(dest => dest.NewsAction, src => PanelOf(ActionFields(src)))
+            .Map(dest => dest.IsDisabled, src => ActionFields(src).IsDisabled == true)
+            .Map(dest => dest.IsRecommended, src => ActionFields(src).Recommended == true)
+            .Map(dest => dest.Confirmation, src => ConfirmationOf(ActionFields(src)))
+            .Ignore(dest => dest.Index)
+            .Ignore(dest => dest.Flow!);
+    }
+
+    private static BridgeSpeakToActionDto ActionFields(BridgeSpeakToActionDto action)
+    {
+        return action.ActionTitle is null && action.RowData is not null ? action.RowData : action;
+    }
+
+    private static int? PanelOf(BridgeSpeakToActionDto action)
+    {
+        return action.NewsAction is >= 0 ? action.NewsAction : null;
+    }
+
+    private static string? ConfirmationOf(BridgeSpeakToActionDto action)
+    {
+        return Text(action.ConfirmationDialogData?.Description);
     }
 
     // What the club's scouting knows: the game sends values it doesn't know as empty text, or a -1 count.
