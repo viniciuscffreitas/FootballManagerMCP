@@ -30,4 +30,31 @@ public class InboxController(IInboxService inboxService) : ControllerBase
         var result = await inboxService.GetInboxAsync(unreadOnly, limit, skip, includeArticles, cancellationToken);
         return result.ToGetResult<Inbox, InboxResponse>(inbox => inbox.Adapt<InboxResponse>());
     }
+
+    /// <summary>
+    /// The answers the game offers to a message, read without opening it, and how many answers the inbox still needs
+    /// before Continue moves on.
+    /// </summary>
+    [HttpGet("{messageId:int}/options")]
+    public async Task<Results<Ok<MessageOptionsResponse>, BadRequest, NotFound, ProblemHttpResult>> GetOptionsAsync(
+        int messageId, CancellationToken cancellationToken = default)
+    {
+        var result = await inboxService.GetMessageOptionsAsync(messageId, cancellationToken);
+        return result.ToGetResult<MessageOptions, MessageOptionsResponse>(options => options.Adapt<MessageOptionsResponse>());
+    }
+
+    /// <summary>
+    /// Answers a message with one of its options, by index, as its button would: a dry run unless apply=true. Options
+    /// that open a flow are refused.
+    /// </summary>
+    [HttpPost("{messageId:int}/reply")]
+    public async Task<Results<Ok<MessageReplyResponse>, BadRequest, NotFound, ProblemHttpResult>> ReplyAsync(
+        int messageId,
+        [FromQuery] int option,
+        [FromQuery] bool apply = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await inboxService.ReplyAsync(messageId, option, apply, cancellationToken);
+        return result.ToGetResult<MessageReply, MessageReplyResponse>(reply => reply.Adapt<MessageReplyResponse>());
+    }
 }

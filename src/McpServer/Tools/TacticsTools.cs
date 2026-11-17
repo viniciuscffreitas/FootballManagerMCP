@@ -106,8 +106,9 @@ public static class TacticsTools
         [Description("Formation keys for each phase, e.g. 433DMWide in possession and 4141DM out of it.")]
         PhaseValues? formation = null,
         [Description("Players of the starting eleven to place. To change who plays, list all eleven, each with a " +
-                     "position for both phases; otherwise list only the players to change. Exactly one goalkeeper, and " +
-                     "the goalkeeper's slot stays GK.")]
+                     "position for both phases, or by id alone in the order of get_tactics' lineup index: a player " +
+                     "coming in then takes the position and role of the slot he's listed at. Otherwise list only the " +
+                     "players to change. Exactly one goalkeeper, and the goalkeeper's slot stays GK.")]
         List<LineupEntry>? lineup = null,
         [Description("The substitutes by FM id, in the bench's order from its first place (the bench has as many " +
                      "places as the competition allows; the answer says how many if too many are given). Players not " +
@@ -124,6 +125,45 @@ public static class TacticsTools
         var response = await http.PostAsJsonAsync(
             $"/api/v1/tactics?apply={apply.ToString().ToLowerInvariant()}",
             new { slot, style, mentality, teamInstructions, formation, lineup, bench });
+
+        return await response.ReadContentOrError();
+    }
+
+    [McpServerTool(Name = "create_tactic")]
+    [Description("Create a tactic in an empty tactic slot of the running game, through the game's own tactic creator: " +
+                 "a tactical style, then a formation in possession and one out of possession, by key (see " +
+                 "get_tactic_options; get_tactics shows which slots hold a tactic). The game fills the first empty slot, " +
+                 "so only that one is taken; a slot that already holds a tactic is refused: change it with set_tactic instead. By default this is a dry run: it checks the keys and " +
+                 "returns the creator's planned steps without changing anything. Show the user the plan, and only call " +
+                 "again with apply=true once they have agreed. The first failed step stops the rest, and the answer " +
+                 "reports each step as Done, Failed or Skipped, and once created what the slot holds. Effects to tell " +
+                 "the user about: the new slot becomes the tactic the team plays, and stays active afterwards; the game " +
+                 "picks the starting eleven for it and leaves the bench empty, so follow with set_tactic for the bench, " +
+                 "mentality and instructions. Refused while a match is being played.")]
+    public static async Task<string> CreateTactic(
+        IHttpClientFactory httpFactory,
+        [Description("The slot to create the tactic in, 1 to 3: the first empty one.")]
+        int slot,
+        [Description("Tactical style key, e.g. Gegenpress or BlankSlate.")]
+        string style,
+        [Description("Formation key in possession, e.g. 433DMWide.")]
+        string formationInPossession,
+        [Description("Formation key out of possession, e.g. 4141DM.")]
+        string formationOutOfPossession,
+        [Description("False (the default) only checks and plans. True creates the tactic in the game: only once the " +
+                     "user has agreed to the plan.")]
+        bool apply = false)
+    {
+        var http = httpFactory.CreateClient("FootballManagerApi");
+
+        var response = await http.PostAsJsonAsync(
+            $"/api/v1/tactics/new?apply={apply.ToString().ToLowerInvariant()}",
+            new
+            {
+                slot,
+                style,
+                formation = new PhaseValues { InPossession = formationInPossession, OutOfPossession = formationOutOfPossession }
+            });
 
         return await response.ReadContentOrError();
     }

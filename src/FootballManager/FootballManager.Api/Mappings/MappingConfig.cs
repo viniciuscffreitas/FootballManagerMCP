@@ -1,5 +1,9 @@
 using FootballManager.Api.Requests.Scouting;
+using FootballManager.Api.Responses.Availability;
+using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
+using FootballManager.Api.Responses.Conversations;
+using FootballManager.Api.Responses.Transfers;
 using FootballManager.Api.Requests.Tactics.Editing;
 using FootballManager.Api.Requests.Training;
 using FootballManager.Api.Responses.Database;
@@ -11,7 +15,11 @@ using FootballManager.Api.Responses.Teams;
 using FootballManager.Api.Responses.Trials;
 using FootballManager.Api.Responses.Tactics.Effectiveness;
 using FootballManager.Api.Responses.Training;
+using FootballManager.Domain.Availability;
+using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
+using FootballManager.Domain.Conversations;
+using FootballManager.Domain.Transfers;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
@@ -38,6 +46,28 @@ public class MappingConfig
 
         Rounded(config.NewConfig<PlayerSeasonStats, PlayerSeasonStatsResponse>());
 
+        config.NewConfig<PlayerInjury, InjuredPlayerResponse>();
+        config.NewConfig<PlayerBan, SuspendedPlayerResponse>();
+        config.NewConfig<PlayerAvailability, PlayerAvailabilityResponse>()
+            .Map(dest => dest.Absences, src => src.Absences.Count > 0 ? src.Absences : null);
+
+        config.NewConfig<RotationPlan, RotationPlanResponse>();
+        config.NewConfig<RotationSwap, RotationSwapResponse>();
+        config.NewConfig<PlayerTalk, PlayerTalkResponse>()
+            .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)
+            .Map(dest => dest.Lines, src => src.Lines.Count > 0 ? src.Lines : null)
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
+        config.NewConfig<TransferOffer, TransferOfferResponse>()
+            .Map(dest => dest.Advice, src => src.Advice.Count > 0 ? src.Advice : null)
+            .Map(dest => dest.Response, src => src.Response.Count > 0 ? src.Response : null)
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
+        config.NewConfig<ContractNegotiation, ContractNegotiationResponse>()
+            .Map(dest => dest.Steps, src => src.Steps.Count > 0 ? src.Steps : null)
+            .Map(dest => dest.Terms, src => src.Terms.Count > 0 ? src.Terms : null)
+            .Map(dest => dest.Buttons, src => src.Buttons.Count > 0 ? src.Buttons : null)
+            .Map(dest => dest.Response, src => src.Response.Count > 0 ? src.Response : null)
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
+
         // Scores and positions as FM writes them: "17" or "15-17", "DCL". Mapster inlines these, null sources included.
         config.NewConfig<Rating, string?>()
             .MapWith(src => src == null ? null : src.Display);
@@ -52,6 +82,9 @@ public class MappingConfig
         config.NewConfig<SetTacticRequest, TacticChanges>()
             .Map(dest => dest.TeamInstructions, src => src.TeamInstructions ?? new Dictionary<string, string>())
             .Map(dest => dest.Lineup, src => src.Lineup ?? new List<LineupChangeRequest>());
+
+        config.NewConfig<CreateTacticRequest, NewTactic>()
+            .Map(dest => dest.Formation, src => src.Formation ?? new ByPhaseRequest<string>());
 
         RegisterMatches(config);
         RegisterScouting(config);
@@ -116,6 +149,10 @@ public class MappingConfig
             .Map(dest => dest.CanReply, src => src.CanReply ? true : (bool?)null)
             .Map(dest => dest.HasReplied, src => src.HasReplied ? true : (bool?)null)
             .Map(dest => dest.IsForwarded, src => src.IsForwarded ? true : (bool?)null);
+
+        config.NewConfig<MessageOption, MessageOptionResponse>()
+            .Map(dest => dest.IsDisabled, src => src.IsDisabled ? true : (bool?)null)
+            .Map(dest => dest.IsRecommended, src => src.IsRecommended ? true : (bool?)null);
     }
 
     // Flags and empty lists that only repeat the usual case are left out, keeping long player lists short.

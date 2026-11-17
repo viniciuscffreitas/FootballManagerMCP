@@ -127,6 +127,19 @@ internal static class TacticConstants
     // Native event switching the active slot; its data is the slot, 0 to 2.
     public const string SwitchSlotEvent = "EventFmxSetTacticSlot";
 
+    // The tactic creator, which the tactics screen shows for a slot with no tactic: a style, then a formation with the
+    // ball and one without, each step's choice a binding on the tactic and each move on its Next event (no data), then
+    // the confirm event, which creates the tactic. A team with no tactic gets the creator on its own; one with a tactic
+    // opens it with the start event (no data), as the screen's "+" > "Criar Nova Tática" does, and the confirm then
+    // fills the first empty slot (the game won't switch to an empty slot: EventFmxSetTacticSlot to one does nothing).
+    // Ids are the styles' and formations' own.
+    public const string CreatorStyle = "TacticCreatorTacticalStyle";
+    public const string CreatorFormation = "TacticCreatorContextFormation";
+    public const string CreatorStage = "TacticCreatorCurrentStage";
+    public const string CreatorStartEvent = "EventFmxTacticCreatorStartNewTactic";
+    public const string CreatorNextStageEvent = "EventFmxTacticCreatorIncrementStage";
+    public const string CreatorConfirmEvent = "EventFmxConfirmedCreateNewTactic";
+
     // The game's enums naming what the tactic holds as numbers (the plugin's /enums). Role values are the masks
     // lineup slots hold; the duty flags and "no role" aren't roles.
     public const string StylesEnum = "FM.UI.TacticalStyles";

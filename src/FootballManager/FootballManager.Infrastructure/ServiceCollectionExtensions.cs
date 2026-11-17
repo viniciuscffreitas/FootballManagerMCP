@@ -1,5 +1,6 @@
 using FootballManager.Application.Interfaces;
 using FootballManager.Infrastructure.Clients;
+using FootballManager.Infrastructure.Files;
 using FootballManager.Infrastructure.Mappings;
 using FootballManager.Infrastructure.Settings;
 using Mapster;
@@ -34,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GameVocabulary>();
         services.AddScoped<TeamInstructionReader>();
         services.AddScoped<ISquadGameClient, SquadBridgeClient>();
+        services.AddScoped<IAvailabilityGameClient, AvailabilityBridgeClient>();
         services.AddScoped<ITacticsGameClient, TacticsBridgeClient>();
         services.AddScoped<ITacticEditorGameClient, TacticEditorBridgeClient>();
         services.AddScoped<IMatchesGameClient, MatchesBridgeClient>();
@@ -44,6 +46,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlayerSearchGameClient, PlayerSearchBridgeClient>();
         services.AddScoped<IInboxGameClient, InboxBridgeClient>();
         services.AddScoped<ITrainingGameClient, TrainingBridgeClient>();
+        services.AddScoped<ISaveSessionGameClient, SaveSessionBridgeClient>();
+        services.AddScoped<IConversationGameClient, ConversationBridgeClient>();
+        services.AddScoped<ITransferGameClient, TransferBridgeClient>();
+        services.AddSingleton<ISaveFiles, LocalSaveFiles>();
         services.AddScoped<ICompetitionsGameClient, CompetitionsBridgeClient>();
         services.AddScoped<DatabaseSearchBridgeClient>();
         services.AddScoped<IDatabaseSearchGameClient>(provider => provider.GetRequiredService<DatabaseSearchBridgeClient>());

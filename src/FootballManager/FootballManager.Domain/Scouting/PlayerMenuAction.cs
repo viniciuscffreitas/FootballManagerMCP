@@ -15,5 +15,8 @@ public enum PlayerMenuAction
     WithdrawOffer,
 
     /// <summary>End the trial of a player on trial at the club: he leaves it.</summary>
-    EndTrial
+    EndTrial,
+
+    /// <summary>Make a transfer offer for the player: opens the game's transfer offer panel.</summary>
+    MakeOffer
 }

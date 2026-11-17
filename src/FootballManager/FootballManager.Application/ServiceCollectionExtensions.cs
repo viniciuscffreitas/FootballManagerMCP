@@ -1,5 +1,6 @@
 using FootballManager.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace FootballManager.Application;
 
@@ -8,7 +9,11 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<ISquadService, SquadService>();
+        services.AddScoped<IAvailabilityService, AvailabilityService>();
+        services.AddScoped<IRotationService, RotationService>();
         services.AddScoped<ITacticsService, TacticsService>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<ISaveGuard, SaveGuard>();
         services.AddScoped<ITacticEditingService, TacticEditingService>();
         services.AddScoped<IMatchesService, MatchesService>();
         services.AddScoped<ITeamsService, TeamsService>();
@@ -18,6 +23,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInboxService, InboxService>();
         services.AddScoped<IDatabaseSearchService, DatabaseSearchService>();
         services.AddScoped<ITrialsService, TrialsService>();
+        services.AddScoped<IConversationService, ConversationService>();
+        services.AddScoped<ITransferService, TransferService>();
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();
         return services;

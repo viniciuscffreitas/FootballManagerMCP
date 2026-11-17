@@ -1,6 +1,8 @@
 using FootballManager.Application.Interfaces;
 using FootballManager.Application.ResultErrors;
 using FootballManager.Application.Services;
+using FluentResults;
+using FootballManager.Domain.Saves;
 using FootballManager.Domain.Tactics.Editing;
 using NSubstitute;
 
@@ -11,13 +13,14 @@ public class BenchValidationTests
     private const int BenchPlaces = 7;
 
     private readonly ITacticEditorGameClient _game = Substitute.For<ITacticEditorGameClient>();
+    private readonly ISaveGuard _saveGuard = Substitute.For<ISaveGuard>();
     private readonly TacticEditingService _editing;
 
     public BenchValidationTests()
     {
         _game.GetOptionsAsync(Arg.Any<CancellationToken>()).Returns(new TacticOptions { ActiveSlot = 1 });
         _game.GetTacticAsync(Arg.Any<CancellationToken>()).Returns(_ => Tactic());
-        _editing = new TacticEditingService(_game);
+        _editing = new TacticEditingService(_game, _saveGuard);
     }
 
     [Fact]
@@ -60,6 +63,40 @@ public class BenchValidationTests
         var edit = (await _editing.SetTacticAsync(new TacticChanges { Slot = 1 }, apply: false)).Value;
 
         Assert.Contains(edit.Notes, note => note.Contains("The bench is empty"));
+    }
+
+    [Fact]
+    public async Task An_apply_the_save_guard_refuses_sends_nothing_to_the_game()
+    {
+        _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())
+            .Returns(Result.Fail<SaveClearance>(new SaveRefusedError("Another save is loaded.")));
+
+        var result = await _editing.SetTacticAsync(new TacticChanges { Slot = 1, Bench = [12] }, apply: true);
+
+        Assert.Contains("Another save is loaded.", Messages(result));
+        await _game.DidNotReceiveWithAnyArgs().PickAsync(default, default);
+    }
+
+    [Fact]
+    public async Task A_dry_run_leaves_the_save_guard_alone()
+    {
+        await _editing.SetTacticAsync(new TacticChanges { Slot = 1, Bench = [12] }, apply: false);
+
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
+
+    [Fact]
+    public async Task An_applied_edit_says_where_the_copy_of_the_save_went()
+    {
+        _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>()).Returns(Result.Ok(new SaveClearance
+        {
+            SaveName = "Vinicius Freitas - Santos", Club = "Santos", GameDate = new DateOnly(2026, 3, 10),
+            Backup = @"C:\Code\fm-backup\Santos-20261117-1430-jogo-2026-03-10.fm"
+        }));
+
+        var edit = (await _editing.SetTacticAsync(new TacticChanges { Slot = 1, Bench = [12] }, apply: true)).Value;
+
+        Assert.Contains(edit.Notes, note => note.Contains("Santos-20261117-1430-jogo-2026-03-10.fm"));
     }
 
     private static string Messages(FluentResults.Result<TacticEdit> result)

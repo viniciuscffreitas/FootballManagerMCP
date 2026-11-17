@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text.Json;
+using FootballManager.Domain.Availability;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Matches;
@@ -11,6 +13,7 @@ using FootballManager.Domain.Tactics.Effectiveness;
 using FootballManager.Domain.Training;
 using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
+using FootballManager.Infrastructure.Dtos.Availability;
 using FootballManager.Infrastructure.Dtos.Competitions;
 using FootballManager.Infrastructure.Dtos.Database;
 using FootballManager.Infrastructure.Dtos.Matches;
@@ -67,6 +70,7 @@ public class MappingConfig
         RegisterDatabase(config);
         RegisterTraining(config);
         RegisterCompetitions(config);
+        RegisterAvailability(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -210,6 +214,35 @@ public class MappingConfig
             .Map(dest => dest.IsForwarded, src => src.IsForwarded == true)
             .Map(dest => dest.Source, src => src.IsForwarded == true ? Text(src.Source) : null)
             .Map(dest => dest.Article, src => src.IsForwarded == true ? Text(src.Article) : null);
+
+        // A button's fields, from its RowData when the game nests them there. NewsAction -1 opens no panel. Index and
+        // the recommendation come from the button's place in the list (InboxBridgeClient).
+        config.NewConfig<BridgeSpeakToActionDto, MessageOption>()
+            .Map(dest => dest.Title, src => ActionFields(src).ActionTitle ?? string.Empty)
+            .Map(dest => dest.Event, src => ActionFields(src).Event ?? 0)
+            .Map(dest => dest.ResponseId, src => ActionFields(src).ActionResponseId)
+            .Map(dest => dest.ResponseValue, src => ActionFields(src).ActionResponseValue)
+            .Map(dest => dest.NewsAction, src => PanelOf(ActionFields(src)))
+            .Map(dest => dest.IsDisabled, src => ActionFields(src).IsDisabled == true)
+            .Map(dest => dest.IsRecommended, src => ActionFields(src).Recommended == true)
+            .Map(dest => dest.Confirmation, src => ConfirmationOf(ActionFields(src)))
+            .Ignore(dest => dest.Index)
+            .Ignore(dest => dest.Flow!);
+    }
+
+    private static BridgeSpeakToActionDto ActionFields(BridgeSpeakToActionDto action)
+    {
+        return action.ActionTitle is null && action.RowData is not null ? action.RowData : action;
+    }
+
+    private static int? PanelOf(BridgeSpeakToActionDto action)
+    {
+        return action.NewsAction is >= 0 ? action.NewsAction : null;
+    }
+
+    private static string? ConfirmationOf(BridgeSpeakToActionDto action)
+    {
+        return Text(action.ConfirmationDialogData?.Description);
     }
 
     // What the club's scouting knows: the game sends values it doesn't know as empty text, or a -1 count.
@@ -548,6 +581,38 @@ public class MappingConfig
             DatabaseRecordKind.NationalTeam => Text(record.SecondaryLinked),
             _ => null
         };
+    }
+
+    // Who can play the next match. Empty texts are the game's blanks (no injury, no reason); a ban's -1 count is the one
+    // it isn't measured in.
+    private static void RegisterAvailability(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeInjuryDto, PlayerInjury>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Availability, src => src.Availability ?? 0)
+            .Map(dest => dest.Injury, src => Text(src.Description))
+            .Map(dest => dest.ExpectedReturn, src => Text(src.ExpectedReturn));
+
+        config.NewConfig<BridgeBanDto, PlayerBan>()
+            .Map(dest => dest.PlayerId, src => src.PlayerId ?? 0)
+            .Map(dest => dest.Name, src => src.PlayerName ?? string.Empty)
+            .Map(dest => dest.Scope, src => Text(src.Scope))
+            .Map(dest => dest.MatchesRemaining, src => src.MatchesRemaining == AvailabilityConstants.NotCounted ? null : src.MatchesRemaining)
+            .Map(dest => dest.DaysRemaining, src => src.DaysRemaining == AvailabilityConstants.NotCounted ? null : src.DaysRemaining)
+            .Map(dest => dest.Reason, src => Text(src.Reason));
+
+        config.NewConfig<BridgeNextMatchRulesDto, NextMatchRules>()
+            .Map(dest => dest.Competition, src => Text(src.Competition))
+            .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
+            .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
+            .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
+    private static string RuleText(JsonElement rule)
+    {
+        return rule.ValueKind == JsonValueKind.String ? rule.GetString() ?? string.Empty : rule.GetRawText();
     }
 
     private static string? Text(string? value)
