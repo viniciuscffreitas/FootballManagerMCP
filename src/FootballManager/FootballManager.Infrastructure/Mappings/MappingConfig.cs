@@ -3,6 +3,7 @@ using System.Text.Json;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Database;
+using FootballManager.Domain.Finances;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
@@ -16,6 +17,7 @@ using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
 using FootballManager.Infrastructure.Dtos.Competitions;
 using FootballManager.Infrastructure.Dtos.Database;
+using FootballManager.Infrastructure.Dtos.Finances;
 using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
 using FootballManager.Infrastructure.Dtos.Players;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterFinances(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,67 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The club finance screen. Amounts in pounds stay numbers (the service writes them in the screens' currency); texts
+    // pass as the game writes them.
+    private static void RegisterFinances(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeFinancesDto, FinanceReadout>()
+            .Map(dest => dest.FinancialStatus, src => Text(src.FinancialStatus))
+            .Map(dest => dest.Wages, src => src.Wages ?? new BridgeWagesDto())
+            .Map(dest => dest.WageGroups, src => src.Wages != null && src.Wages.PlayerTypeWageData != null
+                ? src.Wages.PlayerTypeWageData
+                : new List<BridgeWageGroupDto>())
+            .Map(dest => dest.IncomeLines, src => src.IncomeLines ?? new List<BridgeFinanceLineDto>())
+            .Map(dest => dest.ExpenditureLines, src => src.ExpenditureLines ?? new List<BridgeFinanceLineDto>())
+            .Map(dest => dest.NotableIncome, src => src.NotableIncome ?? new List<BridgeNotableIncomeDto>())
+            .Map(dest => dest.BalanceHistory, src => src.BalanceHistory ?? new List<BridgeGraphPointDto>())
+            .Map(dest => dest.BalanceProjection, src => SeasonEnds(src.BalanceProjection));
+
+        config.NewConfig<BridgeWagesDto, WageSummary>()
+            .Map(dest => dest.Committed, src => Text(src.CommittedWageTotalValueWithShortText))
+            .Map(dest => dest.Budget, src => Text(src.CurrentWageBudgetValueWithText))
+            .Map(dest => dest.Remaining, src => Text(src.RemainingBudgetValueWithText))
+            .Map(dest => dest.NextSeasonBudget, src => Text(src.NextSeasonWageBudgetValueWithText))
+            .Map(dest => dest.BudgetUsedPercentage, src => src.WageBudgetPercentage == null ? null : (double?)Math.Round(src.WageBudgetPercentage.Value, 1));
+
+        config.NewConfig<BridgeWageGroupDto, WageGroup>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Players, src => src.Quantity ?? 0)
+            .Map(dest => dest.TotalWages, src => Text(src.TotalBasicWage))
+            .Map(dest => dest.TotalWagesInGameUnit, src => src.TotalBasicWageValue ?? 0)
+            .Map(dest => dest.AverageWage, src => Text(src.AverageBasicWage))
+            .Map(dest => dest.HighestWage, src => Text(src.HighestBasicWage))
+            .Map(dest => dest.LowestWage, src => Text(src.LowestBasicWage))
+            .Map(dest => dest.AdvisedMaxWage, src => Text(src.AdvisedMaxBasicWage))
+            .Map(dest => dest.IsOverWages, src => src.IsOverWages ?? false);
+
+        config.NewConfig<BridgeFinanceLineDto, FinanceLine>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Amount, src => Text(src.DisplayValue))
+            .Map(dest => dest.ChangeFromLastMonth, src => src.MonthToMonthPercentage);
+
+        config.NewConfig<BridgeNotableIncomeDto, NotableIncome>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty);
+
+        config.NewConfig<BridgeGraphPointDto, BalanceAt>()
+            .Map(dest => dest.When, src => src.GraphPointX ?? string.Empty)
+            .Map(dest => dest.Amount, src => src.GraphPointY ?? 0);
+    }
+
+    // This season's end and the next two, in order; a point the game leaves out is skipped.
+    private static List<BalanceAt> SeasonEnds(BridgeProjectionDto? projection)
+    {
+        if (projection is null)
+        {
+            return [];
+        }
+
+        return new[] { projection.ProjectionEndOfSeasonOne, projection.ProjectionEndOfSeasonTwo, projection.ProjectionEndOfSeasonThree }
+            .Where(point => point?.PropertyValue is not null)
+            .Select(point => new BalanceAt { When = point!.Title ?? string.Empty, Amount = point.PropertyValue!.Value })
+            .ToList();
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.

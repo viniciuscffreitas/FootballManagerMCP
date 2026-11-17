@@ -62,6 +62,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `set_tactic` | Builds or changes a tactic in a slot: shape, roles, lineup, instructions |
 | | `suggest_rotation` | Swaps injured, banned or tired starters (condition under 85) for fit reserves (92+, match-sharp first), each with the reason; slots keep their position and role |
 | | `create_tactic` | Creates a tactic in an empty slot through the game's tactic creator: style and a formation for each phase |
+| Finances | `get_finances` | The club's finances as the finance screen shows them, in its currency: balance, transfer and wage budgets, the wage bill by squad status, this month's income and expenditure line by line, the balance month by month and its projection |
 | Matches | `get_matches` | Your season so far, match by match, with the shape you played |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
