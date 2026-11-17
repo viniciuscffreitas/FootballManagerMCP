@@ -381,21 +381,28 @@ internal sealed class TacticEditorBridgeClient(
             "The tactic creator didn't move on to its next step.", cancellationToken);
     }
 
+    public Task StartCreatorAsync(CancellationToken cancellationToken = default)
+    {
+        return SendCreatorEventAsync(TacticConstants.CreatorStartEvent, cancellationToken);
+    }
+
+    // The new tactic lands in a slot that held none, which isn't always the active one: wait for one more valid slot.
     public async Task ConfirmCreatorAsync(CancellationToken cancellationToken = default)
     {
-        await SendCreatorEventAsync(TacticConstants.CreatorConfirmEvent, cancellationToken);
-        await WaitAsync(async () =>
-            {
-                var slots = await ValuesAsync<BridgeTacticSettingsDto>(
-                    OnTactic().Props([
-                        TacticConstants.CurrentSlot, TacticConstants.Slot1Valid, TacticConstants.Slot2Valid, TacticConstants.Slot3Valid
-                    ]),
-                    cancellationToken);
-                bool?[] valid = [slots.Slot1Valid, slots.Slot2Valid, slots.Slot3Valid];
+        var before = await ValidSlotCountAsync(cancellationToken);
 
-                return valid[slots.CurrentSlot ?? 0] == true;
-            },
+        await SendCreatorEventAsync(TacticConstants.CreatorConfirmEvent, cancellationToken);
+        await WaitAsync(async () => await ValidSlotCountAsync(cancellationToken) > before,
             "The game didn't create the tactic.", cancellationToken);
+    }
+
+    private async Task<int> ValidSlotCountAsync(CancellationToken cancellationToken)
+    {
+        var slots = await ValuesAsync<BridgeTacticSettingsDto>(
+            OnTactic().Props([TacticConstants.Slot1Valid, TacticConstants.Slot2Valid, TacticConstants.Slot3Valid]), cancellationToken);
+        bool?[] valid = [slots.Slot1Valid, slots.Slot2Valid, slots.Slot3Valid];
+
+        return valid.Count(slot => slot == true);
     }
 
     // The creator's events carry no data, as its buttons send them.

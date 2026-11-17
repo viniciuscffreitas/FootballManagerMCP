@@ -166,6 +166,11 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
             errors.Add(new ValidationError("slot", [$"Slot {tactic.Slot} already holds a tactic: change it with set_tactic, " +
                                                     "or pick an empty slot."]));
         }
+        else if (Enumerable.Range(1, SlotCount).First(slot => !current.Slots.Contains(slot)) is var firstEmpty && firstEmpty != tactic.Slot)
+        {
+            errors.Add(new ValidationError("slot", [$"The game creates a new tactic in the first empty slot, slot {firstEmpty}: " +
+                                                    $"create it there (it can't switch to an empty slot {tactic.Slot})."]));
+        }
 
         Check("style", "tactical style", tactic.Style, options.Styles);
 
@@ -599,19 +604,19 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
         }
 
         // The game's tactic creator, the steps its screen walks through for a slot with no tactic: a style, a formation
-        // with the ball, one without it, each picked and moved on from, then a confirm. The creator fills the active
-        // slot, so an empty slot is switched to first. The game then reads the slot back as holding a tactic.
+        // with the ball, one without it, each picked and moved on from, then a confirm, which fills the first empty slot.
+        // A team with no tactic gets the creator on its own; one with a tactic opens it as the screen's "Criar Nova
+        // Tática" does (the game won't switch to an empty slot to show it there). The game then reads the slot back as
+        // holding a tactic.
         public async Task CreateAsync(NewTactic tactic, EditableTactic current)
         {
-            if (tactic.Slot != current.ActiveSlot)
+            if (current.Slots.Count > 0)
             {
-                await WriteAsync(Step("Switch slot", null, $"slot {current.ActiveSlot}", $"slot {tactic.Slot}"), async () =>
+                await WriteAsync(Step("Open creator", $"slot {tactic.Slot}", null, null), async () =>
                 {
-                    await game.SwitchSlotAsync(tactic.Slot, cancellationToken);
+                    await game.StartCreatorAsync(cancellationToken);
                     return null;
                 });
-
-                edit.Notes.Add($"Slot {tactic.Slot} becomes the tactic the team plays, and stays so.");
             }
 
             await WriteAsync(Step("Style", null, null, tactic.Style),

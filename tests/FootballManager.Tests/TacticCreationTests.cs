@@ -88,10 +88,10 @@ public class TacticCreationTests
         var edit = (await _editing.CreateTacticAsync(Tactic(), apply: false)).Value;
 
         Assert.False(edit.Applied);
-        Assert.Equal(["Switch slot", "Style", "Formation", "Formation", "Create"], edit.Steps.Select(step => step.Action));
+        Assert.Equal(["Open creator", "Style", "Formation", "Formation", "Create"], edit.Steps.Select(step => step.Action));
         Assert.All(edit.Steps, step => Assert.Equal(EditStepStatus.Planned, step.Status));
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
-        await _game.DidNotReceiveWithAnyArgs().SwitchSlotAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().StartCreatorAsync();
         await _game.DidNotReceiveWithAnyArgs().SetCreatorStyleAsync(default!);
         await _game.DidNotReceiveWithAnyArgs().ConfirmCreatorAsync();
     }
@@ -105,7 +105,7 @@ public class TacticCreationTests
         var result = await _editing.CreateTacticAsync(Tactic(), apply: true);
 
         Assert.Contains("Another save is loaded.", Messages(result));
-        await _game.DidNotReceiveWithAnyArgs().SwitchSlotAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().StartCreatorAsync();
         await _game.DidNotReceiveWithAnyArgs().SetCreatorStyleAsync(default!);
         await _game.DidNotReceiveWithAnyArgs().ConfirmCreatorAsync();
     }
@@ -120,7 +120,7 @@ public class TacticCreationTests
         Received.InOrder(() =>
         {
             _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
-            _game.SwitchSlotAsync(2, Arg.Any<CancellationToken>());
+            _game.StartCreatorAsync(Arg.Any<CancellationToken>());
             _game.SetCreatorStyleAsync("Gegenpress", Arg.Any<CancellationToken>());
             _game.NextCreatorStageAsync(Arg.Any<CancellationToken>());
             _game.SetCreatorFormationAsync("433DMWide", Arg.Any<CancellationToken>());
@@ -130,6 +130,32 @@ public class TacticCreationTests
         });
         Assert.True(edit.Applied);
         Assert.All(edit.Steps, step => Assert.Equal(EditStepStatus.Done, step.Status));
+        await _game.DidNotReceiveWithAnyArgs().SwitchSlotAsync(default);
+    }
+
+    // The game won't switch to an empty slot: its creator fills the first empty one.
+    [Fact]
+    public async Task A_slot_after_an_empty_one_is_refused()
+    {
+        var result = await _editing.CreateTacticAsync(Tactic(slot: 3), apply: true);
+
+        Assert.Contains("The game creates a new tactic in the first empty slot, slot 2", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().StartCreatorAsync();
+    }
+
+    // With no tactic at all, the game shows the creator for slot 1 on its own.
+    [Fact]
+    public async Task A_team_without_a_tactic_walks_the_creator_it_already_shows()
+    {
+        _slots = [];
+        _game.When(game => game.ConfirmCreatorAsync(Arg.Any<CancellationToken>())).Do(_ => _slots = [1]);
+
+        var edit = (await _editing.CreateTacticAsync(Tactic(slot: 1), apply: true)).Value;
+
+        Assert.Equal(["Style", "Formation", "Formation", "Create"], edit.Steps.Select(step => step.Action));
+        Assert.All(edit.Steps, step => Assert.Equal(EditStepStatus.Done, step.Status));
+        await _game.DidNotReceiveWithAnyArgs().StartCreatorAsync();
     }
 
     [Fact]
@@ -162,7 +188,7 @@ public class TacticCreationTests
         var result = await _editing.CreateTacticAsync(Tactic(), apply: true);
 
         Assert.Contains("on step 2", Messages(result));
-        await _game.DidNotReceiveWithAnyArgs().SwitchSlotAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().StartCreatorAsync();
         await _game.DidNotReceiveWithAnyArgs().SetCreatorStyleAsync(default!);
     }
 
