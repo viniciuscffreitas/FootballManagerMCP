@@ -16,6 +16,9 @@ public class ScoutedPlayer
     public string? Club { get; set; }
     public string? Nation { get; set; }
 
+    /// <summary>The league his club plays in, only filled with his season numbers.</summary>
+    public string? League { get; set; }
+
     /// <summary>Positions as FM abbreviates them, e.g. "D (C)" or "M/MO (G)".</summary>
     public string? Positions { get; set; }
 
@@ -67,6 +70,9 @@ public class ScoutedPlayer
 
     /// <summary>Only filled when asked for; ranges while knowledge is partial.</summary>
     public List<PlayerAttribute> Attributes { get; set; } = [];
+
+    /// <summary>His season numbers for his club, only filled when asked for.</summary>
+    public PlayerPerformance? Performance { get; set; }
 
     /// <summary>The latest scout report, only filled when asked for.</summary>
     public ScoutReport? Report { get; set; }

@@ -1,5 +1,10 @@
 using FootballManager.Api.Requests.Scouting;
 using FootballManager.Api.Responses.Availability;
+using FootballManager.Api.Responses.Standings;
+using FootballManager.Api.Responses.Board;
+using FootballManager.Api.Responses.Contracts;
+using FootballManager.Api.Responses.Injuries;
+using FootballManager.Api.Responses.Opposition;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
@@ -7,29 +12,42 @@ using FootballManager.Api.Responses.Transfers;
 using FootballManager.Api.Requests.Tactics.Editing;
 using FootballManager.Api.Requests.Training;
 using FootballManager.Api.Responses.Database;
+using FootballManager.Api.Responses.Finances;
 using FootballManager.Api.Responses.Matches;
 using FootballManager.Api.Responses.Messages;
 using FootballManager.Api.Responses.Players;
 using FootballManager.Api.Responses.Scouting;
+using FootballManager.Api.Responses.Staff;
+using FootballManager.Api.Responses.SquadDynamics;
 using FootballManager.Api.Responses.Teams;
 using FootballManager.Api.Responses.Trials;
 using FootballManager.Api.Responses.Tactics.Effectiveness;
 using FootballManager.Api.Responses.Training;
+using FootballManager.Api.Responses.Youth;
 using FootballManager.Domain.Availability;
+using FootballManager.Domain.Standings;
+using FootballManager.Domain.Board;
+using FootballManager.Domain.Contracts;
+using FootballManager.Domain.Opposition;
 using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
 using FootballManager.Domain.Transfers;
 using FootballManager.Domain.Database;
+using FootballManager.Domain.Finances;
+using FootballManager.Domain.DressingRoom;
+using FootballManager.Domain.Injuries;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
+using FootballManager.Domain.Staff;
 using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
 using FootballManager.Domain.Teams;
 using FootballManager.Domain.Training;
+using FootballManager.Domain.Youth;
 using Mapster;
 
 namespace FootballManager.Api.Mappings;
@@ -45,13 +63,50 @@ public class MappingConfig
             .Map(dest => dest.Attributes, src => GroupAttributes(src.Attributes));
 
         Rounded(config.NewConfig<PlayerSeasonStats, PlayerSeasonStatsResponse>());
+        Rounded(config.NewConfig<PlayerPerformance, PlayerPerformanceResponse>());
 
         config.NewConfig<PlayerInjury, InjuredPlayerResponse>();
         config.NewConfig<PlayerBan, SuspendedPlayerResponse>();
         config.NewConfig<PlayerAvailability, PlayerAvailabilityResponse>()
             .Map(dest => dest.Absences, src => src.Absences.Count > 0 ? src.Absences : null);
 
+        config.NewConfig<LeagueTable, LeagueTableResponse>();
+        config.NewConfig<LeagueTableRow, LeagueTableRowResponse>()
+            .Map(dest => dest.IsUser, src => src.IsUser ? true : (bool?)null);
+
+        config.NewConfig<ClubFinances, FinancesResponse>();
+        config.NewConfig<BoardStatus, BoardResponse>();
+        config.NewConfig<BoardConfidence, BoardConfidenceResponse>();
+        config.NewConfig<SupporterConfidence, SupporterConfidenceResponse>();
+        config.NewConfig<VisionObjective, VisionObjectiveResponse>();
+
+        config.NewConfig<TeamStaff, StaffResponse>();
+        config.NewConfig<StaffAttribute, StaffAttributeResponse>();
+        config.NewConfig<StaffMember, StaffMemberResponse>()
+            .Map(dest => dest.CoachingAttributes, src => src.CoachingAttributes.Count > 0 ? src.CoachingAttributes : null)
+            .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes.Count > 0 ? src.MedicalAttributes : null);
+
+        config.NewConfig<SquadPlayerContract, SquadPlayerContractResponse>();
+
+        config.NewConfig<SquadDynamics, SquadDynamicsResponse>();
+        config.NewConfig<PlayerDynamics, PlayerDynamicsResponse>()
+            .Map(dest => dest.HappinessPositives, src => src.HappinessPositives.Count > 0 ? src.HappinessPositives : null)
+            .Map(dest => dest.HappinessNegatives, src => src.HappinessNegatives.Count > 0 ? src.HappinessNegatives : null);
+
+        config.NewConfig<PlayerMedicalRecord, PlayerMedicalRecordResponse>()
+            .Map(dest => dest.History, src => src.History.Count > 0 ? src.History : null);
+
+        config.NewConfig<YouthAndLoans, YouthAndLoansResponse>();
+        config.NewConfig<YouthSetup, YouthSetupResponse>();
+        config.NewConfig<YouthPlayer, YouthPlayerResponse>();
+        config.NewConfig<LoanedPlayer, LoanedPlayerResponse>()
+            .Map(dest => dest.Comments, src => src.Comments.Count > 0 ? src.Comments : null);
+
         config.NewConfig<RotationPlan, RotationPlanResponse>();
+
+        config.NewConfig<OppositionReport, OppositionReportResponse>();
+        config.NewConfig<ExpectedPlayer, ExpectedPlayerResponse>();
+        config.NewConfig<ReportPoint, ReportPointResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
         config.NewConfig<PlayerTalk, PlayerTalkResponse>()
             .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)
@@ -149,6 +204,9 @@ public class MappingConfig
             .Map(dest => dest.CanReply, src => src.CanReply ? true : (bool?)null)
             .Map(dest => dest.HasReplied, src => src.HasReplied ? true : (bool?)null)
             .Map(dest => dest.IsForwarded, src => src.IsForwarded ? true : (bool?)null);
+
+        config.NewConfig<NewsPage, NewsPageResponse>()
+            .Map(dest => dest.Count, src => src.Stories.Count);
 
         config.NewConfig<MessageOption, MessageOptionResponse>()
             .Map(dest => dest.IsDisabled, src => src.IsDisabled ? true : (bool?)null)
@@ -313,6 +371,16 @@ public class MappingConfig
         config.NewConfig<MatchSubstitution, MatchSubstitutionResponse>()
             .Map(dest => dest.Injury, src => src.Injury ? true : (bool?)null);
         Rounded(config.NewConfig<PlayerOfTheMatch, PlayerOfTheMatchResponse>());
+
+        // Out of a match only the message goes; empty lists and false flags are left out.
+        Rounded(config.NewConfig<LiveMatch, LiveMatchResponse>())
+            .Map(dest => dest.Venue, src => src.Venue == null ? null : src.Venue.ToString())
+            .Map(dest => dest.Goals, src => src.InProgress ? src.Goals : null)
+            .Map(dest => dest.OnPitch, src => src.InProgress ? src.OnPitch : null)
+            .Map(dest => dest.Substitutions, src => src.InProgress ? src.Substitutions : null);
+        Rounded(config.NewConfig<LivePlayer, LivePlayerResponse>())
+            .Map(dest => dest.YellowCard, src => src.YellowCard ? true : (bool?)null)
+            .Map(dest => dest.RedCard, src => src.RedCard ? true : (bool?)null);
 
         Rounded(config.NewConfig<StyleAverages, StyleAveragesResponse>());
     }

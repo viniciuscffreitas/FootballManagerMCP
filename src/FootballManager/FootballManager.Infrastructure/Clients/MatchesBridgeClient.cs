@@ -13,20 +13,17 @@ namespace FootballManager.Infrastructure.Clients;
 
 // Reads the user's matches through the MCPFM plugin, the way the game's fixtures and match screens do. A match is
 // asked about by its place in the season's fixture list, which the list itself gives.
-internal sealed class MatchesBridgeClient(GameBridge bridge, GameVocabulary vocabulary) : IMatchesGameClient
+internal sealed partial class MatchesBridgeClient(GameBridge bridge, GameVocabulary vocabulary) : IMatchesGameClient
 {
-    public async Task<TeamFixtures> GetFixturesAsync(CancellationToken cancellationToken = default)
+    public Task<TeamFixtures> GetFixturesAsync(CancellationToken cancellationToken = default)
     {
-        var team = TeamAsync(cancellationToken);
-        var fixtures = FixturesAsync(cancellationToken);
+        return TeamFixturesAsync(MatchConstants.PreviousMatches, MatchConstants.UpcomingMatches, cancellationToken);
+    }
 
-        await Task.WhenAll(team, fixtures);
-
-        return new TeamFixtures
-        {
-            TeamName = (await team).TeamName ?? string.Empty,
-            Fixtures = Summaries(await fixtures, (await team).TeamId).Select(dated => dated.Summary).ToList()
-        };
+    // The calendar: no past matches, only the next ones, as many as asked for.
+    public Task<TeamFixtures> GetUpcomingFixturesAsync(int count, CancellationToken cancellationToken = default)
+    {
+        return TeamFixturesAsync(previous: 0, upcoming: count, cancellationToken);
     }
 
     public async Task<MatchDetail?> GetMatchAsync(DateOnly date, CancellationToken cancellationToken = default)
@@ -77,13 +74,27 @@ internal sealed class MatchesBridgeClient(GameBridge bridge, GameVocabulary voca
         };
     }
 
-    // The season's fixtures, oldest first, sized like the game's fixtures screen.
-    private static BridgeQuery Fixtures()
+    // The season's fixtures, oldest first, sized like the game's fixtures screen unless told otherwise.
+    private static BridgeQuery Fixtures(int previous = MatchConstants.PreviousMatches, int upcoming = MatchConstants.UpcomingMatches)
     {
         return BridgeQuery.FromHuman()
             .List(MatchConstants.FixtureList)
-            .FixtureWindow()
+            .FixtureWindow(previous, upcoming)
             .WithHumanAndTeam();
+    }
+
+    private async Task<TeamFixtures> TeamFixturesAsync(int previous, int upcoming, CancellationToken cancellationToken)
+    {
+        var team = TeamAsync(cancellationToken);
+        var fixtures = FixturesAsync(cancellationToken, previous, upcoming);
+
+        await Task.WhenAll(team, fixtures);
+
+        return new TeamFixtures
+        {
+            TeamName = (await team).TeamName ?? string.Empty,
+            Fixtures = Summaries(await fixtures, (await team).TeamId).Select(dated => dated.Summary).ToList()
+        };
     }
 
     private async Task<BridgeHumanDto> TeamAsync(CancellationToken cancellationToken)
@@ -95,10 +106,11 @@ internal sealed class MatchesBridgeClient(GameBridge bridge, GameVocabulary voca
     }
 
     // Each fixture with the user's lineup in possession, which gives the shape they played; future ones have none.
-    private Task<BridgeListDto<BridgeFixtureDto>> FixturesAsync(CancellationToken cancellationToken)
+    private Task<BridgeListDto<BridgeFixtureDto>> FixturesAsync(
+        CancellationToken cancellationToken, int previous = MatchConstants.PreviousMatches, int upcoming = MatchConstants.UpcomingMatches)
     {
         return bridge.GetListAsync<BridgeFixtureDto>(
-            Fixtures().Context(TacticConstants.InPossession, true).Props(MatchConstants.Summary),
+            Fixtures(previous, upcoming).Context(TacticConstants.InPossession, true).Props(MatchConstants.Summary),
             cancellationToken,
             gapsExpected: true);
     }

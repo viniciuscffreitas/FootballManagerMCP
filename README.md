@@ -56,15 +56,25 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 |---|---|---|
 | Squad | `get_squad` | Your first team: positions, condition, morale, season numbers; attributes on request |
 | | `get_availability` | Who can play the next match: the injured and their time out, the suspended (scope, matches left, reason), the match's registration and squad size rules, and every player's condition and sharpness |
+| | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |
+| | `get_contracts` | Your first team's contracts: wage, end date and time left, type, agreed playing time, release clause, clauses, renewal offer and the staff's advice; optionally only those ending by a date |
+| | `get_squad_dynamics` | The dressing room: the hierarchy by level, the club atmosphere and its reasons, open happiness issues (player, severity), the manager's promises, and each player's level and reasons to be happy or unhappy |
+| | `get_injuries` | The medical centre: each player's injury history, injuries this season and injury risk in the game's words, and the season summary with who's expected back for the next match; one player on request |
+| | `get_youth_and_loans` | Your youth set-up (next intake, facilities, coaching and recruitment), the highest youth team's players with those on loan marked, and every player out on loan: club, loan end, fee, games, rating, happiness and the loan report |
 | Tactics | `get_tactics` | Your three tactic slots with the game's effectiveness ratings, and the active one in full |
 | | `get_role_fit` | Every role at a position, and how each of your players rates in it |
 | | `get_tactic_options` | Every style, mentality, formation and instruction a tactic can take |
 | | `set_tactic` | Builds or changes a tactic in a slot: shape, roles, lineup, instructions |
 | | `suggest_rotation` | Swaps injured, banned or tired starters (condition under 85) for fit reserves (92+, match-sharp first), each with the reason; slots keep their position and role |
 | | `create_tactic` | Creates a tactic in an empty slot through the game's tactic creator: style and a formation for each phase |
+| Finances | `get_finances` | The club's finances as the finance screen shows them, in its currency: balance, transfer and wage budgets, the wage bill by squad status, this month's income and expenditure line by line, the balance month by month and its projection |
 | Matches | `get_matches` | Your season so far, match by match, with the shape you played |
+| | `get_fixtures` | Your calendar: the next matches (20 by default, up to 50) in every competition, with date, venue and opponent |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
+| | `get_live_match` | The match being played: minute, score, goals, xG, shots, possession, players on the pitch with rating, condition and cards, substitutions made and left, the tactic and mentality in use |
+| League | `get_league_table` | Your league's table: every team's position, games, wins, draws, losses, goals, goal difference and points, your line marked, and where the press expects you to finish |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
+| | `get_opposition_report` | The game's own opposition report: expected formation and eleven with positions and roles, its tactic summary, the analysis' points, and the threat level of your next opponent |
 | Scouting | `get_scouting` | Your recruitment set-up: scouts, focuses, budget |
 | | `get_scouted_players` | Players from a scouting list (recommendations, shortlist, a focus, the player search) |
 | | `run_player_search` | Runs the game's player search with filters (age, positions, grade, quick filters, interest) |
@@ -78,6 +88,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `end_trials` | Ends trials, or withdraws offers not yet answered, for up to 50 players at once |
 | Transfers | `make_transfer_offer` | Bids a fee for a player through the game's offer panel, its fee moved with the panel's +/− buttons to exactly the one asked; the club's answer comes in the inbox |
 | | `negotiate_contract` | Once the club accepts, opens the contract negotiation from its message, agrees to the agent's promises, shows the contract's salary and length, and offers the deal at them on a second call |
+| | `get_transfer_activity` | Your transfers under way and the offers received, as the transfer activity screen shows them: the counts, what the deals would spend and bring in, and each offer's player, other club, type, fee and status, those awaiting your answer first |
 | Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
 | | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
 | Training | `get_training` | This week's and next week's sessions, and each player's training position, role, additional focus, intensity and rating |
@@ -86,6 +97,8 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | Inbox | `get_inbox` | Your messages, newest first, with forwarded press articles on request |
 | | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
 | | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
+| Board | `get_board` | The board's and the supporters' confidence (grade and texts, the board's praise and criticism), the club vision's objectives, each side's culture, requests to the board and promises made to it |
+| News | `get_news` | The newest stories about your club and your league from the news portal (date, title, club, source), their text on request |
 | Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
 | | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |
 | | `release_game_version` | Clears a new game version for changes on your career save, after the short test on the investigation save |

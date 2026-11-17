@@ -1,29 +1,49 @@
 using System.Globalization;
 using System.Text.Json;
 using FootballManager.Domain.Availability;
+using FootballManager.Domain.Board;
 using FootballManager.Domain.Competitions;
+using FootballManager.Domain.Contracts;
 using FootballManager.Domain.Database;
+using FootballManager.Domain.Finances;
+using FootballManager.Domain.DressingRoom;
+using FootballManager.Domain.Injuries;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
+using FootballManager.Domain.Opposition;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
+using FootballManager.Domain.Standings;
+using FootballManager.Domain.Staff;
 using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
 using FootballManager.Domain.Training;
+using FootballManager.Domain.Youth;
+using FootballManager.Domain.Transfers;
 using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
+using FootballManager.Infrastructure.Dtos.Board;
 using FootballManager.Infrastructure.Dtos.Competitions;
+using FootballManager.Infrastructure.Dtos.Contracts;
 using FootballManager.Infrastructure.Dtos.Database;
+using FootballManager.Infrastructure.Dtos.Finances;
+using FootballManager.Infrastructure.Dtos.DressingRoom;
+using FootballManager.Infrastructure.Dtos.Injuries;
 using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
+using FootballManager.Infrastructure.Dtos.Opposition;
 using FootballManager.Infrastructure.Dtos.Players;
 using FootballManager.Infrastructure.Dtos.Scouting;
+using FootballManager.Infrastructure.Dtos.Standings;
+using FootballManager.Infrastructure.Dtos.Staff;
 using FootballManager.Infrastructure.Dtos.Tactics;
 using FootballManager.Infrastructure.Dtos.Tactics.Editing;
 using FootballManager.Infrastructure.Dtos.Tactics.Effectiveness;
 using FootballManager.Infrastructure.Dtos.Training;
+using FootballManager.Infrastructure.Dtos.Youth;
+using FootballManager.Infrastructure.Dtos.Transfers;
 using Mapster;
 
 namespace FootballManager.Infrastructure.Mappings;
@@ -38,6 +58,12 @@ public class MappingConfig
 
     /// <summary>The Mapster parameter giving the game's names for a player's status flags (GameVocabulary.StatusKeysAsync).</summary>
     public const string StatusKeysParameter = "statusKeys";
+
+    /// <summary>
+    /// The Mapster parameter giving a team's players by their record's index (Dictionary of int to BridgePlayerDto), for
+    /// the players an opposition report names by reference.
+    /// </summary>
+    public const string PlayersByRecordParameter = "playersByRecord";
 
     private const string UnknownAmount = "-";
 
@@ -71,6 +97,78 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterStandings(config);
+        RegisterFinances(config);
+        RegisterBoard(config);
+        RegisterStaff(config);
+        RegisterContracts(config);
+        RegisterSquadDynamics(config);
+        RegisterInjuries(config);
+        RegisterOpposition(config);
+        RegisterYouth(config);
+        RegisterTransferActivity(config);
+    }
+
+    // An opposition report. Players come by reference, named through PlayersByRecordParameter; role keys need the
+    // game's role names (TacticKeys), passed as TacticKeysParameter. The game marks an expected tactic it has nothing
+    // for as not valid.
+    private static void RegisterOpposition(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeOppositionReportDto, OppositionReport>()
+            .Map(dest => dest.TeamId, src => src.Id ?? 0)
+            .Map(dest => dest.TeamName, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Formation, src => src.ExpectedTactic != null && src.ExpectedTactic.IsValid != false ? Text(src.ExpectedTactic.Formation) : null)
+            .Map(dest => dest.TacticSummary, src => src.ExpectedTactic != null ? Text(src.ExpectedTactic.Summary) : null)
+            .Map(dest => dest.ExpectedLineup, src => src.ExpectedTactic != null && src.ExpectedTactic.IsValid != false
+                ? (src.ExpectedTactic.Players ?? new List<BridgeExpectedPlayerDto>()).Select(place => ExpectedPlayer(place)).ToList()
+                : new List<ExpectedPlayer>())
+            .Map(dest => dest.Points, src => (src.Visuals ?? new List<BridgeReportVisualDto>())
+                .Select(visual => visual.ObservationData)
+                .Where(observation => observation != null && !string.IsNullOrWhiteSpace(observation.GraphType))
+                .Select(observation => ReportPoint(observation!))
+                .ToList())
+            // Set by the service, which knows whether the team is the next opponent.
+            .Ignore(dest => dest.IsNextOpponent)
+            .Ignore(dest => dest.ThreatLevel);
+    }
+
+    // The role mask carries the duty's bit beside the role's; the role's key is the mask without it.
+    private static ExpectedPlayer ExpectedPlayer(BridgeExpectedPlayerDto place)
+    {
+        var keys = MapContext.Current?.Parameters.TryGetValue(TacticKeysParameter, out var names) == true ? names as TacticKeys : null;
+        var duties = keys?.InPossessionDuties ?? new Dictionary<ulong, string>();
+        var dutyBits = duties.Keys.Aggregate(0UL, (all, bit) => all | bit);
+        var player = RecordPlayer(place.Player?.Index);
+
+        return new ExpectedPlayer
+        {
+            PlayerId = player?.Id,
+            Name = player?.Name,
+            Position = place.Position is { } position ? PositionMasks.ToPosition(position) : null,
+            RoleKey = place.Role is { } role ? keys?.InPossessionRoles.GetValueOrDefault(role & ~dutyBits) : null,
+            Duty = place.Role is { } mask ? duties.Where(duty => (mask & duty.Key) != 0).Select(duty => duty.Value).FirstOrDefault() : null
+        };
+    }
+
+    private static ReportPoint ReportPoint(BridgeObservationDto observation)
+    {
+        return new ReportPoint
+        {
+            Topic = observation.GraphType!,
+            Summary = Text(observation.PerformanceSummary),
+            TimeFrame = Text(observation.TimeFrame),
+            // The team's own record when the point is about the team: no player then.
+            PlayerName = RecordPlayer(observation.SubjectRecordId?.Index)?.Name
+        };
+    }
+
+    private static BridgePlayerDto? RecordPlayer(int? index)
+    {
+        return index is { } record
+               && MapContext.Current?.Parameters.TryGetValue(PlayersByRecordParameter, out var players) == true
+               && players is Dictionary<int, BridgePlayerDto> byRecord
+            ? byRecord.GetValueOrDefault(record)
+            : null;
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -215,6 +313,13 @@ public class MappingConfig
             .Map(dest => dest.Source, src => src.IsForwarded == true ? Text(src.Source) : null)
             .Map(dest => dest.Article, src => src.IsForwarded == true ? Text(src.Article) : null);
 
+        config.NewConfig<BridgeNewsStoryDto, NewsStory>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Title, src => src.Title ?? string.Empty)
+            .Map(dest => dest.Subtitle, src => Text(src.Subtitle))
+            .Map(dest => dest.Source, src => Text(src.Source))
+            .Map(dest => dest.Body, src => Text(src.Body));
+
         // A button's fields, from its RowData when the game nests them there. NewsAction -1 opens no panel. Index and
         // the recommendation come from the button's place in the list (InboxBridgeClient).
         config.NewConfig<BridgeSpeakToActionDto, MessageOption>()
@@ -274,6 +379,8 @@ public class MappingConfig
             .Map(dest => dest.DaysSinceLastScouted, src => Days(src.DaysSinceLastScouted))
             .Map(dest => dest.Statuses, src => AllStatuses(src.Statuses, src.TeamStatuses))
             .Map(dest => dest.Attributes, src => AttributeBoundsMapper.ToAttributes(src.AttributeBounds))
+            .Map(dest => dest.Performance, src => PerformanceMapper.ToPerformance(src.AttributeBounds))
+            .Map(dest => dest.League, src => PerformanceMapper.League(src.AttributeBounds))
             // The report's date always comes back when the report was asked for; a player never scouted has a blank one.
             .Map(dest => dest.Report, src => IsBlankDate(src.ReportDate) ? null : src);
 
@@ -604,15 +711,355 @@ public class MappingConfig
 
         config.NewConfig<BridgeNextMatchRulesDto, NextMatchRules>()
             .Map(dest => dest.Competition, src => Text(src.Competition))
-            .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
+            .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(ListItemText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
     }
 
-    // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
-    private static string RuleText(JsonElement rule)
+    // The league table. The game's fate for a place with none is a blank name.
+    private static void RegisterStandings(TypeAdapterConfig config)
     {
-        return rule.ValueKind == JsonValueKind.String ? rule.GetString() ?? string.Empty : rule.GetRawText();
+        config.NewConfig<BridgeTableRowDto, LeagueTableRow>()
+            .Map(dest => dest.TeamId, src => src.TeamId ?? 0)
+            .Map(dest => dest.TeamName, src => src.TeamName ?? string.Empty)
+            .Map(dest => dest.Position, src => src.Position ?? 0)
+            .Map(dest => dest.Played, src => src.Played ?? 0)
+            .Map(dest => dest.Won, src => src.Won ?? 0)
+            .Map(dest => dest.Drawn, src => src.Drawn ?? 0)
+            .Map(dest => dest.Lost, src => src.Lost ?? 0)
+            .Map(dest => dest.GoalsFor, src => src.GoalsFor ?? 0)
+            .Map(dest => dest.GoalsAgainst, src => src.GoalsAgainst ?? 0)
+            .Map(dest => dest.GoalDifference, src => src.GoalDifference ?? 0)
+            .Map(dest => dest.Points, src => src.Points ?? 0)
+            .Map(dest => dest.Fate, src => Text(src.Fate))
+            .Map(dest => dest.Movement, src => src.Rising == true ? TableMovement.Up : src.Falling == true ? TableMovement.Down : TableMovement.Same)
+            .Ignore(dest => dest.IsUser);
+    }
+
+    // The club finance screen. Amounts in pounds stay numbers (the service writes them in the screens' currency); texts
+    // pass as the game writes them.
+    private static void RegisterFinances(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeFinancesDto, FinanceReadout>()
+            .Map(dest => dest.FinancialStatus, src => Text(src.FinancialStatus))
+            .Map(dest => dest.Wages, src => src.Wages ?? new BridgeWagesDto())
+            .Map(dest => dest.WageGroups, src => src.Wages != null && src.Wages.PlayerTypeWageData != null
+                ? src.Wages.PlayerTypeWageData
+                : new List<BridgeWageGroupDto>())
+            .Map(dest => dest.IncomeLines, src => src.IncomeLines ?? new List<BridgeFinanceLineDto>())
+            .Map(dest => dest.ExpenditureLines, src => src.ExpenditureLines ?? new List<BridgeFinanceLineDto>())
+            .Map(dest => dest.NotableIncome, src => src.NotableIncome ?? new List<BridgeNotableIncomeDto>())
+            .Map(dest => dest.BalanceHistory, src => src.BalanceHistory ?? new List<BridgeGraphPointDto>())
+            .Map(dest => dest.BalanceProjection, src => SeasonEnds(src.BalanceProjection));
+
+        config.NewConfig<BridgeWagesDto, WageSummary>()
+            .Map(dest => dest.Committed, src => Text(src.CommittedWageTotalValueWithShortText))
+            .Map(dest => dest.Budget, src => Text(src.CurrentWageBudgetValueWithText))
+            .Map(dest => dest.Remaining, src => Text(src.RemainingBudgetValueWithText))
+            .Map(dest => dest.NextSeasonBudget, src => Text(src.NextSeasonWageBudgetValueWithText))
+            .Map(dest => dest.BudgetUsedPercentage, src => src.WageBudgetPercentage == null ? null : (double?)Math.Round(src.WageBudgetPercentage.Value, 1));
+
+        config.NewConfig<BridgeWageGroupDto, WageGroup>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Players, src => src.Quantity ?? 0)
+            .Map(dest => dest.TotalWages, src => Text(src.TotalBasicWage))
+            .Map(dest => dest.TotalWagesInGameUnit, src => src.TotalBasicWageValue ?? 0)
+            .Map(dest => dest.AverageWage, src => Text(src.AverageBasicWage))
+            .Map(dest => dest.HighestWage, src => Text(src.HighestBasicWage))
+            .Map(dest => dest.LowestWage, src => Text(src.LowestBasicWage))
+            .Map(dest => dest.AdvisedMaxWage, src => Text(src.AdvisedMaxBasicWage))
+            .Map(dest => dest.IsOverWages, src => src.IsOverWages ?? false);
+
+        config.NewConfig<BridgeFinanceLineDto, FinanceLine>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Amount, src => Text(src.DisplayValue))
+            .Map(dest => dest.ChangeFromLastMonth, src => src.MonthToMonthPercentage);
+
+        config.NewConfig<BridgeNotableIncomeDto, NotableIncome>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty);
+
+        config.NewConfig<BridgeGraphPointDto, BalanceAt>()
+            .Map(dest => dest.When, src => src.GraphPointX ?? string.Empty)
+            .Map(dest => dest.Amount, src => src.GraphPointY ?? 0);
+    }
+
+    // This season's end and the next two, in order; a point the game leaves out is skipped.
+    private static List<BalanceAt> SeasonEnds(BridgeProjectionDto? projection)
+    {
+        if (projection is null)
+        {
+            return [];
+        }
+
+        return new[] { projection.ProjectionEndOfSeasonOne, projection.ProjectionEndOfSeasonTwo, projection.ProjectionEndOfSeasonThree }
+            .Where(point => point?.PropertyValue is not null)
+            .Select(point => new BalanceAt { When = point!.Title ?? string.Empty, Amount = point.PropertyValue!.Value })
+            .ToList();
+    }
+
+    // The club vision screen. An objective the game leaves unnamed isn't shown; the culture texts hold one item a line.
+    private static void RegisterBoard(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeTeamConfidenceDto, BoardConfidence>()
+            .Map(dest => dest.Grade, src => src.BoardGrade)
+            .Map(dest => dest.Summary, src => Text(src.BoardSummary))
+            .Map(dest => dest.Matches, src => Text(src.BoardMatches))
+            .Map(dest => dest.SquadSupport, src => Text(src.BoardSquadSupport))
+            .Map(dest => dest.Tactics, src => Text(src.BoardTactics))
+            .Map(dest => dest.Vision, src => Text(src.BoardVision))
+            .Map(dest => dest.Transfers, src => Text(src.BoardTransfers))
+            .Map(dest => dest.Highlights, src => src.BoardHighlights ?? new List<string>())
+            .Map(dest => dest.Criticism, src => src.BoardCriticism ?? new List<string>());
+
+        config.NewConfig<BridgeTeamConfidenceDto, SupporterConfidence>()
+            .Map(dest => dest.Grade, src => src.SupporterGrade)
+            .Map(dest => dest.Summary, src => Text(src.SupporterSummary))
+            .Map(dest => dest.Matches, src => Text(src.SupporterMatches))
+            .Map(dest => dest.Vision, src => Text(src.SupporterVision));
+
+        config.NewConfig<BridgeClubVisionDto, BoardStatus>()
+            .Map(dest => dest.ThisYearObjective, src => Objective(src.ThisYearName, src.ThisYearYear, src.ThisYearProgress, src.ThisYearStatus))
+            .Map(dest => dest.FinalObjective, src => Objective(src.FinalName, src.FinalYear, src.FinalProgress, src.FinalStatus))
+            .Map(dest => dest.SupporterCulture, src => Lines(src.SupporterCulture))
+            .Map(dest => dest.BoardCulture, src => Lines(src.BoardCulture))
+            .Map(dest => dest.BoardRequests, src => src.BoardRequests ?? 0)
+            .Map(dest => dest.ActiveBoardRequests, src => src.ActiveBoardRequests ?? 0)
+            // Set by the client from the confidence record and the manager's promises.
+            .Ignore(dest => dest.Board)
+            .Ignore(dest => dest.Supporters)
+            .Ignore(dest => dest.Promises);
+
+        config.NewConfig<BridgeBoardPromisesDto, List<string>>()
+            .MapWith(src => (src.Promises ?? new List<JsonElement>()).Select(ListItemText).ToList());
+    }
+
+    // The first team's staff as their profiles show them. A contract without an end is dated 1900. The wage stays the
+    // game's own text, in the save's currency.
+    private static void RegisterStaff(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeStaffAttributeDto, StaffAttribute>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Value, src => src.PropertyValue ?? 0)
+            .Map(dest => dest.Level, src => Text(src.DisplayString));
+
+        config.NewConfig<BridgeStaffMemberDto, StaffMember>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Job, src => Text(src.Job))
+            .Map(dest => dest.CoachingStyle, src => Text(src.CoachingStyle))
+            .Map(dest => dest.CoachingAttributes, src => src.CoachingAttributes ?? new List<BridgeStaffAttributeDto>())
+            .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes ?? new List<BridgeStaffAttributeDto>())
+            .Map(dest => dest.Wage, src => Text(src.Wage))
+            .Map(dest => dest.ContractEnd, src => IsBlankDate(src.ContractEnd) ? null : src.ContractEnd);
+
+        config.NewConfig<BridgeStaffCountsDto, TeamStaff>()
+            .Map(dest => dest.TeamName, src => src.TeamName ?? string.Empty)
+            .Map(dest => dest.Analyst, src => Text(src.Analyst))
+            // Set by the client from their own reads.
+            .Ignore(dest => dest.Members)
+            .Ignore(dest => dest.Vacancies);
+    }
+
+    // The first team's contracts. Money stays as the game writes it; a release clause of 0 ("-") is none, and a contract
+    // without an end date (dated 1900) has no end.
+    private static void RegisterContracts(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeSquadContractDto, SquadPlayerContract>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Wage, src => src.Wage == null ? null : Text(src.Wage.DisplayValue))
+            .Map(dest => dest.EndDate, src => ContractEnd(src.HasEndDate, src.EndDate))
+            .Map(dest => dest.TimeRemaining, src => Text(src.TimeRemaining))
+            .Map(dest => dest.Type, src => src.Type == null ? null : Text(src.Type.DisplayValue))
+            .Map(dest => dest.AgreedPlayingTime, src => src.AgreedPlayingTime == null ? null : Text(src.AgreedPlayingTime.DisplayValue))
+            .Map(dest => dest.ReleaseClause,
+                src => src.ReleaseClause != null && src.ReleaseClause.SortValue > 0 ? Text(src.ReleaseClause.DisplayValue) : null)
+            .Map(dest => dest.ClausesCount, src => src.ClausesCount ?? 0)
+            .Map(dest => dest.HasRenewalOffer, src => src.HasRenewalOffer ?? false)
+            .Map(dest => dest.StaffAdvice, src => Text(src.StaffAdvice));
+    }
+
+    private static DateOnly? ContractEnd(bool? hasEndDate, string? date)
+    {
+        if (hasEndDate != true || IsBlankDate(date))
+        {
+            return null;
+        }
+
+        return DateOnly.TryParseExact(date, MatchConstants.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            ? day
+            : null;
+    }
+
+    // The dressing room. Empty texts are the game's blanks; a happiness reason is the sentence the game shows.
+    private static void RegisterSquadDynamics(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeHierarchyMemberDto, HierarchyMember>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty);
+
+        config.NewConfig<BridgeHappinessIssueDto, HappinessIssue>()
+            .Map(dest => dest.PlayerId, src => src.PlayerId ?? 0)
+            .Map(dest => dest.PlayerName, src => src.PlayerName ?? string.Empty)
+            .Map(dest => dest.Severity, src => Text(src.Severity))
+            .Map(dest => dest.Description, src => Text(src.Description))
+            .Map(dest => dest.PlayersAgreeing, src => src.PlayersAgreeing ?? 0)
+            .Map(dest => dest.HasPromises, src => src.LinkedPromises != null && src.LinkedPromises.Count > 0);
+
+        config.NewConfig<BridgeAtmosphereFactorDto, AtmosphereFactor>()
+            .Map(dest => dest.Text, src => src.Text ?? string.Empty);
+
+        config.NewConfig<BridgeAtmosphereDto, DressingRoomAtmosphere>()
+            .Map(dest => dest.Summary, src => Text(src.Summary))
+            .Map(dest => dest.Factors, src => src.Factors ?? new List<BridgeAtmosphereFactorDto>());
+
+        config.NewConfig<BridgePromiseDto, PlayerPromise>()
+            .Map(dest => dest.Title, src => Text(src.Title))
+            .Map(dest => dest.Description, src => Text(src.Description))
+            .Map(dest => dest.Status, src => Text(src.Status))
+            .Map(dest => dest.EndDate, src => src.EndDate == null ? null : Text(ListItemText(src.EndDate.Value)));
+
+        config.NewConfig<BridgePlayerDynamicsDto, PlayerDynamics>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.HierarchyLevel, src => Text(src.HierarchyLevel))
+            .Map(dest => dest.HappinessPositives, src => Reasons(src.HappinessPositives))
+            .Map(dest => dest.HappinessNegatives, src => Reasons(src.HappinessNegatives))
+            .Map(dest => dest.Promises, src => src.Promises ?? 0);
+    }
+
+    private static List<string> Reasons(List<BridgeHappinessReasonDto>? reasons)
+    {
+        return (reasons ?? []).Select(reason => Text(reason.Text)).OfType<string>().ToList();
+    }
+
+    // The medical centre. Empty texts are the game's blanks (no risk factor, no one returning).
+    private static void RegisterInjuries(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeMedicalRecordDto, PlayerMedicalRecord>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.InjuriesThisSeason, src => src.InjuriesThisSeason ?? 0)
+            .Map(dest => dest.RiskOverview, src => Text(src.RiskOverview))
+            .Map(dest => dest.RiskReason, src => Text(src.RiskReason))
+            .Map(dest => dest.History, src => src.History ?? new List<BridgePastInjuryDto>());
+
+        config.NewConfig<BridgePastInjuryDto, PastInjury>()
+            .Map(dest => dest.Date, src => InjuryDate(src.Date))
+            .Map(dest => dest.Injury, src => Text(src.Description))
+            .Map(dest => dest.Duration, src => Text(src.Duration))
+            .Map(dest => dest.Severity, src => Severity(src.Severity))
+            .Map(dest => dest.Cause, src => Text(src.Cause))
+            .Map(dest => dest.Context, src => Text(src.ReceivedIn))
+            .Map(dest => dest.IsActive, src => src.IsActive ?? false);
+
+        config.NewConfig<BridgeSeasonInjuriesDto, SeasonInjurySummary>()
+            .Map(dest => dest.ComparedWithLastSeason, src => Text(src.ComparedWithLastSeason))
+            .Map(dest => dest.ExpectedOverSeason, src => Text(src.ExpectedOverSeason))
+            .Map(dest => dest.LeagueAverage, src => Text(src.LeagueAverage))
+            .Map(dest => dest.ExhaustedAndRecurring, src => Text(src.ExhaustedAndRecurring))
+            .Map(dest => dest.ExpectedReturnsNextMatch, src => Text(src.ExpectedReturnsNextMatch));
+    }
+
+    private static DateOnly? InjuryDate(string? date)
+    {
+        return DateOnly.TryParseExact(date, InjuryConstants.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    // The game's 0-3 scale; anything else is left out rather than guessed.
+    private static InjurySeverity? Severity(int? severity)
+    {
+        return severity is >= (int)InjurySeverity.Slight and <= (int)InjurySeverity.Major ? (InjurySeverity)severity.Value : null;
+    }
+
+    // The youth set-up and loans. Empty texts are the game's blanks; a loan rating of 0 means no appearances yet.
+    private static void RegisterYouth(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeYouthSetupDto, YouthSetup>()
+            .Map(dest => dest.TeamName, src => Text(src.TeamName))
+            .Map(dest => dest.IntakeDate, src => Text(src.IntakeDate))
+            .Map(dest => dest.FacilitiesRating, src => src.Facilities == null ? null : src.Facilities.Rating)
+            .Map(dest => dest.Facilities, src => src.Facilities == null ? null : Text(src.Facilities.DescriptionShort))
+            .Map(dest => dest.FacilitiesDescription, src => src.Facilities == null ? null : Text(src.Facilities.Description));
+
+        config.NewConfig<BridgeYouthPlayerDto, YouthPlayer>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Positions, src => Text(src.Positions))
+            .Map(dest => dest.Morale, src => Text(src.Morale))
+            .Map(dest => dest.ContractEndDate, src => Text(src.ContractEndDate))
+            .Ignore(dest => dest.OnLoan, dest => dest.LoanClub);
+
+        config.NewConfig<BridgeLoanedPlayerDto, LoanedPlayer>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Club, src => Text(src.Club))
+            .Map(dest => dest.LoanEndDate, src => Text(src.LoanEndDate))
+            .Map(dest => dest.MonthlyFee, src => Text(src.MonthlyFee))
+            .Map(dest => dest.AverageRating, src => src.AverageRating > 0 ? (double?)Math.Round(src.AverageRating.Value, 2) : null)
+            .Map(dest => dest.Comments, src => (src.Comments ?? new List<BridgeSortedValueDto>())
+                .Select(comment => comment.DisplayValue)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Select(text => text!)
+                .ToList());
+    }
+
+    private static VisionObjective? Objective(string? name, string? year, int? progress, int? status)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        return new VisionObjective { Name = name, Year = Text(year), Progress = progress, Status = status };
+    }
+
+    private static List<string> Lines(string? text)
+    {
+        return (text ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    }
+
+    // A list item the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
+    private static string ListItemText(JsonElement item)
+    {
+        return item.ValueKind == JsonValueKind.String ? item.GetString() ?? string.Empty : item.GetRawText();
+    }
+
+    // The transfer activity screen. A count the game didn't answer is 0; its texts, money included, stay as it shows them.
+    private static void RegisterTransferActivity(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeTransferActivityDto, TransferOfferCounts>()
+            .Map(dest => dest.All, src => src.OffersAll ?? 0)
+            .Map(dest => dest.In, src => src.OffersIn ?? 0)
+            .Map(dest => dest.Out, src => src.OffersOut ?? 0)
+            .Map(dest => dest.AwaitingResponseAll, src => src.AwaitingResponseAll ?? 0)
+            .Map(dest => dest.AwaitingResponseIn, src => src.AwaitingResponseIn ?? 0)
+            .Map(dest => dest.AwaitingResponseOut, src => src.AwaitingResponseOut ?? 0)
+            .Map(dest => dest.Trades, src => src.Trades ?? 0);
+
+        config.NewConfig<BridgeTransferActivityDto, TransferActivityReadout>()
+            .Map(dest => dest.Counts, src => src)
+            .Map(dest => dest.IncomingValue, src => Text(src.IncomingValue))
+            .Map(dest => dest.OutgoingValue, src => Text(src.OutgoingValue))
+            .Ignore(dest => dest.Players);
+
+        config.NewConfig<BridgeTransferActivityPlayerDto, TransferActivityPlayer>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Status, src => Text(src.Status))
+            .Map(dest => dest.Wage, src => Text(src.Wage))
+            .Ignore(dest => dest.Direction)
+            .Ignore(dest => dest.Offers);
+
+        config.NewConfig<BridgeTransferActivityOfferDto, TransferActivityOffer>()
+            .Map(dest => dest.BuyingClub, src => Text(src.BuyingClub))
+            .Map(dest => dest.SellingClub, src => Text(src.SellingClub))
+            .Map(dest => dest.Type, src => Text(src.Type))
+            .Map(dest => dest.Fee, src => Text(src.Fee))
+            .Map(dest => dest.Status, src => Text(src.Status))
+            .Map(dest => dest.RequiresResponse, src => src.RequiresResponse ?? false);
     }
 
     private static string? Text(string? value)

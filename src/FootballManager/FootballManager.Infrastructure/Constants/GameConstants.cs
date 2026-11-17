@@ -9,6 +9,9 @@ internal static class GameConstants
     public const string HumanRoot = "Human";
     public const string GameRoot = "game";
 
+    // The match being played; the root only exists during one.
+    public const string MatchRoot = "Match";
+
     public const string Team = "Team";
     public const string TeamName = "Team.Name";
     public const string TeamId = "Team.UniqueId";

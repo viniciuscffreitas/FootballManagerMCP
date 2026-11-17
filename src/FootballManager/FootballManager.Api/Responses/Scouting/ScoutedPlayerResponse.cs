@@ -9,6 +9,7 @@ public class ScoutedPlayerResponse
     public int? Age { get; set; }
     public string? Club { get; set; }
     public string? Nation { get; set; }
+    public string? League { get; set; }
     public string? Positions { get; set; }
 
     /// <summary>A position code, e.g. "DC".</summary>
@@ -46,6 +47,9 @@ public class ScoutedPlayerResponse
 
     /// <summary>Category ("technical", "mental", ...) to attribute name to value: "12", "11-14" or null if masked.</summary>
     public Dictionary<string, Dictionary<string, string?>>? Attributes { get; set; }
+
+    /// <summary>His season numbers for his club, when asked for.</summary>
+    public PlayerPerformanceResponse? Performance { get; set; }
 
     public ScoutReportResponse? Report { get; set; }
 

@@ -8,6 +8,12 @@ public interface IMatchesGameClient
     /// <summary>Returns every fixture of the user's team this season, played and the next few, friendlies included.</summary>
     Task<TeamFixtures> GetFixturesAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Returns the user's next <paramref name="count"/> fixtures in every competition, in date order.</summary>
+    Task<TeamFixtures> GetUpcomingFixturesAsync(int count, CancellationToken cancellationToken = default);
+
     /// <summary>Returns the user's match on <paramref name="date"/> in depth, or null if there's none that day.</summary>
     Task<MatchDetail?> GetMatchAsync(DateOnly date, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the user's match being played right now, or null if no match is in progress.</summary>
+    Task<LiveMatchReadout?> GetLiveMatchAsync(CancellationToken cancellationToken = default);
 }

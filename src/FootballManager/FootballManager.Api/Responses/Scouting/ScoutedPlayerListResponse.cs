@@ -17,6 +17,9 @@ public class ScoutedPlayerListResponse
     /// <summary>How many the list holds; more than <see cref="Count"/> when a limit cut it short.</summary>
     public int Total { get; set; }
 
+    /// <summary>With a performance filter: how many players were read and cut down to the ones listed.</summary>
+    public int? Scanned { get; set; }
+
     public bool? HiddenDataMasked { get; set; }
     public List<ScoutedPlayerResponse> Players { get; set; } = [];
 }

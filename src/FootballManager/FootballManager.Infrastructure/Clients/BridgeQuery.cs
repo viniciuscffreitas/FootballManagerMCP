@@ -29,6 +29,12 @@ internal sealed class BridgeQuery
         return new BridgeQuery(GameConstants.GameRoot);
     }
 
+    /// <summary>The match being played (only during one), as the match screen binds it.</summary>
+    public static BridgeQuery FromMatch()
+    {
+        return new BridgeQuery(GameConstants.MatchRoot);
+    }
+
     /// <summary>
     /// The tactic the team plays. Reads pass the user's manager and team as contexts, like the game's screens; writes
     /// don't, like the tactics screen's controls.
@@ -82,11 +88,14 @@ internal sealed class BridgeQuery
     /// <summary>Passes the user's manager and team as "human" and "team", as the game's own screens do.</summary>
     public BridgeQuery WithHumanAndTeam() => Add("contexts", "true");
 
-    /// <summary>Sizes a fixture list like the game's fixtures screen: the season so far and the next few matches.</summary>
-    public BridgeQuery FixtureWindow()
+    /// <summary>
+    /// Sizes a fixture list like the game's fixtures screen: by default the season so far and the next few matches,
+    /// else the given number of past and future ones.
+    /// </summary>
+    public BridgeQuery FixtureWindow(int previous = MatchConstants.PreviousMatches, int upcoming = MatchConstants.UpcomingMatches)
     {
-        return Context(MatchConstants.PreviousAmount, MatchConstants.PreviousMatches)
-            .Context(MatchConstants.FutureAmount, MatchConstants.UpcomingMatches)
+        return Context(MatchConstants.PreviousAmount, previous)
+            .Context(MatchConstants.FutureAmount, upcoming)
             .Context(MatchConstants.FixturePadding, 0)
             .Context(MatchConstants.YearIndex, 0);
     }
