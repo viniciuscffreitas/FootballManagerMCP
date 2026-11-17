@@ -70,17 +70,21 @@ internal sealed class ConversationBridgeClient(GameBridge bridge) : IConversatio
                     ("action", actionId.ToString(CultureInfo.InvariantCulture)), ("field", ConversationConstants.EntryData)),
             cancellationToken);
 
+        // The card shows before its lines: wait for the lines, and hand back a card without them only when time runs out.
+        ConversationCard? shown = null;
+
         for (var check = 0; check < OpenChecks; check++)
         {
             await Task.Delay(Poll, cancellationToken);
+            shown = await ReadCardAsync(cancellationToken) ?? shown;
 
-            if (await ReadCardAsync(cancellationToken) is { } card)
+            if (shown is { Lines.Count: > 0 })
             {
-                return card;
+                return shown;
             }
         }
 
-        return null;
+        return shown;
     }
 
     public async Task<ConversationCard?> SayAsync(int line, CancellationToken cancellationToken = default)

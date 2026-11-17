@@ -132,6 +132,19 @@ public class ConversationServiceTests
     }
 
     [Fact]
+    public async Task A_card_that_opens_without_lines_is_left_open_not_ended()
+    {
+        _game.OpenAsync(Rollheiser, Praise, Arg.Any<CancellationToken>()).Returns(Card([], "Abatido"));
+
+        var talk = (await _conversations.TalkAsync(Rollheiser, Praise, [1], continueOpen: false, apply: true)).Value;
+
+        Assert.False(talk.Ended);
+        Assert.Contains(talk.Notes, note => note.Contains("continue=true", StringComparison.Ordinal));
+        await _game.DidNotReceiveWithAnyArgs().SayAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().EndAsync();
+    }
+
+    [Fact]
     public async Task Continuing_plays_the_criticisms_second_round_and_ends()
     {
         _game.ReadCardAsync(Arg.Any<CancellationToken>()).Returns(Card(["Seu treino tem sido fraco.", "Espero mais de você."]));

@@ -196,6 +196,14 @@ public class ConversationService(IConversationGameClient game, ISaveGuard saveGu
     {
         var next = 0;
 
+        // A card that opened without lines hasn't asked anything yet: ending it here would spend the conversation unsaid.
+        if (card.Lines.Count == 0)
+        {
+            talk.BodyLanguage = card.BodyLanguage;
+            talk.Notes.Add("The card is open but shows no lines yet: call again with continue=true (a dry run reads it).");
+            return talk;
+        }
+
         try
         {
             while (card.Lines.Count > 0)
