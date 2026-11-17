@@ -16,6 +16,10 @@ _Avoid_: autopilot, piloto automático, modo autônomo
 O pedido do Vini que liga o Modo piloto: diz até onde avançar e, se ele quiser, em quais decisões o Claude deve chamá-lo.
 _Avoid_: comando, missão
 
+**Ponto de decisão**:
+Um momento em que o avanço do calendário para no Modo piloto e o Claude decide: o dia de jogo, um estado do jogo que o avanço não conhece e a conversa semanal com jogadores.
+_Avoid_: checkpoint, parada
+
 **Save de teste**:
 A cópia da carreira (`MCPFM investigation`) onde toda descoberta e todo teste acontecem; o save real do Vini nunca recebe escrita de teste.
 _Avoid_: save de investigação, sandbox
