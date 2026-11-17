@@ -75,6 +75,8 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_competition_stats` | A league's players ranked by any stat of its stats screen (xG, tackles won, passes completed, headers won, saves...), filtered by position, age and minutes, each cross-checked with your scouting and his contract |
 | Trials | `offer_trials` | Offers trials of 1 to 4 weeks to up to 50 players at once (free agents found with the player search, say) |
 | | `end_trials` | Ends trials, or withdraws offers not yet answered, for up to 50 players at once |
+| Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
+| | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
 | Training | `get_training` | This week's and next week's sessions, and each player's training position, role, additional focus, intensity and rating |
 | | `set_training` | Changes players' additional focus and intensity (or rests them), and sessions of the schedule |
 | Database | `search_database` | The game's search box: any player, staff member, club, competition or nation in the world |
@@ -96,15 +98,19 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   request at a time, so nothing else reads or writes while another team is the current one.
 - **Every change is a dry run first.** The tools that change something (`set_tactic`, `run_player_search`,
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`) only
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`, `suggest_rotation`, `talk_to_player`) only
   check and describe the change unless they're called with `apply: true`. Their descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
   confirmation message, and the game's warnings block the change. `scout_team`, `offer_trials` and `end_trials` only
   apply with the number of players you agreed to: if the plan has changed since the dry run, nothing is sent.
-- **Your career is checked and copied before a change.** Before `set_tactic` applies (`suggest_rotation` applies
-  through it), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the
-  game's date, and checks the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
+- **A conversation is spent once opened.** The game takes a conversation off the player's menu as soon as its card
+  opens, answered or not, so `talk_to_player`'s dry run opens nothing and says so; it refuses conversations the menu
+  doesn't offer.
+- **Your career is checked and copied before a change.** Before `set_tactic` (`suggest_rotation` applies
+  through it) or `talk_to_player` applies, the API checks the open save
+  against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks the game's version
+  against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
   to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that club's two newest such
   copies; files named any other way are never removed. A new game version (Game Pass updates on its own) keeps your
   save read-only until it's released: `release_game_version` writes the running build, e.g. `27.0.1.2494769`, in
