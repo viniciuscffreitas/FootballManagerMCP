@@ -2,6 +2,7 @@ using FluentResults;
 using FootballManager.Application.Exceptions;
 using FootballManager.Application.Interfaces;
 using FootballManager.Application.ResultErrors;
+using FootballManager.Domain.Saves;
 using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 
@@ -18,8 +19,9 @@ public interface ITacticEditingService
 // Edits a tactic slot the way a user would in the game, in the game's order: switch to the slot, then style (which
 // resets the mentality and team instructions), mentality, team instructions, formations (which redo the lineup), and
 // last the lineup: picks, position moves, roles, player instructions. Each stage plans from what the game holds after
-// the one before, so a dry run can only plan what it can see. The first failed write stops the edit.
-public class TacticEditingService(ITacticEditorGameClient game) : ITacticEditingService
+// the one before, so a dry run can only plan what it can see. The first failed write stops the edit. An apply goes
+// through the save guard first, which checks the open save and copies it.
+public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveGuard) : ITacticEditingService
 {
     public const int SlotCount = 3;
     public const int LineupSize = 11;
@@ -63,6 +65,18 @@ public class TacticEditingService(ITacticEditorGameClient game) : ITacticEditing
 
             var edit = new TacticEdit { Slot = changes.Slot, Applied = apply };
 
+            if (apply)
+            {
+                var clearance = await saveGuard.PrepareWriteAsync(cancellationToken);
+
+                if (clearance.IsFailed)
+                {
+                    return Result.Fail<TacticEdit>(clearance.Errors);
+                }
+
+                edit.Notes.Add(SaveNote(clearance.Value));
+            }
+
             try
             {
                 await new EditRun(game, options, roles, edit, apply, cancellationToken).RunAsync(changes, tactic);
@@ -81,6 +95,14 @@ public class TacticEditingService(ITacticEditorGameClient game) : ITacticEditing
         {
             return Result.Fail<TacticEdit>(new GameUnavailableError(exception.Message));
         }
+    }
+
+    private static string SaveNote(SaveClearance save)
+    {
+        return save.Backup is null
+            ? $"Written to the test save '{save.SaveName}', without a copy."
+            : $"Checked '{save.SaveName}' ({save.Club}, game date {save.GameDate:yyyy-MM-dd}, version {save.GameVersion}) " +
+              $"and copied it to {save.Backup} before writing.";
     }
 
     private static List<IError> Validate(TacticChanges changes, TacticOptions options, EditableTactic tactic)

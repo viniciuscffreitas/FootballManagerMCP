@@ -4,6 +4,7 @@ using FootballManager.Api.ExceptionHandler;
 using FootballManager.Api.Extensions;
 using FootballManager.Api.Mappings;
 using FootballManager.Application;
+using FootballManager.Application.Settings;
 using FootballManager.Infrastructure;
 using FootballManager.Infrastructure.Settings;
 using Mapster;
@@ -62,6 +63,9 @@ builder.Services.AddApiVersioning(options =>
 
 // Add application services
 builder.Services.AddApplicationServices();
+
+// The real save the save guard protects, and where its copies go (see SaveGuardSettings for the defaults).
+builder.Services.AddSingleton(builder.Configuration.GetSection("SaveGuard").Get<SaveGuardSettings>() ?? new SaveGuardSettings());
 
 // Add infrastructure services
 var infrastructureSettings = builder.Configuration

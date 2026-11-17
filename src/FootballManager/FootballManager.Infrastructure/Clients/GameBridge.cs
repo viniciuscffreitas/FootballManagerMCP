@@ -67,6 +67,12 @@ internal sealed class GameBridge(IHttpClientFactory httpClientFactory, ILogger<G
         return GetAsync<T>(path, cancellationToken);
     }
 
+    /// <summary>A plugin endpoint that answers in plain text, e.g. /status.</summary>
+    public Task<string> GetTextAsync(string path, CancellationToken cancellationToken)
+    {
+        return GetAsync<string>(path, cancellationToken, text: true);
+    }
+
     /// <summary>
     /// A write (see BridgeQuery.ToWrite). The game refusing it, e.g. a player already in the position, throws
     /// <see cref="GameRejectedException"/> with its reason.
@@ -81,7 +87,8 @@ internal sealed class GameBridge(IHttpClientFactory httpClientFactory, ILogger<G
     // writes sent any other way).
     private const string WriteHeader = "X-MCPFM-Write";
 
-    private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken, bool rejectionThrows = false, bool write = false)
+    private async Task<T> GetAsync<T>(
+        string path, CancellationToken cancellationToken, bool rejectionThrows = false, bool write = false, bool text = false)
     {
         var http = httpClientFactory.CreateClient(HttpClientName);
         HttpResponseMessage response;
@@ -123,6 +130,11 @@ internal sealed class GameBridge(IHttpClientFactory httpClientFactory, ILogger<G
             }
 
             throw new GameUnavailableException($"The game couldn't answer ({(int)response.StatusCode}): {reason}");
+        }
+
+        if (text)
+        {
+            return (T)(object)await response.Content.ReadAsStringAsync(cancellationToken);
         }
 
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken)

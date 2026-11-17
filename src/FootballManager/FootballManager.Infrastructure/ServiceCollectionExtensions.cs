@@ -1,5 +1,6 @@
 using FootballManager.Application.Interfaces;
 using FootballManager.Infrastructure.Clients;
+using FootballManager.Infrastructure.Files;
 using FootballManager.Infrastructure.Mappings;
 using FootballManager.Infrastructure.Settings;
 using Mapster;
@@ -44,6 +45,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPlayerSearchGameClient, PlayerSearchBridgeClient>();
         services.AddScoped<IInboxGameClient, InboxBridgeClient>();
         services.AddScoped<ITrainingGameClient, TrainingBridgeClient>();
+        services.AddScoped<ISaveSessionGameClient, SaveSessionBridgeClient>();
+        services.AddSingleton<ISaveFiles, LocalSaveFiles>();
         services.AddScoped<ICompetitionsGameClient, CompetitionsBridgeClient>();
         services.AddScoped<DatabaseSearchBridgeClient>();
         services.AddScoped<IDatabaseSearchGameClient>(provider => provider.GetRequiredService<DatabaseSearchBridgeClient>());

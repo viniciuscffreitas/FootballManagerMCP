@@ -97,6 +97,14 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
   confirmation message, and the game's warnings block the change. `scout_team`, `offer_trials` and `end_trials` only
   apply with the number of players you agreed to: if the plan has changed since the dry run, nothing is sent.
+- **Your career is checked and copied before a change.** Before `set_tactic` applies, the API checks the open save
+  against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks the game's version
+  against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
+  to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that club's two newest such
+  copies; files named any other way are never removed. A new game version (Game Pass updates on its own) keeps your
+  save read-only until it's released: write the build, e.g. `27.0.1.2494769`, in `released-version.txt` in the backup
+  folder. The investigation save takes changes without a copy or a version check. The API reads the saves as local
+  files, so in Docker every change to another save is refused.
 - **No changes during a match.** The plugin refuses every change while a match is being played, and when it can't
   tell whether one is.
 - **Web pages can't change your game.** The plugin only takes a change as a POST with its own header, which a page
@@ -307,6 +315,11 @@ stop working until MCPFM is updated.
 |---|---|---|
 | `InfrastructureSettings__GameBridgeBaseUrl` | `http://localhost:5121` | Where the plugin answers. Change the port here if you changed the plugin's |
 | `InfrastructureSettings__TimeoutSeconds` | `60` | How long the API waits for one answer from the game |
+| `SaveGuard__Save` | none | Your career's save, named without `.fm`. Without it, changes go only to the investigation save |
+| `SaveGuard__Club` | none | The club you manage in that save |
+| `SaveGuard__GamesFolder` | `Documents\Sports Interactive\Football Manager 27\games` | Where the game keeps its saves |
+| `SaveGuard__BackupFolder` | `C:\Code\fm-backup` | Where the copies go, and `released-version.txt` with them |
+| `SaveGuard__ReleasedVersion` | none | The game build cleared for changes while `released-version.txt` doesn't exist |
 | `Seq__ServerUrl` | `http://localhost:5341` | Where to send logs, if a Seq server runs. Without one, logs only go to the console. The compose file's Seq answers on `http://localhost:5342` (the API container already points to it) |
 
 The API listens on port 5120. The MCP server expects it there.
