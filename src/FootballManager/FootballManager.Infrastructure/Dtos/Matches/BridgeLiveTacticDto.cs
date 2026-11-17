@@ -1,10 +1,9 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using FootballManager.Infrastructure.Constants;
 
 namespace FootballManager.Infrastructure.Dtos.Matches;
 
-/// <summary>The tactic the match is played with, and the substitutions it has left.</summary>
+/// <summary>The tactic the match is played with.</summary>
 internal sealed class BridgeLiveTacticDto
 {
     [JsonPropertyName(GameConstants.Name)]
@@ -15,10 +14,4 @@ internal sealed class BridgeLiveTacticDto
 
     [JsonPropertyName(TacticConstants.Mentality)]
     public string? Mentality { get; set; }
-
-    [JsonPropertyName(LiveMatchConstants.SubstitutionsRemaining)]
-    public JsonElement? SubstitutionsRemaining { get; set; }
-
-    [JsonPropertyName(LiveMatchConstants.SubstitutionsAllowed)]
-    public JsonElement? SubstitutionsAllowed { get; set; }
 }

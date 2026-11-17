@@ -1,8 +1,9 @@
 namespace FootballManager.Infrastructure.Constants;
 
 // The match being played, as the match screen reads it. The game says whether a match is on (IsDuringMatch on the game
-// record); while it is, the user's next managed fixture is that match (seen on 16/11/2026, Primavera x Santos), and the
-// live-only properties (MatchTimeInMinutes, MatchHomeScore...) answer on it. Out of a match they stay pending.
+// record); while it is, the user's next managed fixture is that match (seen on 16/11/2026, Primavera x Santos). The
+// live properties (MatchTime, MatchHomeScore, Stats, PlayerMatchStats...) answer on the "Match" root only: on the
+// fixture they stay pending or empty during the match (seen on 17/11/2026, Atlético Mineiro x Santos).
 internal static class LiveMatchConstants
 {
     // On the game record.
@@ -16,7 +17,7 @@ internal static class LiveMatchConstants
     public static readonly string[] Teams = [GameConstants.TeamId, MatchDate];
 
     // On the match. The fixture's own score and numbers are only written at the final whistle; the Match* ones follow
-    // the play.
+    // the play. MatchTimeInMinutes answers null; the clock ("18:45", minutes and seconds) gives the minute.
     public const string Minute = "MatchTimeInMinutes";
     public const string Clock = "MatchTime";
     public const string HomeScore = "MatchHomeScore";
@@ -29,12 +30,20 @@ internal static class LiveMatchConstants
         MatchConstants.Incidents
     ];
 
-    // On the tactic the team plays, which is the one the match uses. The substitution counts only answer in a match.
-    public const string SubstitutionsRemaining = "SubsRemaining";
-    public const string SubstitutionsAllowed = "TotalSubsAllowed";
+    // On the tactic the team plays, which is the one the match uses.
+    public static readonly string[] Tactic = [GameConstants.Name, TacticConstants.FormationName, TacticConstants.Mentality];
 
-    public static readonly string[] Tactic =
+    // On one side of the match (context isHomeTeam): its numbers and its match tactic's substitutions. The counts stay
+    // pending on the team's tactic; they answer on the match's.
+    public const string SubstitutionsRemaining = "Tactic.SubsRemaining";
+    public const string SubstitutionsAllowed = "Tactic.TotalSubsAllowed";
+    public static readonly string[] Side = [MatchConstants.TeamStats, SubstitutionsRemaining, SubstitutionsAllowed];
+
+    // Each player who took the pitch for a side (a list on the match, context isHomeTeam). On the match the list holds
+    // references, so its items are read field by field.
+    public static readonly string[] PlayerLine =
     [
-        GameConstants.Name, TacticConstants.FormationName, TacticConstants.Mentality, SubstitutionsRemaining, SubstitutionsAllowed
+        "Player", "IncidentType", "MatchTime", "PlayerTeamSelectionIndex", "YellowCardedInMatch", "RedCardedInMatch",
+        "TotalRating", "Goals"
     ];
 }

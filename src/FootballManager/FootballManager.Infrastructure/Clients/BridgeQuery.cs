@@ -29,6 +29,12 @@ internal sealed class BridgeQuery
         return new BridgeQuery(GameConstants.GameRoot);
     }
 
+    /// <summary>The match being played (only during one), as the match screen binds it.</summary>
+    public static BridgeQuery FromMatch()
+    {
+        return new BridgeQuery(GameConstants.MatchRoot);
+    }
+
     /// <summary>
     /// The tactic the team plays. Reads pass the user's manager and team as contexts, like the game's screens; writes
     /// don't, like the tactics screen's controls.

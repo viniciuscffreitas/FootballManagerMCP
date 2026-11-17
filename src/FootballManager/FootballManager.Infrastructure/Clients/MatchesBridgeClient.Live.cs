@@ -44,7 +44,9 @@ internal sealed partial class MatchesBridgeClient
         var live = (await match).Values;
         var teamId = user.TeamId ?? 0;
         var isHome = live.HomeTeamId == teamId;
-        var ours = isHome ? await home : await away;
+        var (homeSide, homePlayers) = await home;
+        var (awaySide, awayPlayers) = await away;
+        var (ourSide, ourPlayers) = isHome ? (homeSide, homePlayers) : (awaySide, awayPlayers);
         var played = (await tactic).Values;
 
         // The squad by database index, which is how a match refers to its players.
@@ -57,34 +59,56 @@ internal sealed partial class MatchesBridgeClient
 
         return new LiveMatchReadout
         {
-            Minute = Number(live.Minute),
+            Minute = Number(live.Minute) ?? ClockMinute(live.Clock),
             Clock = string.IsNullOrEmpty(live.Clock) ? null : live.Clock,
             Competition = live.Competition,
             TeamId = teamId,
             Home = new MatchSide { TeamId = live.HomeTeamId ?? 0, TeamName = live.HomeTeamName ?? string.Empty, Goals = Score(live.LiveHomeScore, live.HomeScore) },
             Away = new MatchSide { TeamId = live.AwayTeamId ?? 0, TeamName = live.AwayTeamName ?? string.Empty, Goals = Score(live.LiveAwayScore, live.AwayScore) },
-            HomeStats = (await home).Stats.Adapt<TeamMatchStats?>(),
-            AwayStats = (await away).Stats.Adapt<TeamMatchStats?>(),
+            HomeStats = homeSide.Stats.Adapt<TeamMatchStats?>(),
+            AwayStats = awaySide.Stats.Adapt<TeamMatchStats?>(),
             Goals = Goals(new BridgeMatchEventsDto { Incidents = live.Incidents }, isHome, names),
-            Players = (ours.Players ?? []).Select(line => LivePlayer(line, members)).ToList(),
+            Players = ourPlayers.Select(line => LivePlayer(line, members)).ToList(),
             Tactic = new LiveTactic { Name = played.Name, Formation = played.Formation, Mentality = played.Mentality },
-            SubstitutionsRemaining = Number(played.SubstitutionsRemaining),
-            SubstitutionsAllowed = Number(played.SubstitutionsAllowed)
+            SubstitutionsRemaining = Number(ourSide.SubstitutionsRemaining),
+            SubstitutionsAllowed = Number(ourSide.SubstitutionsAllowed)
         };
     }
 
+    // The match root, not the fixture: on the fixture the live values stay pending or empty during the match.
     private static BridgeQuery Live()
     {
-        return BridgeQuery.FromHuman().Base(LiveMatchConstants.Match).WithHumanAndTeam();
+        return BridgeQuery.FromMatch().WithHumanAndTeam();
     }
 
-    private async Task<BridgeMatchSideDto> LiveSideAsync(bool isHome, CancellationToken cancellationToken)
+    private async Task<(BridgeLiveSideDto Side, List<BridgePlayerMatchStatsDto> Players)> LiveSideAsync(
+        bool isHome, CancellationToken cancellationToken)
     {
-        var side = await bridge.GetRecordAsync<BridgeMatchSideDto>(
-            Live().Context(MatchConstants.IsHomeTeam, isHome).Props([MatchConstants.TeamStats, MatchConstants.PlayerStats]),
+        var side = bridge.GetRecordAsync<BridgeLiveSideDto>(
+            Live().Context(MatchConstants.IsHomeTeam, isHome).Props(LiveMatchConstants.Side), cancellationToken);
+        var players = bridge.GetListAsync<BridgePlayerMatchStatsDto>(
+            Live().List(MatchConstants.PlayerStats).Context(MatchConstants.IsHomeTeam, isHome).Props(LiveMatchConstants.PlayerLine),
             cancellationToken);
 
-        return side.Values;
+        await Task.WhenAll(side, players);
+
+        return ((await side).Values, (await players).Items.Select(item => item.Values).ToList());
+    }
+
+    // The minute being played from the match clock (minutes and seconds gone): "18:45" is the 19th minute, and a clock
+    // stopped on the minute ("45:00" at half-time) is that minute.
+    private static int? ClockMinute(string? clock)
+    {
+        var parts = clock?.Split(':');
+
+        if (parts is not [var minutes, var seconds]
+            || !int.TryParse(minutes, NumberStyles.Integer, CultureInfo.InvariantCulture, out var gone)
+            || !int.TryParse(seconds, NumberStyles.Integer, CultureInfo.InvariantCulture, out var secondsGone))
+        {
+            return null;
+        }
+
+        return gone > 0 && secondsGone == 0 ? gone : gone + 1;
     }
 
     // A player's match line keeps his last change only: came on (with the minute), or left the pitch (his slot is then
