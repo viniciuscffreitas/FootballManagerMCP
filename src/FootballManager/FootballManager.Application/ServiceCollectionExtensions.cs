@@ -8,6 +8,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<ISquadService, SquadService>();
+        services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<ITacticsService, TacticsService>();
         services.AddScoped<ITacticEditingService, TacticEditingService>();
         services.AddScoped<IMatchesService, MatchesService>();

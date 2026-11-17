@@ -34,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<GameVocabulary>();
         services.AddScoped<TeamInstructionReader>();
         services.AddScoped<ISquadGameClient, SquadBridgeClient>();
+        services.AddScoped<IAvailabilityGameClient, AvailabilityBridgeClient>();
         services.AddScoped<ITacticsGameClient, TacticsBridgeClient>();
         services.AddScoped<ITacticEditorGameClient, TacticEditorBridgeClient>();
         services.AddScoped<IMatchesGameClient, MatchesBridgeClient>();
