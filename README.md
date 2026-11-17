@@ -59,6 +59,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |
 | | `get_contracts` | Your first team's contracts: wage, end date and time left, type, agreed playing time, release clause, clauses, renewal offer and the staff's advice; optionally only those ending by a date |
 | | `get_squad_dynamics` | The dressing room: the hierarchy by level, the club atmosphere and its reasons, open happiness issues (player, severity), the manager's promises, and each player's level and reasons to be happy or unhappy |
+| | `get_injuries` | The medical centre: each player's injury history, injuries this season and injury risk in the game's words, and the season summary with who's expected back for the next match; one player on request |
 | Tactics | `get_tactics` | Your three tactic slots with the game's effectiveness ratings, and the active one in full |
 | | `get_role_fit` | Every role at a position, and how each of your players rates in it |
 | | `get_tactic_options` | Every style, mentality, formation and instruction a tactic can take |
