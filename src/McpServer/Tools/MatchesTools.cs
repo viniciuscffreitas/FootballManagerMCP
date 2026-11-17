@@ -26,6 +26,26 @@ public static class MatchesTools
         return await response.ReadContentOrError();
     }
 
+    [McpServerTool(Name = "get_live_match")]
+    [Description("Read the user's match while it's being played, as the match screen shows it (get_match only sees a " +
+                 "match after the final whistle). Read-only and light: safe to call during a live match, e.g. at half " +
+                 "time, after a goal, or when a player's condition drops. Returns the minute and match clock, " +
+                 "competition, opponent, venue, the score for and against, the goals so far (minute, side, scorer and " +
+                 "assister for the user's), both teams' numbers (xG, possession, shots, shots on target, cards...), " +
+                 "the user's players on the pitch in lineup order with rating, condition (percent), cards, goals and " +
+                 "when a substitute came on, the substitutions made (minute, who went off and on, injury when the game " +
+                 "tells), the substitutions left, and the tactic in use (name, shape with the ball, mentality in the " +
+                 "game's display language). A value the game doesn't send is left out. Out of a match it answers " +
+                 "inProgress false with the message 'nenhuma partida em andamento', not an error. Fails with a 503 " +
+                 "when the game isn't running or no save is loaded.")]
+    public static async Task<string> GetLiveMatch(IHttpClientFactory httpFactory)
+    {
+        var http = httpFactory.CreateClient("FootballManagerApi");
+
+        var response = await http.GetAsync("/api/v1/matches/live");
+        return await response.ReadContentOrError();
+    }
+
     [McpServerTool(Name = "get_match")]
     [Description("Get one of the user's matches in depth: the summary (as in get_matches), both teams' numbers (xG, " +
                  "possession, shots, chances created, crosses, passes, progressive and final-third passes, PPDA, " +

@@ -28,6 +28,19 @@ public class MatchesController(IMatchesService matchesService) : ControllerBase
         return result.ToGetResult<SeasonMatches, SeasonMatchesResponse>(m => m.Adapt<SeasonMatchesResponse>());
     }
 
+    /// <summary>
+    /// The user's match being played right now, as its screen shows it: minute, score, goals, both teams' numbers, the
+    /// players on the pitch with rating, condition and cards, the substitutions made and left, and the tactic. Out of a
+    /// match it answers that no match is in progress.
+    /// </summary>
+    [HttpGet("live")]
+    public async Task<Results<Ok<LiveMatchResponse>, BadRequest, NotFound, ProblemHttpResult>> GetLiveAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var result = await matchesService.GetLiveMatchAsync(cancellationToken);
+        return result.ToGetResult<LiveMatch, LiveMatchResponse>(m => m.Adapt<LiveMatchResponse>());
+    }
+
     /// <summary>One match in depth: both teams' numbers, the goals, and the user's players with positions, roles and stats.</summary>
     /// <param name="date">The match date, yyyy-MM-dd.</param>
     [HttpGet("{date}")]

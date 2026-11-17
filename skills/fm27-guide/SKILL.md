@@ -56,6 +56,15 @@ Match and tactics:
   only to chase a score. *confirmed in save* (steps), *probable* (effect)
 - Tweaks such as Lock It Down and Goalkeeper Up For Set Pieces are for the last minutes, never from kick-off. *probable*
 
+During a live match (`get_live_match`, read-only and light; `get_match` only sees the match after the final whistle):
+
+- Read it at half time, right after a goal either way, and when Vini says a player is tiring. Say what changed in one
+  line: score, xG and shots for and against, and the player most at risk. *confirmed in save* (out-of-match answer),
+  *probable* (live values; the tool was built without a live match to test)
+- Condition dropping under 60-65 on a starter, or a booked player on a low rating, is the cue to suggest a
+  substitution; check `substitutionsRemaining` first. *probable*
+- Never poll it in a loop or call `/ui`: heavy screen reads have frozen the live match. *confirmed in save*
+
 Squad and training:
 
 - Rotate 3 to 5 starters a match; a starter plays 2 games in 3. Out: injured, suspended, condition below 85. In:

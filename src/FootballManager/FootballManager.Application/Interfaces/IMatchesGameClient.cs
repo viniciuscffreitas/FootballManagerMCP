@@ -10,4 +10,7 @@ public interface IMatchesGameClient
 
     /// <summary>Returns the user's match on <paramref name="date"/> in depth, or null if there's none that day.</summary>
     Task<MatchDetail?> GetMatchAsync(DateOnly date, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the user's match being played right now, or null if no match is in progress.</summary>
+    Task<LiveMatchReadout?> GetLiveMatchAsync(CancellationToken cancellationToken = default);
 }

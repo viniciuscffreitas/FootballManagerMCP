@@ -13,7 +13,7 @@ namespace FootballManager.Infrastructure.Clients;
 
 // Reads the user's matches through the MCPFM plugin, the way the game's fixtures and match screens do. A match is
 // asked about by its place in the season's fixture list, which the list itself gives.
-internal sealed class MatchesBridgeClient(GameBridge bridge, GameVocabulary vocabulary) : IMatchesGameClient
+internal sealed partial class MatchesBridgeClient(GameBridge bridge, GameVocabulary vocabulary) : IMatchesGameClient
 {
     public async Task<TeamFixtures> GetFixturesAsync(CancellationToken cancellationToken = default)
     {

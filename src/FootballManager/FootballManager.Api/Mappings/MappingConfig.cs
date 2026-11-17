@@ -314,6 +314,16 @@ public class MappingConfig
             .Map(dest => dest.Injury, src => src.Injury ? true : (bool?)null);
         Rounded(config.NewConfig<PlayerOfTheMatch, PlayerOfTheMatchResponse>());
 
+        // Out of a match only the message goes; empty lists and false flags are left out.
+        Rounded(config.NewConfig<LiveMatch, LiveMatchResponse>())
+            .Map(dest => dest.Venue, src => src.Venue == null ? null : src.Venue.ToString())
+            .Map(dest => dest.Goals, src => src.InProgress ? src.Goals : null)
+            .Map(dest => dest.OnPitch, src => src.InProgress ? src.OnPitch : null)
+            .Map(dest => dest.Substitutions, src => src.InProgress ? src.Substitutions : null);
+        Rounded(config.NewConfig<LivePlayer, LivePlayerResponse>())
+            .Map(dest => dest.YellowCard, src => src.YellowCard ? true : (bool?)null)
+            .Map(dest => dest.RedCard, src => src.RedCard ? true : (bool?)null);
+
         Rounded(config.NewConfig<StyleAverages, StyleAveragesResponse>());
     }
 
