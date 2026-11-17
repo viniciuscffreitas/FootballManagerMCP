@@ -82,11 +82,11 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `set_training` | Changes players' additional focus and intensity (or rests them), and sessions of the schedule |
 | Database | `search_database` | The game's search box: any player, staff member, club, competition or nation in the world |
 | Inbox | `get_inbox` | Your messages, newest first, with forwarded press articles on request |
+| | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
+| | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
 | Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
 | | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |
 | | `release_game_version` | Clears a new game version for changes on your career save, after the short test on the investigation save |
-| | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
-| | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
 
 Names and labels come in the game's display language. Settings and roles also come as the game's English keys
 (`CentreForward`, `MuchHigherTempo`), which is what `set_tactic` takes.
@@ -108,30 +108,20 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
 - **A conversation is spent once opened.** The game takes a conversation off the player's menu as soon as its card
   opens, answered or not, so `talk_to_player`'s dry run opens nothing and says so; it refuses conversations the menu
   doesn't offer.
-- **Your career is checked and copied before a change.** Before `set_tactic` (`suggest_rotation` applies
-  through it) or `talk_to_player` applies, the API checks the open save
-- **Your career is checked and copied before a change.** Before `set_tactic` or `reply_to_message` applies, the API checks the open save
-  against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks the game's version
-  against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
-  to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that club's two newest such
-  copies; files named any other way are never removed. A new game version (Game Pass updates on its own) keeps your
-  save read-only until it's released: `release_game_version` writes the running build, e.g. `27.0.1.2494769`, in
-  `released-version.txt` in the backup folder, once a short test on the investigation save (advance a day, answer a
-  message, change the lineup) has passed by hand. The investigation save takes changes without a copy or a version check. The API reads the saves as local
-  files, so in Docker every change to another save is refused.
 - **A restore can be undone too.** `restore_save` only runs when you ask, and only while your career save is closed in
   the game (no tool closes a save): an open save would be written back over the restored file. It first keeps the save
   as it is as `<club>-antes-de-restaurar-<yyyyMMdd-HHmm>.fm` in the backup folder, which the rotation never removes,
   then copies the chosen copy over it.
 - **Only plain replies.** `reply_to_message` sends only the answers a message's button sends straight away. An option
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game.
-- **Your career is checked and copied before a change.** Before `set_tactic` or `create_tactic` applies, the API
-  checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+- **Your career is checked and copied before a change.** Before any change to your career applies (`set_tactic`,
+  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
   the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
   Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
   club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on
   its own) keeps your save read-only until it's released: write the build, e.g. `27.0.1.2494769`, in
-  `released-version.txt` in the backup folder. The investigation save takes changes without a copy or a version check.
+  `released-version.txt` in the backup folder with `release_game_version`, once a short test on the investigation
+  save (advance a day, answer a message, change the lineup) has passed by hand. The investigation save takes changes without a copy or a version check.
   The API reads the saves as local files, so in Docker every change to another save is refused.
 - **No changes during a match.** The plugin refuses every change while a match is being played, and when it can't
   tell whether one is.
