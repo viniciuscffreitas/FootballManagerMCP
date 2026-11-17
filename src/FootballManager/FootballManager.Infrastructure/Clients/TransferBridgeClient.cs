@@ -44,18 +44,26 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
         return OfferPanel(await PanelElementsAsync(TransferConstants.OfferPanel, cancellationToken));
     }
 
+    // The panel shows before its fee is bound: the fee counts once two reads in a row agree (and agree with what the
+    // combobox shows, see OfferPanel).
     public async Task<OfferPanel?> OpenOfferPanelAsync(int playerId, CancellationToken cancellationToken = default)
     {
         await players.OpenPanelAsync(playerId, PlayerMenuAction.MakeOffer, TransferConstants.OfferPanelAction, cancellationToken);
+
+        long? previous = null;
 
         for (var check = 0; check < OpenChecks; check++)
         {
             await Task.Delay(Poll, cancellationToken);
 
-            if (await ReadOfferPanelAsync(cancellationToken) is { Fee: not null } panel)
+            var panel = await ReadOfferPanelAsync(cancellationToken);
+
+            if (panel is { Fee: { } fee } && fee == previous)
             {
                 return panel;
             }
+
+            previous = panel?.Fee;
         }
 
         return null;
@@ -256,17 +264,11 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
             return null;
         }
 
-        var fee = FeeBox(elements) is { } box
-            ? elements.Where(element => element.IsWithin(box.Path) && element.Type == TransferConstants.FeeText)
-                .Select(element => long.TryParse(element.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? value : (long?)null)
-                .FirstOrDefault(value => value is not null)
-            : null;
-
         return new OfferPanel
         {
             Club = TextOf(elements, TransferConstants.OfferClub),
             Player = TextOf(elements, TransferConstants.OfferPlayer),
-            Fee = fee,
+            Fee = Fee(elements),
             Advice = SpeakerLines(elements),
             Texts = Texts(elements)
         };
@@ -276,6 +278,44 @@ internal sealed class TransferBridgeClient(GameBridge bridge, IScoutingEditorGam
     private static UiElementLine? FeeBox(List<UiElementLine> elements)
     {
         return elements.FirstOrDefault(element => element.Type.StartsWith(TransferConstants.Combobox, StringComparison.Ordinal));
+    }
+
+    // The number in the fee combobox's own field ("1000000"), only while it is what the combobox shows ("R$1 MI"):
+    // while the panel binds, the field can still hold another number than the one on screen.
+    private static long? Fee(List<UiElementLine> elements)
+    {
+        if (FeeBox(elements) is not { } box
+            || elements.FirstOrDefault(element => element.IsWithin(box.Path) && element.Type == TransferConstants.FeeField) is not { } field
+            || elements.FirstOrDefault(element => element.IsWithin(field.Path) && element.Type == TransferConstants.FeeText) is not { } text
+            || !long.TryParse(text.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var fee))
+        {
+            return null;
+        }
+
+        var preview = elements.FirstOrDefault(element => element.IsWithin(box.Path)
+                                                         && element.Classes.Contains(TransferConstants.FeePreview)
+                                                         && element.Text is not null);
+
+        return preview is not null && Shows(preview.Text!, fee) ? fee : null;
+    }
+
+    // Whether a short amount as the game writes it ("R$1 MI", "R$1.05 MI", "R$990 mil") is the fee, to its rounding.
+    // One it doesn't write that way (another currency's format) can't be checked, and passes.
+    private static bool Shows(string preview, long fee)
+    {
+        var match = TransferConstants.ShortAmount.Match(preview);
+
+        if (!match.Success
+            || !decimal.TryParse(match.Groups["number"].Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var number))
+        {
+            return true;
+        }
+
+        var unit = match.Groups["unit"].Value == TransferConstants.Millions ? 1_000_000m : 1_000m;
+        var decimals = match.Groups["number"].Value.Split('.').ElementAtOrDefault(1)?.Length ?? 0;
+        var halfStep = unit / (decimal)Math.Pow(10, decimals) / 2;
+
+        return Math.Abs(number * unit - fee) <= halfStep;
     }
 
     // What the staff member beside the panel says: his column's texts, but for his name, his job and the buttons.

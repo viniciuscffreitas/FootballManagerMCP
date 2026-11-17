@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace FootballManager.Infrastructure.Constants;
 
 // Transfers, through the game's own panels. The player's menu entry "make offer" opens the transfer offer panel
@@ -34,9 +36,16 @@ internal static class TransferConstants
     public const string TermLabelClass = "body-md-strong";
     public const int TermRowLevels = 4;
 
-    // The fee is the panel's first combobox: its number field's text, and its − and + buttons (R$10 mil a press).
+    // The fee is the panel's first combobox: what it shows ("R$1 MI"), its number field's text ("1000000"), and its −
+    // and + buttons (R$10 mil a press under R$1 mi, R$50 mil above).
     public const string Combobox = "FMCombobox";
+    public const string FeePreview = "si-combobox__preview-element";
+    public const string FeeField = "SILongField";
     public const string FeeText = "TextElement";
+
+    // A short amount as the panel shows it, in Brazilian Portuguese: "R$1.05 MI", "R$990 mil".
+    public static readonly Regex ShortAmount = new(@"(?<number>\d+(\.\d+)?)\s*(?<unit>MI|mil)\b", RegexOptions.CultureInvariant);
+    public const string Millions = "MI";
     public const string LowerButton = "si-combobox__lower-button";
     public const string RaiseButton = "si-combobox__raise-button";
 
