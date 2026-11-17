@@ -63,6 +63,7 @@ public class MappingConfig
             .Map(dest => dest.Attributes, src => GroupAttributes(src.Attributes));
 
         Rounded(config.NewConfig<PlayerSeasonStats, PlayerSeasonStatsResponse>());
+        Rounded(config.NewConfig<PlayerPerformance, PlayerPerformanceResponse>());
 
         config.NewConfig<PlayerInjury, InjuredPlayerResponse>();
         config.NewConfig<PlayerBan, SuspendedPlayerResponse>();

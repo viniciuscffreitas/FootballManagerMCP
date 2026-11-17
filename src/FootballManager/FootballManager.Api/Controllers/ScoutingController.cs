@@ -36,6 +36,11 @@ public class ScoutingController(
     /// <param name="includeHidden">Add hidden attributes and current/potential ability (masked without the In-Game Editor).</param>
     /// <param name="includeReport">Add each player's latest scout report: pros, cons, fee, wage demands and interest.</param>
     /// <param name="limit">At most this many players (1-200); the search reads 50 by default, in its own order.</param>
+    /// <param name="includeStats">Add each player's league and season numbers for his club, totals and per 90.</param>
+    /// <param name="leagues">Keep only players whose club plays in one of these leagues (whole names, as each player's league reads).</param>
+    /// <param name="minMinutes">Keep only players with at least these minutes this season.</param>
+    /// <param name="minAverageRating">Keep only players with at least this average rating this season.</param>
+    /// <param name="scan">With a filter on the search: how many results to read before cutting (300 by default, up to 1000).</param>
     [HttpGet("players")]
     public async Task<Results<Ok<ScoutedPlayerListResponse>, BadRequest, NotFound, ProblemHttpResult>> GetPlayersAsync(
         [FromQuery] ScoutingSource source = ScoutingSource.Recommendations,
@@ -45,10 +50,22 @@ public class ScoutingController(
         [FromQuery] bool includeHidden = false,
         [FromQuery] bool includeReport = false,
         [FromQuery] int? limit = null,
+        [FromQuery] bool includeStats = false,
+        [FromQuery] List<string>? leagues = null,
+        [FromQuery] int? minMinutes = null,
+        [FromQuery] double? minAverageRating = null,
+        [FromQuery] int? scan = null,
         CancellationToken cancellationToken = default)
     {
+        var filter = new PerformanceFilter
+        {
+            Leagues = leagues?.Where(league => !string.IsNullOrWhiteSpace(league)).ToList() ?? [],
+            MinMinutes = minMinutes,
+            MinAverageRating = minAverageRating
+        };
         var result = await scoutingService.GetPlayersAsync(
-            source, focusId, pool, includeAttributes, includeHidden, includeReport, limit, cancellationToken);
+            source, focusId, pool, includeAttributes, includeHidden, includeReport, limit, includeStats, filter, scan,
+            cancellationToken);
 
         return result.ToGetResult<ScoutedPlayerList, ScoutedPlayerListResponse>(l => l.Adapt<ScoutedPlayerListResponse>());
     }
