@@ -204,7 +204,10 @@ internal sealed class ConversationBridgeClient(GameBridge bridge) : IConversatio
 
     private static List<UiElementLine> LineButtons(List<UiElementLine> elements)
     {
-        return elements.Where(element => element.Classes.Contains(ConversationConstants.LineClass)).ToList();
+        // The game names the class after the button's look (speakto-body-header-suggestion-button--action-secondary).
+        return elements
+            .Where(element => element.Classes.Any(name => name.Contains(ConversationConstants.LineClass, StringComparison.Ordinal)))
+            .ToList();
     }
 
     private static bool Same(ConversationCard one, ConversationCard other)
