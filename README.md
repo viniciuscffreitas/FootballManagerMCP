@@ -56,6 +56,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 |---|---|---|
 | Squad | `get_squad` | Your first team: positions, condition, morale, season numbers; attributes on request |
 | | `get_availability` | Who can play the next match: the injured and their time out, the suspended (scope, matches left, reason), the match's registration and squad size rules, and every player's condition and sharpness |
+| | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |
 | Tactics | `get_tactics` | Your three tactic slots with the game's effectiveness ratings, and the active one in full |
 | | `get_role_fit` | Every role at a position, and how each of your players rates in it |
 | | `get_tactic_options` | Every style, mentality, formation and instruction a tactic can take |

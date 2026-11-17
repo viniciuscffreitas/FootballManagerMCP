@@ -7,6 +7,7 @@ using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
+using FootballManager.Domain.Staff;
 using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
@@ -20,6 +21,7 @@ using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
 using FootballManager.Infrastructure.Dtos.Players;
 using FootballManager.Infrastructure.Dtos.Scouting;
+using FootballManager.Infrastructure.Dtos.Staff;
 using FootballManager.Infrastructure.Dtos.Tactics;
 using FootballManager.Infrastructure.Dtos.Tactics.Editing;
 using FootballManager.Infrastructure.Dtos.Tactics.Effectiveness;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterStaff(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,33 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The first team's staff as their profiles show them. A contract without an end is dated 1900. The wage stays the
+    // game's own text, in the save's currency.
+    private static void RegisterStaff(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeStaffAttributeDto, StaffAttribute>()
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Value, src => src.PropertyValue ?? 0)
+            .Map(dest => dest.Level, src => Text(src.DisplayString));
+
+        config.NewConfig<BridgeStaffMemberDto, StaffMember>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Job, src => Text(src.Job))
+            .Map(dest => dest.CoachingStyle, src => Text(src.CoachingStyle))
+            .Map(dest => dest.CoachingAttributes, src => src.CoachingAttributes ?? new List<BridgeStaffAttributeDto>())
+            .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes ?? new List<BridgeStaffAttributeDto>())
+            .Map(dest => dest.Wage, src => Text(src.Wage))
+            .Map(dest => dest.ContractEnd, src => IsBlankDate(src.ContractEnd) ? null : src.ContractEnd);
+
+        config.NewConfig<BridgeStaffCountsDto, TeamStaff>()
+            .Map(dest => dest.TeamName, src => src.TeamName ?? string.Empty)
+            .Map(dest => dest.Analyst, src => Text(src.Analyst))
+            // Set by the client from their own reads.
+            .Ignore(dest => dest.Members)
+            .Ignore(dest => dest.Vacancies);
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
