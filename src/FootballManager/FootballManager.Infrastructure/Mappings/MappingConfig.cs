@@ -3,6 +3,7 @@ using System.Text.Json;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Database;
+using FootballManager.Domain.DressingRoom;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
@@ -16,6 +17,7 @@ using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
 using FootballManager.Infrastructure.Dtos.Competitions;
 using FootballManager.Infrastructure.Dtos.Database;
+using FootballManager.Infrastructure.Dtos.DressingRoom;
 using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
 using FootballManager.Infrastructure.Dtos.Players;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterSquadDynamics(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,48 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The dressing room. Empty texts are the game's blanks; a happiness reason is the sentence the game shows.
+    private static void RegisterSquadDynamics(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeHierarchyMemberDto, HierarchyMember>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty);
+
+        config.NewConfig<BridgeHappinessIssueDto, HappinessIssue>()
+            .Map(dest => dest.PlayerId, src => src.PlayerId ?? 0)
+            .Map(dest => dest.PlayerName, src => src.PlayerName ?? string.Empty)
+            .Map(dest => dest.Severity, src => Text(src.Severity))
+            .Map(dest => dest.Description, src => Text(src.Description))
+            .Map(dest => dest.PlayersAgreeing, src => src.PlayersAgreeing ?? 0)
+            .Map(dest => dest.HasPromises, src => src.LinkedPromises != null && src.LinkedPromises.Count > 0);
+
+        config.NewConfig<BridgeAtmosphereFactorDto, AtmosphereFactor>()
+            .Map(dest => dest.Text, src => src.Text ?? string.Empty);
+
+        config.NewConfig<BridgeAtmosphereDto, DressingRoomAtmosphere>()
+            .Map(dest => dest.Summary, src => Text(src.Summary))
+            .Map(dest => dest.Factors, src => src.Factors ?? new List<BridgeAtmosphereFactorDto>());
+
+        config.NewConfig<BridgePromiseDto, PlayerPromise>()
+            .Map(dest => dest.Title, src => Text(src.Title))
+            .Map(dest => dest.Description, src => Text(src.Description))
+            .Map(dest => dest.Status, src => Text(src.Status))
+            .Map(dest => dest.EndDate, src => src.EndDate == null ? null : Text(RuleText(src.EndDate.Value)));
+
+        config.NewConfig<BridgePlayerDynamicsDto, PlayerDynamics>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.HierarchyLevel, src => Text(src.HierarchyLevel))
+            .Map(dest => dest.HappinessPositives, src => Reasons(src.HappinessPositives))
+            .Map(dest => dest.HappinessNegatives, src => Reasons(src.HappinessNegatives))
+            .Map(dest => dest.Promises, src => src.Promises ?? 0);
+    }
+
+    private static List<string> Reasons(List<BridgeHappinessReasonDto>? reasons)
+    {
+        return (reasons ?? []).Select(reason => Text(reason.Text)).OfType<string>().ToList();
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
