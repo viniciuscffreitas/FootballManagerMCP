@@ -23,6 +23,7 @@ using FootballManager.Api.Responses.Teams;
 using FootballManager.Api.Responses.Trials;
 using FootballManager.Api.Responses.Tactics.Effectiveness;
 using FootballManager.Api.Responses.Training;
+using FootballManager.Api.Responses.Youth;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Standings;
 using FootballManager.Domain.Board;
@@ -46,6 +47,7 @@ using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
 using FootballManager.Domain.Teams;
 using FootballManager.Domain.Training;
+using FootballManager.Domain.Youth;
 using Mapster;
 
 namespace FootballManager.Api.Mappings;
@@ -92,6 +94,12 @@ public class MappingConfig
 
         config.NewConfig<PlayerMedicalRecord, PlayerMedicalRecordResponse>()
             .Map(dest => dest.History, src => src.History.Count > 0 ? src.History : null);
+
+        config.NewConfig<YouthAndLoans, YouthAndLoansResponse>();
+        config.NewConfig<YouthSetup, YouthSetupResponse>();
+        config.NewConfig<YouthPlayer, YouthPlayerResponse>();
+        config.NewConfig<LoanedPlayer, LoanedPlayerResponse>()
+            .Map(dest => dest.Comments, src => src.Comments.Count > 0 ? src.Comments : null);
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
 
