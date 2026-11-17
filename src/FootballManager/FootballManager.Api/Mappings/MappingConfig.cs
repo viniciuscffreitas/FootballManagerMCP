@@ -16,6 +16,7 @@ using FootballManager.Api.Responses.Messages;
 using FootballManager.Api.Responses.Players;
 using FootballManager.Api.Responses.Scouting;
 using FootballManager.Api.Responses.Staff;
+using FootballManager.Api.Responses.SquadDynamics;
 using FootballManager.Api.Responses.Teams;
 using FootballManager.Api.Responses.Trials;
 using FootballManager.Api.Responses.Tactics.Effectiveness;
@@ -30,6 +31,7 @@ using FootballManager.Domain.Conversations;
 using FootballManager.Domain.Transfers;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Finances;
+using FootballManager.Domain.DressingRoom;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
@@ -78,6 +80,11 @@ public class MappingConfig
             .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes.Count > 0 ? src.MedicalAttributes : null);
 
         config.NewConfig<SquadPlayerContract, SquadPlayerContractResponse>();
+
+        config.NewConfig<SquadDynamics, SquadDynamicsResponse>();
+        config.NewConfig<PlayerDynamics, PlayerDynamicsResponse>()
+            .Map(dest => dest.HappinessPositives, src => src.HappinessPositives.Count > 0 ? src.HappinessPositives : null)
+            .Map(dest => dest.HappinessNegatives, src => src.HappinessNegatives.Count > 0 ? src.HappinessNegatives : null);
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();

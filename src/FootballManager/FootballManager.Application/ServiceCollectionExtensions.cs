@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<IStaffService, StaffService>();
         services.AddScoped<IContractsService, ContractsService>();
+        services.AddScoped<ISquadDynamicsService, SquadDynamicsService>();
         services.AddScoped<IRotationService, RotationService>();
         services.AddScoped<ITacticsService, TacticsService>();
         services.TryAddSingleton(TimeProvider.System);

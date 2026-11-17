@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBoardGameClient, BoardBridgeClient>();
         services.AddScoped<IStaffGameClient, StaffBridgeClient>();
         services.AddScoped<IContractsGameClient, ContractsBridgeClient>();
+        services.AddScoped<ISquadDynamicsGameClient, SquadDynamicsBridgeClient>();
         services.AddScoped<ITacticsGameClient, TacticsBridgeClient>();
         services.AddScoped<ITacticEditorGameClient, TacticEditorBridgeClient>();
         services.AddScoped<IMatchesGameClient, MatchesBridgeClient>();
