@@ -46,4 +46,10 @@ internal static class LiveMatchConstants
         "Player", "IncidentType", "MatchTime", "PlayerTeamSelectionIndex", "YellowCardedInMatch", "RedCardedInMatch",
         "TotalRating", "Goals"
     ];
+
+    // The players a side has in the match as its match screen lists them (context isHomeTeam; ShowingSubs false for
+    // those who played), with their condition now.
+    public const string MatchPlayers = "Tactic.SquadOverviewPlayerInformation";
+    public const string ShowingSubs = "ShowingSubs";
+    public static readonly string[] MatchPlayerCondition = [GameConstants.UniqueId, GameConstants.Condition];
 }

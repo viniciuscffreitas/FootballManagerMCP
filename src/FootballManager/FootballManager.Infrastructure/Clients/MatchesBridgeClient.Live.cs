@@ -8,7 +8,7 @@ using Mapster;
 namespace FootballManager.Infrastructure.Clients;
 
 // The match being played, read the way its screen does: first whether the game is in a match at all, then the match,
-// both sides' numbers, the tactic and the squad's condition together. Every read is a light /get; nothing touches the
+// both sides' numbers, the tactic and the squad's names together. Every read is a light /get; nothing touches the
 // screen's UI tree, which stalls the live match.
 internal sealed partial class MatchesBridgeClient
 {
@@ -37,16 +37,16 @@ internal sealed partial class MatchesBridgeClient
         var tactic = bridge.GetRecordAsync<BridgeLiveTacticDto>(
             BridgeQuery.OnActiveTactic().Context(TacticConstants.InPossession, true).Props(LiveMatchConstants.Tactic), cancellationToken);
         var squad = bridge.GetSquadAsync<BridgeLiveSquadPlayerDto>(
-            [GameConstants.UniqueId, GameConstants.Name, GameConstants.Condition], cancellationToken);
+            [GameConstants.UniqueId, GameConstants.Name], cancellationToken);
 
         await Task.WhenAll(match, home, away, tactic, squad);
 
         var live = (await match).Values;
         var teamId = user.TeamId ?? 0;
         var isHome = live.HomeTeamId == teamId;
-        var (homeSide, homePlayers) = await home;
-        var (awaySide, awayPlayers) = await away;
-        var (ourSide, ourPlayers) = isHome ? (homeSide, homePlayers) : (awaySide, awayPlayers);
+        var (homeSide, homePlayers, homeCondition) = await home;
+        var (awaySide, awayPlayers, awayCondition) = await away;
+        var (ourSide, ourPlayers, ourCondition) = isHome ? (homeSide, homePlayers, homeCondition) : (awaySide, awayPlayers, awayCondition);
         var played = (await tactic).Values;
 
         // The squad by database index, which is how a match refers to its players.
@@ -68,7 +68,7 @@ internal sealed partial class MatchesBridgeClient
             HomeStats = homeSide.Stats.Adapt<TeamMatchStats?>(),
             AwayStats = awaySide.Stats.Adapt<TeamMatchStats?>(),
             Goals = Goals(new BridgeMatchEventsDto { Incidents = live.Incidents }, isHome, names),
-            Players = ourPlayers.Select(line => LivePlayer(line, members)).ToList(),
+            Players = ourPlayers.Select(line => LivePlayer(line, members, ourCondition)).ToList(),
             Tactic = new LiveTactic { Name = played.Name, Formation = played.Formation, Mentality = played.Mentality },
             SubstitutionsRemaining = Number(ourSide.SubstitutionsRemaining),
             SubstitutionsAllowed = Number(ourSide.SubstitutionsAllowed)
@@ -81,7 +81,9 @@ internal sealed partial class MatchesBridgeClient
         return BridgeQuery.FromMatch().WithHumanAndTeam();
     }
 
-    private async Task<(BridgeLiveSideDto Side, List<BridgePlayerMatchStatsDto> Players)> LiveSideAsync(
+    // A side's numbers, its players' match lines and their condition now. The condition is the match's: a player's own
+    // (on /squad) holds the kick-off value until the match ends (seen 17/11/2026: 93 there, 82 in the match at 45').
+    private async Task<(BridgeLiveSideDto Side, List<BridgePlayerMatchStatsDto> Players, Dictionary<int, int> Condition)> LiveSideAsync(
         bool isHome, CancellationToken cancellationToken)
     {
         var side = bridge.GetRecordAsync<BridgeLiveSideDto>(
@@ -89,10 +91,20 @@ internal sealed partial class MatchesBridgeClient
         var players = bridge.GetListAsync<BridgePlayerMatchStatsDto>(
             Live().List(MatchConstants.PlayerStats).Context(MatchConstants.IsHomeTeam, isHome).Props(LiveMatchConstants.PlayerLine),
             cancellationToken);
+        var condition = bridge.GetListAsync<BridgeLiveConditionDto>(
+            Live().List(LiveMatchConstants.MatchPlayers).Context(MatchConstants.IsHomeTeam, isHome)
+                .Context(LiveMatchConstants.ShowingSubs, false).Props(LiveMatchConstants.MatchPlayerCondition),
+            cancellationToken);
 
-        await Task.WhenAll(side, players);
+        await Task.WhenAll(side, players, condition);
 
-        return ((await side).Values, (await players).Items.Select(item => item.Values).ToList());
+        var conditionById = (await condition).Items
+            .Select(item => item.Values)
+            .Where(player => player.Id is not null && player.Condition >= 0)
+            .GroupBy(player => player.Id!.Value)
+            .ToDictionary(group => group.Key, group => group.First().Condition!.Value);
+
+        return ((await side).Values, (await players).Items.Select(item => item.Values).ToList(), conditionById);
     }
 
     // The minute being played from the match clock (minutes and seconds gone): "18:45" is the 19th minute, and a clock
@@ -114,7 +126,8 @@ internal sealed partial class MatchesBridgeClient
     // A player's match line keeps his last change only: came on (with the minute), or left the pitch (his slot is then
     // -1, with the minute he left). Its incident only tells an injury apart for a substitute who came on and went off
     // injured; a starter going off is the same incident, injured or not.
-    private static LivePlayer LivePlayer(BridgePlayerMatchStatsDto line, IReadOnlyDictionary<int, BridgeLiveSquadPlayerDto> squad)
+    private static LivePlayer LivePlayer(
+        BridgePlayerMatchStatsDto line, IReadOnlyDictionary<int, BridgeLiveSquadPlayerDto> squad, IReadOnlyDictionary<int, int> condition)
     {
         var member = line.Player?.Index is { } index ? squad.GetValueOrDefault(index) : null;
         var leftThePitch = line.PlayerTeamSelectionIndex is < 0;
@@ -125,7 +138,7 @@ internal sealed partial class MatchesBridgeClient
             Name = member?.Name,
             Slot = line.PlayerTeamSelectionIndex,
             Rating = line.TotalRating > 0 ? line.TotalRating : null,
-            Condition = member?.Condition >= 0 ? member.Condition : null,
+            Condition = member?.Id is { } id && condition.TryGetValue(id, out var now) ? now : null,
             YellowCard = line.YellowCardedInMatch == true,
             RedCard = line.RedCardedInMatch == true,
             Goals = line.Goals,

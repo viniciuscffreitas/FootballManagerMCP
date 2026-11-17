@@ -3,7 +3,7 @@ using FootballManager.Infrastructure.Constants;
 
 namespace FootballManager.Infrastructure.Dtos.Matches;
 
-/// <summary>A first-team player with his physical condition (percent).</summary>
+/// <summary>A first-team player, to name the players a match refers to.</summary>
 internal sealed class BridgeLiveSquadPlayerDto
 {
     [JsonPropertyName(GameConstants.UniqueId)]
@@ -11,7 +11,4 @@ internal sealed class BridgeLiveSquadPlayerDto
 
     [JsonPropertyName(GameConstants.Name)]
     public string? Name { get; set; }
-
-    [JsonPropertyName(GameConstants.Condition)]
-    public int? Condition { get; set; }
 }
