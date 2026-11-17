@@ -3,6 +3,7 @@ using System.Text.Json;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Board;
 using FootballManager.Domain.Competitions;
+using FootballManager.Domain.Contracts;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Finances;
 using FootballManager.Domain.Matches;
@@ -20,6 +21,7 @@ using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
 using FootballManager.Infrastructure.Dtos.Board;
 using FootballManager.Infrastructure.Dtos.Competitions;
+using FootballManager.Infrastructure.Dtos.Contracts;
 using FootballManager.Infrastructure.Dtos.Database;
 using FootballManager.Infrastructure.Dtos.Finances;
 using FootballManager.Infrastructure.Dtos.Matches;
@@ -83,6 +85,7 @@ public class MappingConfig
         RegisterFinances(config);
         RegisterBoard(config);
         RegisterStaff(config);
+        RegisterContracts(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -763,6 +766,37 @@ public class MappingConfig
             // Set by the client from their own reads.
             .Ignore(dest => dest.Members)
             .Ignore(dest => dest.Vacancies);
+    }
+
+    // The first team's contracts. Money stays as the game writes it; a release clause of 0 ("-") is none, and a contract
+    // without an end date (dated 1900) has no end.
+    private static void RegisterContracts(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeSquadContractDto, SquadPlayerContract>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Wage, src => src.Wage == null ? null : Text(src.Wage.DisplayValue))
+            .Map(dest => dest.EndDate, src => ContractEnd(src.HasEndDate, src.EndDate))
+            .Map(dest => dest.TimeRemaining, src => Text(src.TimeRemaining))
+            .Map(dest => dest.Type, src => src.Type == null ? null : Text(src.Type.DisplayValue))
+            .Map(dest => dest.AgreedPlayingTime, src => src.AgreedPlayingTime == null ? null : Text(src.AgreedPlayingTime.DisplayValue))
+            .Map(dest => dest.ReleaseClause,
+                src => src.ReleaseClause != null && src.ReleaseClause.SortValue > 0 ? Text(src.ReleaseClause.DisplayValue) : null)
+            .Map(dest => dest.ClausesCount, src => src.ClausesCount ?? 0)
+            .Map(dest => dest.HasRenewalOffer, src => src.HasRenewalOffer ?? false)
+            .Map(dest => dest.StaffAdvice, src => Text(src.StaffAdvice));
+    }
+
+    private static DateOnly? ContractEnd(bool? hasEndDate, string? date)
+    {
+        if (hasEndDate != true || IsBlankDate(date))
+        {
+            return null;
+        }
+
+        return DateOnly.TryParseExact(date, MatchConstants.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            ? day
+            : null;
     }
 
     private static VisionObjective? Objective(string? name, string? year, int? progress, int? status)

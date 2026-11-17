@@ -2,6 +2,7 @@ using FootballManager.Api.Requests.Scouting;
 using FootballManager.Api.Responses.Availability;
 using FootballManager.Api.Responses.Standings;
 using FootballManager.Api.Responses.Board;
+using FootballManager.Api.Responses.Contracts;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
@@ -22,6 +23,7 @@ using FootballManager.Api.Responses.Training;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Standings;
 using FootballManager.Domain.Board;
+using FootballManager.Domain.Contracts;
 using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
@@ -74,6 +76,8 @@ public class MappingConfig
         config.NewConfig<StaffMember, StaffMemberResponse>()
             .Map(dest => dest.CoachingAttributes, src => src.CoachingAttributes.Count > 0 ? src.CoachingAttributes : null)
             .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes.Count > 0 ? src.MedicalAttributes : null);
+
+        config.NewConfig<SquadPlayerContract, SquadPlayerContractResponse>();
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
