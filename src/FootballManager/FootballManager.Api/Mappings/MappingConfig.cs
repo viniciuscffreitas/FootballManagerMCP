@@ -1,5 +1,6 @@
 using FootballManager.Api.Requests.Scouting;
 using FootballManager.Api.Responses.Availability;
+using FootballManager.Api.Responses.Injuries;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
@@ -21,6 +22,7 @@ using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
 using FootballManager.Domain.Transfers;
 using FootballManager.Domain.Database;
+using FootballManager.Domain.Injuries;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
@@ -50,6 +52,9 @@ public class MappingConfig
         config.NewConfig<PlayerBan, SuspendedPlayerResponse>();
         config.NewConfig<PlayerAvailability, PlayerAvailabilityResponse>()
             .Map(dest => dest.Absences, src => src.Absences.Count > 0 ? src.Absences : null);
+
+        config.NewConfig<PlayerMedicalRecord, PlayerMedicalRecordResponse>()
+            .Map(dest => dest.History, src => src.History.Count > 0 ? src.History : null);
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();

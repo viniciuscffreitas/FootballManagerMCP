@@ -3,6 +3,7 @@ using System.Text.Json;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Database;
+using FootballManager.Domain.Injuries;
 using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
@@ -16,6 +17,7 @@ using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
 using FootballManager.Infrastructure.Dtos.Competitions;
 using FootballManager.Infrastructure.Dtos.Database;
+using FootballManager.Infrastructure.Dtos.Injuries;
 using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
 using FootballManager.Infrastructure.Dtos.Players;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterInjuries(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,47 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The medical centre. Empty texts are the game's blanks (no risk factor, no one returning).
+    private static void RegisterInjuries(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeMedicalRecordDto, PlayerMedicalRecord>()
+            .Map(dest => dest.PlayerId, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.InjuriesThisSeason, src => src.InjuriesThisSeason ?? 0)
+            .Map(dest => dest.RiskOverview, src => Text(src.RiskOverview))
+            .Map(dest => dest.RiskReason, src => Text(src.RiskReason))
+            .Map(dest => dest.History, src => src.History ?? new List<BridgePastInjuryDto>());
+
+        config.NewConfig<BridgePastInjuryDto, PastInjury>()
+            .Map(dest => dest.Date, src => InjuryDate(src.Date))
+            .Map(dest => dest.Injury, src => Text(src.Description))
+            .Map(dest => dest.Duration, src => Text(src.Duration))
+            .Map(dest => dest.Severity, src => Severity(src.Severity))
+            .Map(dest => dest.Cause, src => Text(src.Cause))
+            .Map(dest => dest.Context, src => Text(src.ReceivedIn))
+            .Map(dest => dest.IsActive, src => src.IsActive ?? false);
+
+        config.NewConfig<BridgeSeasonInjuriesDto, SeasonInjurySummary>()
+            .Map(dest => dest.ComparedWithLastSeason, src => Text(src.ComparedWithLastSeason))
+            .Map(dest => dest.ExpectedOverSeason, src => Text(src.ExpectedOverSeason))
+            .Map(dest => dest.LeagueAverage, src => Text(src.LeagueAverage))
+            .Map(dest => dest.ExhaustedAndRecurring, src => Text(src.ExhaustedAndRecurring))
+            .Map(dest => dest.ExpectedReturnsNextMatch, src => Text(src.ExpectedReturnsNextMatch));
+    }
+
+    private static DateOnly? InjuryDate(string? date)
+    {
+        return DateOnly.TryParseExact(date, InjuryConstants.DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    // The game's 0-3 scale; anything else is left out rather than guessed.
+    private static InjurySeverity? Severity(int? severity)
+    {
+        return severity is >= (int)InjurySeverity.Slight and <= (int)InjurySeverity.Major ? (InjurySeverity)severity.Value : null;
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.

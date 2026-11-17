@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions
     {
         services.AddScoped<ISquadService, SquadService>();
         services.AddScoped<IAvailabilityService, AvailabilityService>();
+        services.AddScoped<IInjuriesService, InjuriesService>();
         services.AddScoped<IRotationService, RotationService>();
         services.AddScoped<ITacticsService, TacticsService>();
         services.TryAddSingleton(TimeProvider.System);
