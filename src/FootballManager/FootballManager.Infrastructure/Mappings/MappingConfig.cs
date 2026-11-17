@@ -7,6 +7,7 @@ using FootballManager.Domain.Matches;
 using FootballManager.Domain.Messages;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
+using FootballManager.Domain.Standings;
 using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
@@ -20,6 +21,7 @@ using FootballManager.Infrastructure.Dtos.Matches;
 using FootballManager.Infrastructure.Dtos.Messages;
 using FootballManager.Infrastructure.Dtos.Players;
 using FootballManager.Infrastructure.Dtos.Scouting;
+using FootballManager.Infrastructure.Dtos.Standings;
 using FootballManager.Infrastructure.Dtos.Tactics;
 using FootballManager.Infrastructure.Dtos.Tactics.Editing;
 using FootballManager.Infrastructure.Dtos.Tactics.Effectiveness;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterStandings(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,26 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The league table. The game's fate for a place with none is a blank name.
+    private static void RegisterStandings(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeTableRowDto, LeagueTableRow>()
+            .Map(dest => dest.TeamId, src => src.TeamId ?? 0)
+            .Map(dest => dest.TeamName, src => src.TeamName ?? string.Empty)
+            .Map(dest => dest.Position, src => src.Position ?? 0)
+            .Map(dest => dest.Played, src => src.Played ?? 0)
+            .Map(dest => dest.Won, src => src.Won ?? 0)
+            .Map(dest => dest.Drawn, src => src.Drawn ?? 0)
+            .Map(dest => dest.Lost, src => src.Lost ?? 0)
+            .Map(dest => dest.GoalsFor, src => src.GoalsFor ?? 0)
+            .Map(dest => dest.GoalsAgainst, src => src.GoalsAgainst ?? 0)
+            .Map(dest => dest.GoalDifference, src => src.GoalDifference ?? 0)
+            .Map(dest => dest.Points, src => src.Points ?? 0)
+            .Map(dest => dest.Fate, src => Text(src.Fate))
+            .Map(dest => dest.Movement, src => src.Rising == true ? TableMovement.Up : src.Falling == true ? TableMovement.Down : TableMovement.Same)
+            .Ignore(dest => dest.IsUser);
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.

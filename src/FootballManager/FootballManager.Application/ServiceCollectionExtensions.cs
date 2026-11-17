@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITransferService, TransferService>();
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();
+        services.AddScoped<ILeagueTableService, LeagueTableService>();
         return services;
     }
 }
