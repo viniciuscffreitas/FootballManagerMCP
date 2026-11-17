@@ -23,14 +23,15 @@ public class PerformanceFilterTests
     {
         Returns(
             Player(1, "Série A", minutes: 1800, rating: 7.1),
-            Player(2, "Liga Profesional de Fútbol", minutes: 2100, rating: 7.0),
+            Player(2, "Liga Profesional", minutes: 2100, rating: 7.0),
+            Player(6, "Brasileirão Série B", minutes: 2000, rating: 7.2),
             Player(3, "Série A", minutes: 600, rating: 7.4),
             Player(4, "Série A", minutes: 1500, rating: 6.7),
             Player(5, "Premier League", minutes: 2500, rating: 7.3));
 
         var result = await _service.GetPlayersAsync(
             ScoutingSource.Search,
-            filter: new PerformanceFilter { Leagues = ["Série A", "Liga Profesional"], MinMinutes = 1000, MinAverageRating = 6.9 });
+            filter: new PerformanceFilter { Leagues = ["serie a", "Liga Profesional"], MinMinutes = 1000, MinAverageRating = 6.9 });
 
         Assert.Equal([1, 2], result.Value.Players.Select(p => p.Id).OrderBy(id => id));
     }

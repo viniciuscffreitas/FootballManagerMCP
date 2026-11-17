@@ -6,7 +6,7 @@ namespace FootballManager.Domain.Scouting;
 /// </summary>
 public class PerformanceFilter
 {
-    /// <summary>League names as the game writes them, or part of one; case and accents don't matter.</summary>
+    /// <summary>Whole league names as the game writes them ("Brasileirão" leaves out "Brasileirão Série B"); case and accents don't matter.</summary>
     public List<string> Leagues { get; set; } = [];
     public int? MinMinutes { get; set; }
     public double? MinAverageRating { get; set; }

@@ -51,7 +51,7 @@ dele, não lido no save. IDs entre parênteses são vídeos do YouTube.
 ## Com as tools
 1. `run_player_search` (dry run, depois `apply`): posição natural, idade, interesse em vir (`interestType`/`interestLevel`).
    A busca do jogo não tem regra de liga, minutos nem valor.
-2. `get_scouted_players source=search` com `leagues` (nome ou parte, sem acento), `minMinutes` e `minAverageRating`:
+2. `get_scouted_players source=search` com `leagues` (nome inteiro da liga como vem no campo `league`, sem acento; "Brasileirão" não pega a Série B), `minMinutes` e `minAverageRating`:
    lê os primeiros `scan` resultados (300 por padrão, até 1000) com os números da temporada e corta na API;
    `scanned` diz quantos leu. `includeStats` sozinho traz os números sem cortar (vale para shortlist e focos).
 3. Aplicar os cortes por posição acima nos campos de `performance` (totais e por 90; goleiro: `savePercentage`,

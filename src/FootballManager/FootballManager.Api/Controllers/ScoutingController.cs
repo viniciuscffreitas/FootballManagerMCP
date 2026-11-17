@@ -37,7 +37,7 @@ public class ScoutingController(
     /// <param name="includeReport">Add each player's latest scout report: pros, cons, fee, wage demands and interest.</param>
     /// <param name="limit">At most this many players (1-200); the search reads 50 by default, in its own order.</param>
     /// <param name="includeStats">Add each player's league and season numbers for his club, totals and per 90.</param>
-    /// <param name="leagues">Keep only players whose club plays in one of these leagues (names or part of one).</param>
+    /// <param name="leagues">Keep only players whose club plays in one of these leagues (whole names, as each player's league reads).</param>
     /// <param name="minMinutes">Keep only players with at least these minutes this season.</param>
     /// <param name="minAverageRating">Keep only players with at least this average rating this season.</param>
     /// <param name="scan">With a filter on the search: how many results to read before cutting (300 by default, up to 1000).</param>

@@ -172,7 +172,7 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
     {
         var numbers = player.Performance;
 
-        return (filter.Leagues.Count == 0 || filter.Leagues.Any(league => player.League is { } name && GameNames.Normalise(name).Contains(GameNames.Normalise(league))))
+        return (filter.Leagues.Count == 0 || filter.Leagues.Any(league => player.League is { } name && GameNames.Normalise(name) == GameNames.Normalise(league)))
             && (filter.MinMinutes is not { } minutes || numbers?.Minutes >= minutes)
             && (filter.MinAverageRating is not { } rating || numbers?.AverageRating >= rating);
     }

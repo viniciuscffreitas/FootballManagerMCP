@@ -90,8 +90,9 @@ public static class ScoutingTools
         int? limit = null,
         [Description("Include each player's league and season numbers (see above). About 2 KB more per player.")]
         bool includeStats = false,
-        [Description("Keep only players whose club plays in one of these leagues, as the game names them or part " +
-                     "of the name (e.g. 'Série A', 'Liga Profesional'); case and accents don't matter. Turns on includeStats.")]
+        [Description("Keep only players whose club plays in one of these leagues, by the whole name the game gives " +
+                     "it in each player's 'league' (e.g. 'Brasileirão', 'Brasileirão Série B', 'Liga Profesional'); case " +
+                     "and accents don't matter. Turns on includeStats.")]
         List<string>? leagues = null,
         [Description("Keep only players with at least these minutes this season. Turns on includeStats.")]
         int? minMinutes = null,
