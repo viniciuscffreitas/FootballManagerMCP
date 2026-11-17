@@ -23,3 +23,7 @@ _Avoid_: checkpoint, parada
 **Save de teste**:
 A cópia da carreira (`MCPFM investigation`) onde toda descoberta e todo teste acontecem; o save real do Vini nunca recebe escrita de teste.
 _Avoid_: save de investigação, sandbox
+
+**Guia do FM 27**:
+O conhecimento do jogo que o Claude consulta antes de decidir: regras gerais do FM 27, cada uma marcada como confirmada no save ou provável, mais os fatos do save do Vini.
+_Avoid_: knowledge base, manual, pesquisa
