@@ -363,13 +363,14 @@ internal sealed class TacticEditorBridgeClient(
         return Outcome(await SetAsync(OnTacticForWrite(), TacticConstants.CreatorStyle, Format(id), cancellationToken), names);
     }
 
-    // One binding for both formation steps: the step the creator is on says which phase it sets.
-    public async Task<WriteOutcome> SetCreatorFormationAsync(string formation, CancellationToken cancellationToken = default)
+    // One binding for both formation steps, answered only in the phase's context (without it the game never sends it).
+    public async Task<WriteOutcome> SetCreatorFormationAsync(bool inPossession, string formation, CancellationToken cancellationToken = default)
     {
         var names = (await vocabulary.KeysAsync(cancellationToken)).Formations;
         var id = IdOf(names, formation, "formation");
 
-        return Outcome(await SetAsync(OnTacticForWrite(), TacticConstants.CreatorFormation, Format(id), cancellationToken), names);
+        return Outcome(await SetAsync(OnTacticForWrite().Context(TacticConstants.InPossession, inPossession),
+            TacticConstants.CreatorFormation, Format(id), cancellationToken), names);
     }
 
     public async Task NextCreatorStageAsync(CancellationToken cancellationToken = default)

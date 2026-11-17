@@ -61,8 +61,8 @@ public interface ITacticEditorGameClient
     /// <summary>Picks the style on the creator's first step.</summary>
     Task<WriteOutcome> SetCreatorStyleAsync(string style, CancellationToken cancellationToken = default);
 
-    /// <summary>Picks the formation of the creator's step: with the ball on the second, without it on the third.</summary>
-    Task<WriteOutcome> SetCreatorFormationAsync(string formation, CancellationToken cancellationToken = default);
+    /// <summary>Picks the formation of the creator's step for a phase: with the ball on the second, without it on the third.</summary>
+    Task<WriteOutcome> SetCreatorFormationAsync(bool inPossession, string formation, CancellationToken cancellationToken = default);
 
     /// <summary>Moves the creator on to its next step, once the game shows it there.</summary>
     Task NextCreatorStageAsync(CancellationToken cancellationToken = default);

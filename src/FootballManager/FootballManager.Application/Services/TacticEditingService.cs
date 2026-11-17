@@ -624,10 +624,10 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
 
             await WriteAsync(Step("Formation", PhaseName(true), null, tactic.Formation.InPossession),
                 () => PickAndMoveOnAsync(
-                    game.SetCreatorFormationAsync(tactic.Formation.InPossession!, cancellationToken), tactic.Formation.InPossession!));
+                    game.SetCreatorFormationAsync(true, tactic.Formation.InPossession!, cancellationToken), tactic.Formation.InPossession!));
 
             await WriteAsync(Step("Formation", PhaseName(false), null, tactic.Formation.OutOfPossession),
-                async () => (await game.SetCreatorFormationAsync(tactic.Formation.OutOfPossession!, cancellationToken)).After);
+                async () => (await game.SetCreatorFormationAsync(false, tactic.Formation.OutOfPossession!, cancellationToken)).After);
 
             var create = Step("Create", $"slot {tactic.Slot}", null, null);
 

@@ -34,7 +34,7 @@ public class TacticCreationTests
         _game.GetTacticAsync(Arg.Any<CancellationToken>()).Returns(_ => new EditableTactic { ActiveSlot = 1, Slots = _slots });
         _game.SetCreatorStyleAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => new WriteOutcome(null, call.Arg<string>()));
-        _game.SetCreatorFormationAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _game.SetCreatorFormationAsync(Arg.Any<bool>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => new WriteOutcome(null, call.Arg<string>()));
         _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())
             .Returns(Result.Ok(new SaveClearance { SaveName = "MCPFM investigation", Club = "Santos" }));
@@ -123,9 +123,9 @@ public class TacticCreationTests
             _game.StartCreatorAsync(Arg.Any<CancellationToken>());
             _game.SetCreatorStyleAsync("Gegenpress", Arg.Any<CancellationToken>());
             _game.NextCreatorStageAsync(Arg.Any<CancellationToken>());
-            _game.SetCreatorFormationAsync("433DMWide", Arg.Any<CancellationToken>());
+            _game.SetCreatorFormationAsync(true, "433DMWide", Arg.Any<CancellationToken>());
             _game.NextCreatorStageAsync(Arg.Any<CancellationToken>());
-            _game.SetCreatorFormationAsync("4141DM", Arg.Any<CancellationToken>());
+            _game.SetCreatorFormationAsync(false, "4141DM", Arg.Any<CancellationToken>());
             _game.ConfirmCreatorAsync(Arg.Any<CancellationToken>());
         });
         Assert.True(edit.Applied);
