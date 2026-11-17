@@ -11,6 +11,7 @@ using FootballManager.Domain.Tactics;
 using FootballManager.Domain.Tactics.Editing;
 using FootballManager.Domain.Tactics.Effectiveness;
 using FootballManager.Domain.Training;
+using FootballManager.Domain.Youth;
 using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
@@ -24,6 +25,7 @@ using FootballManager.Infrastructure.Dtos.Tactics;
 using FootballManager.Infrastructure.Dtos.Tactics.Editing;
 using FootballManager.Infrastructure.Dtos.Tactics.Effectiveness;
 using FootballManager.Infrastructure.Dtos.Training;
+using FootballManager.Infrastructure.Dtos.Youth;
 using Mapster;
 
 namespace FootballManager.Infrastructure.Mappings;
@@ -71,6 +73,7 @@ public class MappingConfig
         RegisterTraining(config);
         RegisterCompetitions(config);
         RegisterAvailability(config);
+        RegisterYouth(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -607,6 +610,38 @@ public class MappingConfig
             .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
+    }
+
+    // The youth set-up and loans. Empty texts are the game's blanks; a loan rating of 0 means no appearances yet.
+    private static void RegisterYouth(TypeAdapterConfig config)
+    {
+        config.NewConfig<BridgeYouthSetupDto, YouthSetup>()
+            .Map(dest => dest.TeamName, src => Text(src.TeamName))
+            .Map(dest => dest.IntakeDate, src => Text(src.IntakeDate))
+            .Map(dest => dest.FacilitiesRating, src => src.Facilities == null ? null : src.Facilities.Rating)
+            .Map(dest => dest.Facilities, src => src.Facilities == null ? null : Text(src.Facilities.DescriptionShort))
+            .Map(dest => dest.FacilitiesDescription, src => src.Facilities == null ? null : Text(src.Facilities.Description));
+
+        config.NewConfig<BridgeYouthPlayerDto, YouthPlayer>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Positions, src => Text(src.Positions))
+            .Map(dest => dest.Morale, src => Text(src.Morale))
+            .Map(dest => dest.ContractEndDate, src => Text(src.ContractEndDate))
+            .Ignore(dest => dest.OnLoan, dest => dest.LoanClub);
+
+        config.NewConfig<BridgeLoanedPlayerDto, LoanedPlayer>()
+            .Map(dest => dest.Id, src => src.Id ?? 0)
+            .Map(dest => dest.Name, src => src.Name ?? string.Empty)
+            .Map(dest => dest.Club, src => Text(src.Club))
+            .Map(dest => dest.LoanEndDate, src => Text(src.LoanEndDate))
+            .Map(dest => dest.MonthlyFee, src => Text(src.MonthlyFee))
+            .Map(dest => dest.AverageRating, src => src.AverageRating > 0 ? (double?)Math.Round(src.AverageRating.Value, 2) : null)
+            .Map(dest => dest.Comments, src => (src.Comments ?? new List<BridgeSortedValueDto>())
+                .Select(comment => comment.DisplayValue)
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Select(text => text!)
+                .ToList());
     }
 
     // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
