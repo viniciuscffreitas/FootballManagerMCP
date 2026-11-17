@@ -29,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScoutingEditingService, ScoutingEditingService>();
         services.AddScoped<IPlayerSearchService, PlayerSearchService>();
         services.AddScoped<IInboxService, InboxService>();
+        services.AddScoped<INewsService, NewsService>();
         services.AddScoped<IDatabaseSearchService, DatabaseSearchService>();
         services.AddScoped<ITrialsService, TrialsService>();
         services.AddScoped<IConversationService, ConversationService>();

@@ -204,6 +204,9 @@ public class MappingConfig
             .Map(dest => dest.HasReplied, src => src.HasReplied ? true : (bool?)null)
             .Map(dest => dest.IsForwarded, src => src.IsForwarded ? true : (bool?)null);
 
+        config.NewConfig<NewsPage, NewsPageResponse>()
+            .Map(dest => dest.Count, src => src.Stories.Count);
+
         config.NewConfig<MessageOption, MessageOptionResponse>()
             .Map(dest => dest.IsDisabled, src => src.IsDisabled ? true : (bool?)null)
             .Map(dest => dest.IsRecommended, src => src.IsRecommended ? true : (bool?)null);
