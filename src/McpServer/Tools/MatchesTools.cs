@@ -26,6 +26,23 @@ public static class MatchesTools
         return await response.ReadContentOrError();
     }
 
+    [McpServerTool(Name = "get_fixtures")]
+    [Description("Get the user's calendar from their running Football Manager 27 save, read live from the game: the " +
+                 "next matches in every competition, in date order, each with date, competition, venue (home or away) " +
+                 "and opponent with their current league position. get_matches only lists the next few. Competition " +
+                 "names are in the game's display language. Fails with a 503 when the game isn't running or no save " +
+                 "is loaded.")]
+    public static async Task<string> GetFixtures(
+        IHttpClientFactory httpFactory,
+        [Description("How many matches to list, 1 to 50. Defaults to 20.")]
+        int count = 20)
+    {
+        var http = httpFactory.CreateClient("FootballManagerApi");
+
+        var response = await http.GetAsync($"/api/v1/fixtures?count={count}");
+        return await response.ReadContentOrError();
+    }
+
     [McpServerTool(Name = "get_match")]
     [Description("Get one of the user's matches in depth: the summary (as in get_matches), both teams' numbers (xG, " +
                  "possession, shots, chances created, crosses, passes, progressive and final-third passes, PPDA, " +
