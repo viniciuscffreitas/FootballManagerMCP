@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using FootballManager.Domain.Availability;
+using FootballManager.Domain.Board;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Finances;
@@ -16,6 +17,7 @@ using FootballManager.Domain.Training;
 using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Availability;
+using FootballManager.Infrastructure.Dtos.Board;
 using FootballManager.Infrastructure.Dtos.Competitions;
 using FootballManager.Infrastructure.Dtos.Database;
 using FootballManager.Infrastructure.Dtos.Finances;
@@ -77,6 +79,7 @@ public class MappingConfig
         RegisterAvailability(config);
         RegisterStandings(config);
         RegisterFinances(config);
+        RegisterBoard(config);
     }
 
     // A competition's stats screen, and the contract of a player in it as the game shows the user.
@@ -610,7 +613,7 @@ public class MappingConfig
 
         config.NewConfig<BridgeNextMatchRulesDto, NextMatchRules>()
             .Map(dest => dest.Competition, src => Text(src.Competition))
-            .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(RuleText).ToList())
+            .Map(dest => dest.EligibilityRules, src => (src.EligibilityRules ?? new List<JsonElement>()).Select(ListItemText).ToList())
             .Map(dest => dest.MaxSquadRule, src => Text(src.MaxSquadRule))
             .Map(dest => dest.MaxSquadRuleStatus, src => Text(src.MaxSquadRuleStatus));
     }
@@ -696,10 +699,61 @@ public class MappingConfig
             .ToList();
     }
 
-    // A rule the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
-    private static string RuleText(JsonElement rule)
+    // The club vision screen. An objective the game leaves unnamed isn't shown; the culture texts hold one item a line.
+    private static void RegisterBoard(TypeAdapterConfig config)
     {
-        return rule.ValueKind == JsonValueKind.String ? rule.GetString() ?? string.Empty : rule.GetRawText();
+        config.NewConfig<BridgeTeamConfidenceDto, BoardConfidence>()
+            .Map(dest => dest.Grade, src => src.BoardGrade)
+            .Map(dest => dest.Summary, src => Text(src.BoardSummary))
+            .Map(dest => dest.Matches, src => Text(src.BoardMatches))
+            .Map(dest => dest.SquadSupport, src => Text(src.BoardSquadSupport))
+            .Map(dest => dest.Tactics, src => Text(src.BoardTactics))
+            .Map(dest => dest.Vision, src => Text(src.BoardVision))
+            .Map(dest => dest.Transfers, src => Text(src.BoardTransfers))
+            .Map(dest => dest.Highlights, src => src.BoardHighlights ?? new List<string>())
+            .Map(dest => dest.Criticism, src => src.BoardCriticism ?? new List<string>());
+
+        config.NewConfig<BridgeTeamConfidenceDto, SupporterConfidence>()
+            .Map(dest => dest.Grade, src => src.SupporterGrade)
+            .Map(dest => dest.Summary, src => Text(src.SupporterSummary))
+            .Map(dest => dest.Matches, src => Text(src.SupporterMatches))
+            .Map(dest => dest.Vision, src => Text(src.SupporterVision));
+
+        config.NewConfig<BridgeClubVisionDto, BoardStatus>()
+            .Map(dest => dest.ThisYearObjective, src => Objective(src.ThisYearName, src.ThisYearYear, src.ThisYearProgress, src.ThisYearStatus))
+            .Map(dest => dest.FinalObjective, src => Objective(src.FinalName, src.FinalYear, src.FinalProgress, src.FinalStatus))
+            .Map(dest => dest.SupporterCulture, src => Lines(src.SupporterCulture))
+            .Map(dest => dest.BoardCulture, src => Lines(src.BoardCulture))
+            .Map(dest => dest.BoardRequests, src => src.BoardRequests ?? 0)
+            .Map(dest => dest.ActiveBoardRequests, src => src.ActiveBoardRequests ?? 0)
+            // Set by the client from the confidence record and the manager's promises.
+            .Ignore(dest => dest.Board)
+            .Ignore(dest => dest.Supporters)
+            .Ignore(dest => dest.Promises);
+
+        config.NewConfig<BridgeBoardPromisesDto, List<string>>()
+            .MapWith(src => (src.Promises ?? new List<JsonElement>()).Select(ListItemText).ToList());
+    }
+
+    private static VisionObjective? Objective(string? name, string? year, int? progress, int? status)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        return new VisionObjective { Name = name, Year = Text(year), Progress = progress, Status = status };
+    }
+
+    private static List<string> Lines(string? text)
+    {
+        return (text ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+    }
+
+    // A list item the game sends as text stays text; anything else is kept as its JSON, since no save has shown one yet.
+    private static string ListItemText(JsonElement item)
+    {
+        return item.ValueKind == JsonValueKind.String ? item.GetString() ?? string.Empty : item.GetRawText();
     }
 
     private static string? Text(string? value)

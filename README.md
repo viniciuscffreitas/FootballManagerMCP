@@ -90,6 +90,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | Inbox | `get_inbox` | Your messages, newest first, with forwarded press articles on request |
 | | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
 | | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
+| Board | `get_board` | The board's and the supporters' confidence (grade and texts, the board's praise and criticism), the club vision's objectives, each side's culture, requests to the board and promises made to it |
 | Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
 | | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |
 | | `release_game_version` | Clears a new game version for changes on your career save, after the short test on the investigation save |

@@ -1,6 +1,7 @@
 using FootballManager.Api.Requests.Scouting;
 using FootballManager.Api.Responses.Availability;
 using FootballManager.Api.Responses.Standings;
+using FootballManager.Api.Responses.Board;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
@@ -19,6 +20,7 @@ using FootballManager.Api.Responses.Tactics.Effectiveness;
 using FootballManager.Api.Responses.Training;
 using FootballManager.Domain.Availability;
 using FootballManager.Domain.Standings;
+using FootballManager.Domain.Board;
 using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
@@ -60,6 +62,10 @@ public class MappingConfig
             .Map(dest => dest.IsUser, src => src.IsUser ? true : (bool?)null);
 
         config.NewConfig<ClubFinances, FinancesResponse>();
+        config.NewConfig<BoardStatus, BoardResponse>();
+        config.NewConfig<BoardConfidence, BoardConfidenceResponse>();
+        config.NewConfig<SupporterConfidence, SupporterConfidenceResponse>();
+        config.NewConfig<VisionObjective, VisionObjectiveResponse>();
 
         config.NewConfig<RotationPlan, RotationPlanResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
