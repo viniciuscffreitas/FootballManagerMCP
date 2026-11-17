@@ -78,6 +78,9 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `set_training` | Changes players' additional focus and intensity (or rests them), and sessions of the schedule |
 | Database | `search_database` | The game's search box: any player, staff member, club, competition or nation in the world |
 | Inbox | `get_inbox` | Your messages, newest first, with forwarded press articles on request |
+| Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
+| | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |
+| | `release_game_version` | Clears a new game version for changes on your career save, after the short test on the investigation save |
 
 Names and labels come in the game's display language. Settings and roles also come as the game's English keys
 (`CentreForward`, `MuchHigherTempo`), which is what `set_tactic` takes.
@@ -92,8 +95,8 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   request at a time, so nothing else reads or writes while another team is the current one.
 - **Every change is a dry run first.** The tools that change something (`set_tactic`, `run_player_search`,
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
-  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`) only check and describe the change unless they're called with
-  `apply: true`. Their descriptions tell the AI to ask you before applying.
+  `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`) only
+  check and describe the change unless they're called with `apply: true`. Their descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
   confirmation message, and the game's warnings block the change. `scout_team`, `offer_trials` and `end_trials` only
@@ -103,9 +106,14 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   against the released one. If anything doesn't match, nothing is sent and the answer says why. Then it copies the save
   to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that club's two newest such
   copies; files named any other way are never removed. A new game version (Game Pass updates on its own) keeps your
-  save read-only until it's released: write the build, e.g. `27.0.1.2494769`, in `released-version.txt` in the backup
-  folder. The investigation save takes changes without a copy or a version check. The API reads the saves as local
+  save read-only until it's released: `release_game_version` writes the running build, e.g. `27.0.1.2494769`, in
+  `released-version.txt` in the backup folder, once a short test on the investigation save (advance a day, answer a
+  message, change the lineup) has passed by hand. The investigation save takes changes without a copy or a version check. The API reads the saves as local
   files, so in Docker every change to another save is refused.
+- **A restore can be undone too.** `restore_save` only runs when you ask, and only while your career save is closed in
+  the game (no tool closes a save): an open save would be written back over the restored file. It first keeps the save
+  as it is as `<club>-antes-de-restaurar-<yyyyMMdd-HHmm>.fm` in the backup folder, which the rotation never removes,
+  then copies the chosen copy over it.
 - **No changes during a match.** The plugin refuses every change while a match is being played, and when it can't
   tell whether one is.
 - **Web pages can't change your game.** The plugin only takes a change as a POST with its own header, which a page

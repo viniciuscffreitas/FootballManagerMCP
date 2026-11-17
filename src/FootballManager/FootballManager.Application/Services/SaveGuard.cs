@@ -18,6 +18,21 @@ public interface ISaveGuard
     /// a copy or a version check. A refusal is a <see cref="SaveRefusedError"/> with the reason for the user.
     /// </summary>
     Task<Result<SaveClearance>> PrepareWriteAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>The .fm files in the backup folder, newest first, with the club, copy time and game date their names carry.</summary>
+    SaveBackupList ListBackups();
+
+    /// <summary>
+    /// Puts a copy from the backup folder back over the real save, keeping the save as it was beside the copies first.
+    /// Refused while the real save is open (or a save is loading) in the game. A dry run unless <paramref name="apply"/>.
+    /// </summary>
+    Task<Result<SaveRestore>> RestoreAsync(string backup, bool apply, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears the running game's version for writes on the real save by writing it to the released-version file. A dry
+    /// run unless <paramref name="apply"/>: the game's version against the released one.
+    /// </summary>
+    Task<Result<VersionRelease>> ReleaseVersionAsync(bool apply, CancellationToken cancellationToken = default);
 }
 
 // Writes through the bridge change the game in memory; the game puts them in the save file when it next saves. A copy
@@ -38,7 +53,12 @@ public class SaveGuard(ISaveSessionGameClient game, ISaveFiles files, SaveGuardS
     // The guard's own copies: <club>-<yyyyMMdd>-<HHmm>-jogo-<game date>.fm. Anything else in the folder (the copy made
     // before MCPFM, the game's own backups, the user's) is never removed.
     private static readonly Regex OwnBackup = new(
-        @"^(?<club>.+)-(?<stamp>\d{8}-\d{4})-jogo-\d{4}-\d{2}-\d{2}\.fm$", RegexOptions.CultureInvariant);
+        @"^(?<club>.+)-(?<stamp>\d{8}-\d{4})-jogo-(?<date>\d{4}-\d{2}-\d{2})\.fm$", RegexOptions.CultureInvariant);
+
+    // The real save as it was before a restore replaced it: <club>-antes-de-restaurar-<yyyyMMdd>-<HHmm>.fm. Outside
+    // the rotation, so it's never removed.
+    private static readonly Regex BeforeRestore = new(
+        @"^(?<club>.+)-antes-de-restaurar-(?<stamp>\d{8}-\d{4})\.fm$", RegexOptions.CultureInvariant);
 
     public async Task<Result<SaveClearance>> PrepareWriteAsync(CancellationToken cancellationToken = default)
     {
@@ -138,6 +158,144 @@ public class SaveGuard(ISaveSessionGameClient game, ISaveFiles files, SaveGuardS
         return Result.Ok(clearance);
     }
 
+    public SaveBackupList ListBackups()
+    {
+        var backups = files.ListFileNames(settings.BackupFolder)
+            .Where(name => name.EndsWith(SaveExtension, StringComparison.OrdinalIgnoreCase))
+            .Select(Describe)
+            .OrderByDescending(backup => backup.CopiedAt.HasValue)
+            .ThenByDescending(backup => backup.CopiedAt)
+            .ThenBy(backup => backup.Name, StringComparer.Ordinal)
+            .ToList();
+
+        return new SaveBackupList { Folder = settings.BackupFolder, Backups = backups };
+    }
+
+    // The game holds an open save in memory and writes it back to the file when it saves (the autosave too): a file
+    // replaced under an open save would be overwritten by the game's next save. The API can't close a save, so the
+    // restore waits for the user to close it. A save loading may be the real one, so that waits as well.
+    public async Task<Result<SaveRestore>> RestoreAsync(string backup, bool apply, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(settings.Save) || string.IsNullOrWhiteSpace(settings.Club))
+        {
+            return Refuse<SaveRestore>("No real save is configured (SaveGuard:Save and SaveGuard:Club), so there's nothing to restore.");
+        }
+
+        // Only a save copy directly in the backup folder, by the name the folder lists: never a path elsewhere.
+        if (!backup.EndsWith(SaveExtension, StringComparison.OrdinalIgnoreCase)
+            || !files.ListFileNames(settings.BackupFolder).Contains(backup, StringComparer.Ordinal))
+        {
+            return Refuse<SaveRestore>($"There's no copy named '{backup}' in {settings.BackupFolder}; list_save_backups " +
+                                       "shows the ones there. Nothing was restored.");
+        }
+
+        LoadedSave save;
+
+        try
+        {
+            save = await game.GetLoadedSaveAsync(cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            return Result.Fail<SaveRestore>(new GameUnavailableError(exception.Message));
+        }
+
+        if (save.Loading)
+        {
+            return Refuse<SaveRestore>("A save is loading in the game. Wait until it's open, close it if it's " +
+                                       $"'{settings.Save}', then restore. Nothing was restored.");
+        }
+
+        if (save.Loaded && string.Equals(save.Name, settings.Save, StringComparison.OrdinalIgnoreCase))
+        {
+            return Refuse<SaveRestore>($"'{settings.Save}' is open in the game. Close the save in FM first (back to the " +
+                                       "start screen), then restore. Nothing was restored.");
+        }
+
+        var target = Path.Combine(settings.GamesFolder, settings.Save + SaveExtension);
+
+        if (!files.Exists(target))
+        {
+            return Refuse<SaveRestore>($"There's no '{settings.Save}{SaveExtension}' in {settings.GamesFolder} to keep " +
+                                       "before the restore. Nothing was restored.");
+        }
+
+        var restore = new SaveRestore
+        {
+            Save = settings.Save,
+            Restored = Describe(backup),
+            KeptAs = $"{FileSafe(settings.Club)}-antes-de-restaurar-{time.GetLocalNow():yyyyMMdd-HHmm}{SaveExtension}"
+        };
+
+        if (!apply)
+        {
+            return Result.Ok(restore);
+        }
+
+        // The save as it is goes aside first, so the restore can be undone too; without it nothing is replaced.
+        try
+        {
+            files.Copy(target, Path.Combine(settings.BackupFolder, restore.KeptAs));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Refuse<SaveRestore>($"The save couldn't be kept as {restore.KeptAs} ({exception.Message}). Nothing was restored.");
+        }
+
+        try
+        {
+            files.Replace(Path.Combine(settings.BackupFolder, backup), target);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Refuse<SaveRestore>($"{backup} couldn't be copied over '{settings.Save}{SaveExtension}' " +
+                                       $"({exception.Message}). The save as it was is kept as {restore.KeptAs}.");
+        }
+
+        restore.Applied = true;
+        return Result.Ok(restore);
+    }
+
+    // The short test on the test save after a game patch is done by hand; this only records its outcome.
+    public async Task<Result<VersionRelease>> ReleaseVersionAsync(bool apply, CancellationToken cancellationToken = default)
+    {
+        string? version;
+
+        try
+        {
+            version = await game.GetGameVersionAsync(cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            return Result.Fail<VersionRelease>(new GameUnavailableError(exception.Message));
+        }
+
+        if (version is null)
+        {
+            return Refuse<VersionRelease>("The game's version couldn't be read, so there's nothing to release.");
+        }
+
+        var release = new VersionRelease { CurrentVersion = version, ReleasedVersion = ReleasedVersion() };
+
+        if (!apply || release.AlreadyReleased)
+        {
+            return Result.Ok(release);
+        }
+
+        try
+        {
+            files.WriteText(Path.Combine(settings.BackupFolder, ReleasedVersionFile), version);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return Refuse<VersionRelease>($"{ReleasedVersionFile} couldn't be written in {settings.BackupFolder} " +
+                                          $"({exception.Message}). The version wasn't released.");
+        }
+
+        release.Applied = true;
+        return Result.Ok(release);
+    }
+
     private string? ReleasedVersion()
     {
         var released = files.ReadText(Path.Combine(settings.BackupFolder, ReleasedVersionFile))?.Trim();
@@ -171,6 +329,35 @@ public class SaveGuard(ISaveSessionGameClient game, ISaveFiles files, SaveGuardS
         }
     }
 
+    private static SaveBackup Describe(string name)
+    {
+        if (OwnBackup.Match(name) is { Success: true } own)
+        {
+            return new SaveBackup
+            {
+                Name = name, Kind = SaveBackupKind.BeforeWrite, Club = own.Groups["club"].Value, CopiedAt = Stamp(own),
+                GameDate = DateOnly.TryParseExact(own.Groups["date"].Value, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var date) ? date : null
+            };
+        }
+
+        if (BeforeRestore.Match(name) is { Success: true } kept)
+        {
+            return new SaveBackup
+            {
+                Name = name, Kind = SaveBackupKind.BeforeRestore, Club = kept.Groups["club"].Value, CopiedAt = Stamp(kept)
+            };
+        }
+
+        return new SaveBackup { Name = name, Kind = SaveBackupKind.Other };
+    }
+
+    private static DateTime? Stamp(Match match)
+    {
+        return DateTime.TryParseExact(match.Groups["stamp"].Value, "yyyyMMdd-HHmm", CultureInfo.InvariantCulture,
+            DateTimeStyles.None, out var stamp) ? stamp : null;
+    }
+
     private static string FileSafe(string name)
     {
         var invalid = Path.GetInvalidFileNameChars().Concat(['\\', '/', ':', '*', '?', '"', '<', '>', '|']).ToHashSet();
@@ -179,6 +366,11 @@ public class SaveGuard(ISaveSessionGameClient game, ISaveFiles files, SaveGuardS
 
     private static Result<SaveClearance> Refuse(string reason)
     {
-        return Result.Fail<SaveClearance>(new SaveRefusedError(reason));
+        return Refuse<SaveClearance>(reason);
+    }
+
+    private static Result<T> Refuse<T>(string reason)
+    {
+        return Result.Fail<T>(new SaveRefusedError(reason));
     }
 }

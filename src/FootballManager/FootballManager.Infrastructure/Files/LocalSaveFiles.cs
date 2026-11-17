@@ -28,6 +28,17 @@ internal sealed class LocalSaveFiles : ISaveFiles
         File.Copy(source, destination, overwrite: false);
     }
 
+    public void Replace(string source, string destination)
+    {
+        File.Copy(source, destination, overwrite: true);
+    }
+
+    public void WriteText(string path, string text)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, text);
+    }
+
     public void Delete(string path)
     {
         File.Delete(path);
