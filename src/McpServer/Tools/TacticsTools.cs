@@ -106,8 +106,9 @@ public static class TacticsTools
         [Description("Formation keys for each phase, e.g. 433DMWide in possession and 4141DM out of it.")]
         PhaseValues? formation = null,
         [Description("Players of the starting eleven to place. To change who plays, list all eleven, each with a " +
-                     "position for both phases; otherwise list only the players to change. Exactly one goalkeeper, and " +
-                     "the goalkeeper's slot stays GK.")]
+                     "position for both phases, or by id alone in the order of get_tactics' lineup index: a player " +
+                     "coming in then takes the position and role of the slot he's listed at. Otherwise list only the " +
+                     "players to change. Exactly one goalkeeper, and the goalkeeper's slot stays GK.")]
         List<LineupEntry>? lineup = null,
         [Description("The substitutes by FM id, in the bench's order from its first place (the bench has as many " +
                      "places as the competition allows; the answer says how many if too many are given). Players not " +

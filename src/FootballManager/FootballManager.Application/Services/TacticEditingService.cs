@@ -51,6 +51,7 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
             var options = await game.GetOptionsAsync(cancellationToken);
             var tactic = await game.GetTacticAsync(cancellationToken);
             var roles = new RoleLookup(game, cancellationToken);
+            FillFromSlots(changes, tactic);
             var errors = Validate(changes, options, tactic);
 
             if (errors.Count == 0)
@@ -103,6 +104,40 @@ public class TacticEditingService(ITacticEditorGameClient game, ISaveGuard saveG
             ? $"Written to the test save '{save.SaveName}', without a copy."
             : $"Checked '{save.SaveName}' ({save.Club}, game date {save.GameDate:yyyy-MM-dd}, version {save.GameVersion}) " +
               $"and copied it to {save.Backup} before writing.";
+    }
+
+    // All eleven by id alone, listed in the order of the slots' index (as get_tactics lists them): a newcomer without a
+    // position takes the position and role of the slot he's listed at, when that slot's player isn't listed, so the
+    // shape stays as it is. Only while the active slot's positions hold (no slot switch, no formation change).
+    private static void FillFromSlots(TacticChanges changes, EditableTactic tactic)
+    {
+        if (changes.Lineup.Count != LineupSize || changes.Slot != tactic.ActiveSlot
+            || changes.Formation?.InPossession is not null || changes.Formation?.OutOfPossession is not null)
+        {
+            return;
+        }
+
+        var listed = changes.Lineup.Select(change => change.PlayerId).ToHashSet();
+        var starters = tactic.Lineup.Select(slot => slot.PlayerId).OfType<int>().ToHashSet();
+
+        for (var i = 0; i < changes.Lineup.Count; i++)
+        {
+            var change = changes.Lineup[i];
+            var slot = tactic.Lineup.FirstOrDefault(s => s.Index == i);
+
+            if (change.Position is not null || starters.Contains(change.PlayerId) || slot is null
+                || (slot.PlayerId is { } holder && listed.Contains(holder)))
+            {
+                continue;
+            }
+
+            change.Position = new ByPhase<string>
+            {
+                InPossession = slot.Position.InPossession?.Code,
+                OutOfPossession = slot.Position.OutOfPossession?.Code
+            };
+            change.Role ??= new ByPhase<string> { InPossession = slot.Role.InPossession, OutOfPossession = slot.Role.OutOfPossession };
+        }
     }
 
     private static List<IError> Validate(TacticChanges changes, TacticOptions options, EditableTactic tactic)
