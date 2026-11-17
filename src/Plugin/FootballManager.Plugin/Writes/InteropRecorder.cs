@@ -97,6 +97,8 @@ internal static class InteropRecorder
             _uiHooked = true;
             Patch(typeof(EventSubsystem), nameof(EventSubsystem.SendEvent), [typeof(EventBase)], nameof(OnUiEvent));
             Patch(typeof(EventDispatcher), nameof(EventDispatcher.SendEvent), [typeof(EventBase)], nameof(OnUiEvent));
+            PatchWith(typeof(FM.Game.PluginContextMenuContributor), nameof(FM.Game.PluginContextMenuContributor.PerformAction), null,
+                typeof(ContextAction), nameof(ContextAction.OnPerformAction));
         }
 
         var recording = new List<string> { "native events" };
@@ -155,6 +157,24 @@ internal static class InteropRecorder
         }
 
         return paths;
+    }
+
+    private static void PatchWith(Type type, string method, Type[]? parameters, Type prefixType, string prefix)
+    {
+        var name = $"{type.Name}.{method}";
+
+        try
+        {
+            var original = AccessTools.Method(type, method, parameters)
+                ?? throw new MissingMethodException(type.FullName, method);
+
+            _harmony!.Patch(original, prefix: new HarmonyMethod(AccessTools.Method(prefixType, prefix)));
+            Hooked.Add(name);
+        }
+        catch (Exception exception)
+        {
+            Failed.Add($"{name}: {exception.Message}");
+        }
     }
 
     private static void Patch(Type type, string method, Type[]? parameters, string prefix)
@@ -316,6 +336,11 @@ internal static class InteropRecorder
                 foreach (var (field, value) in ObjectFieldReader.Read(evt, "EventBase"))
                 {
                     recorded.AddNote(field, value);
+                }
+
+                if (evt.TryCast<SI.Bindable.Events.OpenPanelEvent>() is { } openPanel)
+                {
+                    PanelReplay.Capture(openPanel, recorded.AddNote);
                 }
             });
         }

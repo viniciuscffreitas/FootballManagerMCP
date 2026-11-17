@@ -44,6 +44,9 @@
       <HintPath>$(BepInExDir)\interop\UnityEngine.UIElementsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Unity.Addressables">
+      <HintPath>$(BepInExDir)\interop\Unity.Addressables.dll</HintPath>
+    </Reference>
     <Reference Include="SI.Interop">
       <HintPath>$(BepInExDir)\interop\SI.Interop.dll</HintPath>
       <Private>false</Private>

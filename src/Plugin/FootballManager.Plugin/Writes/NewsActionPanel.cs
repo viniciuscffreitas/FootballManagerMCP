@@ -6,13 +6,13 @@ namespace FootballManager.Plugin.Writes;
 
 // Opens a game panel the way a menu entry with IsOpenPanelAction does (make an offer for a player, set a transfer
 // target, talk to a player): the UI's OpenNewsActionPanelEvent with the entry's NewsAction id and its
-// ActionDataReferences, read from the game as the entry carries them (field=References:@Items[0].ActionData.ActionDataReferences).
+// ActionDataReferences (and DynamicCardId, card=, for the quick chat cards such as a talk with a player), read from the game as the entry carries them (field=References:@Items[0].ActionData.ActionDataReferences).
 internal static class NewsActionPanel
 {
     public const string ReferencesField = "References";
 
     public static async Task<string> OpenAsync(
-        DataQuery query, int actionId, IReadOnlyDictionary<string, ValueSource> given, bool send, TimeSpan timeout)
+        DataQuery query, int actionId, int dynamicCardId, IReadOnlyDictionary<string, ValueSource> given, bool send, TimeSpan timeout)
     {
         if (!given.ContainsKey(ReferencesField))
         {
@@ -38,7 +38,7 @@ internal static class NewsActionPanel
                 Subsystems.Get<EventSubsystem>().SendEvent(new OpenNewsActionPanelEvent
                 {
                     ActionId = actionId,
-                    DynamicCardId = -1,
+                    DynamicCardId = dynamicCardId,
                     ActionDataReferences = list,
                     PortalSourceId = 0
                 });
@@ -48,6 +48,7 @@ internal static class NewsActionPanel
             {
                 ["event"] = "FM.UI.OpenNewsActionPanelEvent",
                 ["actionId"] = actionId,
+                ["dynamicCardId"] = dynamicCardId,
                 ["references"] = list.Count,
                 ["sent"] = send
             });
