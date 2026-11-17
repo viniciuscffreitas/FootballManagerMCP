@@ -47,7 +47,7 @@ public class PlayerSearchService(IPlayerSearchGameClient search, IScoutingGameCl
 
             // Reading the results' count lets the search run to the end; its filters are read back after.
             var page = await scouting.GetPlayersAsync(
-                ScoutingSource.Search, null, FocusPool.Recommended, [], false, false, 0, cancellationToken);
+                ScoutingSource.Search, null, FocusPool.Recommended, [], false, false, 0, cancellationToken: cancellationToken);
             var after = page.Search ?? new PlayerSearchStatus();
             after.Filters = await search.GetFiltersAsync(cancellationToken);
 

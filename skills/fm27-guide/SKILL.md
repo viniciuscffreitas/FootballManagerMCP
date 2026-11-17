@@ -95,6 +95,7 @@ Load one only when the request needs it:
 | [references/match-and-tactics.md](references/match-and-tactics.md) | Building or changing a tactic, instructions, tactical effectiveness, tweaks, shouts, team talks, set pieces, attributes the engine values, home advantage |
 | [references/squad-and-training.md](references/squad-and-training.md) | Rotation, condition and sharpness, training plans, individual training, development by age, personality, morale, promises, talks, loans, youth intake |
 | [references/market-and-board.md](references/market-and-board.md) | Scouting and targets, offers and counter-offers, clauses, contracts and wages, renewals, sales, board goals and requests, finances, Brazilian rules and calendar |
+| [references/moneyball.md](references/moneyball.md) | Signing or selling by performance data (Allan FCL's moneyball): search flow, per-position cuts, pitfalls, sale rules |
 | [references/santos.md](references/santos.md) | Facts of Vini's save: dates, stadium, contracts, competitions, staff, save files, game reads that work |
 
 Research sources (with links) live only in the fork's branches `research/fm27-partida-tatica`,

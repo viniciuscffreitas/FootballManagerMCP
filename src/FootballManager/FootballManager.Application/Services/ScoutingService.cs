@@ -2,6 +2,7 @@ using FluentResults;
 using FootballManager.Application.Exceptions;
 using FootballManager.Application.Interfaces;
 using FootballManager.Application.ResultErrors;
+using FootballManager.Application.Text;
 using FootballManager.Domain.Players;
 using FootballManager.Domain.Scouting;
 
@@ -25,6 +26,9 @@ public interface IScoutingService
         bool includeHidden = false,
         bool includeReport = false,
         int? limit = null,
+        bool includeStats = false,
+        PerformanceFilter? filter = null,
+        int? scan = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -32,6 +36,10 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
 {
     public const int DefaultSearchLimit = 50;
     public const int MaxLimit = 200;
+
+    // With a performance filter the search is read further than the answer goes, then cut on the players' numbers.
+    public const int DefaultScan = 300;
+    public const int MaxScan = 1000;
 
     public async Task<Result<ScoutingOverview>> GetOverviewAsync(CancellationToken cancellationToken = default)
     {
@@ -53,6 +61,9 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
         bool includeHidden = false,
         bool includeReport = false,
         int? limit = null,
+        bool includeStats = false,
+        PerformanceFilter? filter = null,
+        int? scan = null,
         CancellationToken cancellationToken = default)
     {
         if (source == ScoutingSource.Focus && focusId is null)
@@ -69,6 +80,20 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
         {
             return Fail("limit", $"The limit runs 1 to {MaxLimit}.");
         }
+
+        if (scan is < 1 or > MaxScan)
+        {
+            return Fail("scan", $"The scan runs 1 to {MaxScan}.");
+        }
+
+        if (scan is not null && (source != ScoutingSource.Search || filter is null || filter.IsEmpty))
+        {
+            return Fail("scan", "The scan only goes with the search source and a performance filter.");
+        }
+
+        // The cuts need the numbers.
+        var filtering = filter is { IsEmpty: false };
+        includeStats |= filtering;
 
         // Hidden values are never fetched unless asked for, so they can't leak into an answer by accident.
         var attributes = new List<AttributeDefinition>();
@@ -107,9 +132,11 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
             }
 
             // The search is read a page at a time, in its own order; the other lists are short, sorted whole, then cut.
-            var take = source == ScoutingSource.Search ? limit ?? DefaultSearchLimit : (int?)null;
+            var take = source != ScoutingSource.Search ? (int?)null
+                : filtering ? scan ?? DefaultScan
+                : limit ?? DefaultSearchLimit;
             var page = await gameClient.GetPlayersAsync(
-                source, focusId, pool, attributes, includeHidden, includeReport, take, cancellationToken);
+                source, focusId, pool, attributes, includeHidden, includeReport, take, includeStats, cancellationToken);
 
             if (page.Search is not null)
             {
@@ -117,7 +144,11 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
             }
 
             // The sort is stable: within a grade, players keep the game's own order.
-            var players = page.Players.OrderByDescending(p => p.Grade ?? -1).Take(limit ?? int.MaxValue).ToList();
+            var players = page.Players
+                .Where(p => !filtering || Passes(p, filter!))
+                .OrderByDescending(p => p.Grade ?? -1)
+                .Take(limit ?? int.MaxValue)
+                .ToList();
 
             return Result.Ok(new ScoutedPlayerList
             {
@@ -126,6 +157,7 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
                 Pool = focus is null ? null : pool,
                 Search = page.Search,
                 Total = page.Total,
+                Scanned = filtering ? page.Players.Count : null,
                 Players = players,
                 HiddenDataMasked = includeHidden && players.Count > 0 && !players.Any(p => p.HasHiddenValues)
             });
@@ -134,6 +166,15 @@ public class ScoutingService(IScoutingGameClient gameClient, IPlayerSearchGameCl
         {
             return Result.Fail<ScoutedPlayerList>(new GameUnavailableError(exception.Message));
         }
+    }
+
+    private static bool Passes(ScoutedPlayer player, PerformanceFilter filter)
+    {
+        var numbers = player.Performance;
+
+        return (filter.Leagues.Count == 0 || filter.Leagues.Any(league => player.League is { } name && GameNames.Normalise(name).Contains(GameNames.Normalise(league))))
+            && (filter.MinMinutes is not { } minutes || numbers?.Minutes >= minutes)
+            && (filter.MinAverageRating is not { } rating || numbers?.AverageRating >= rating);
     }
 
     private static Result<ScoutedPlayerList> Fail(string property, string message)

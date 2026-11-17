@@ -94,9 +94,11 @@ internal sealed class ScoutingBridgeClient(
         bool includeAbility,
         bool includeReport,
         int? take = null,
+        bool includeStats = false,
         CancellationToken cancellationToken = default)
     {
-        var query = List(source, focusId, pool).WithHumanAndTeam().Props(PlayerPaths(attributes, includeAbility, includeReport));
+        var query = List(source, focusId, pool).WithHumanAndTeam()
+            .Props(PlayerPaths(attributes, includeAbility, includeReport, includeStats));
 
         if (source == ScoutingSource.Search)
         {
@@ -196,7 +198,8 @@ internal sealed class ScoutingBridgeClient(
         return searchType is { } type ? query.Context(ScoutingConstants.SearchType, type) : query;
     }
 
-    private static List<string> PlayerPaths(IReadOnlyCollection<AttributeDefinition> attributes, bool includeAbility, bool includeReport)
+    private static List<string> PlayerPaths(
+        IReadOnlyCollection<AttributeDefinition> attributes, bool includeAbility, bool includeReport, bool includeStats)
     {
         var paths = new List<string>(ScoutingConstants.PlayerBasics);
 
@@ -215,6 +218,11 @@ internal sealed class ScoutingBridgeClient(
         if (includeReport)
         {
             paths.AddRange(ScoutingConstants.PlayerReport);
+        }
+
+        if (includeStats)
+        {
+            paths.AddRange(PerformanceConstants.Paths);
         }
 
         return paths;

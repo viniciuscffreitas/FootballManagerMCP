@@ -17,6 +17,9 @@ public class ScoutedPlayerList
     /// <summary>How many players the list holds; more than <see cref="Players"/> when a limit cut it short.</summary>
     public int Total { get; set; }
 
+    /// <summary>With a performance filter: how many players were read and cut down to <see cref="Players"/>.</summary>
+    public int? Scanned { get; set; }
+
     public List<ScoutedPlayer> Players { get; set; } = [];
 
     /// <summary>True when hidden data was asked for but the game masked all of it (no In-Game Editor).</summary>

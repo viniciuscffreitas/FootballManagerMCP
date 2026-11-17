@@ -49,7 +49,17 @@ public static class ScoutingTools
                  "shortlisted or being scouted, and the statuses the game shows for him (its status icons), each with " +
                  "the game's English key, label and details: FutureTransfer (a transfer agreed, with the club and " +
                  "date he joins), TransferListed and ListedForLoan (with the asking price), Wanted (the clubs watching " +
-                 "him), injured, free agent, work permit, and so on. Text values are in the game's display language. " +
+                 "him), injured, free agent, work permit, and so on. With includeStats, also his club's league and his " +
+                 "numbers this season for his club, all competitive matches together, totals and per 90: appearances, " +
+                 "minutes, average rating, goals, assists, penalties, xG, non-penalty xG, xG overperformance, xG per " +
+                 "shot, xA, shots and on target, conversion, key passes, chances created, passes and completion, " +
+                 "progressive passes, crosses, dribbles, tackles and their success, interceptions, pressures attempted " +
+                 "and completed, headers and their success, clearances, blocks, mistakes leading to goals, possession " +
+                 "won and lost, distance, sprints; for keepers saves, save % and expected save %, xG prevented, clean " +
+                 "sheets and goals conceded. The game's search can't filter on league or minutes: leagues, minMinutes " +
+                 "and minAverageRating cut the list here (moneyball), reading the search's first 'scan' results and " +
+                 "reporting how many it read in 'scanned'; narrow the search first with run_player_search (positions, " +
+                 "age, interest). Text values are in the game's display language. " +
                  "Fails with a 503 when the game isn't running or no save is loaded.")]
     public static async Task<string> GetScoutedPlayers(
         IHttpClientFactory httpFactory,
@@ -77,7 +87,19 @@ public static class ScoutingTools
         bool includeReport = false,
         [Description("At most this many players (1-200). The search reads its first 50 by default (about a second " +
                      "per 30 players); the other lists are short and come whole unless this is set.")]
-        int? limit = null)
+        int? limit = null,
+        [Description("Include each player's league and season numbers (see above). About 2 KB more per player.")]
+        bool includeStats = false,
+        [Description("Keep only players whose club plays in one of these leagues, as the game names them or part " +
+                     "of the name (e.g. 'Série A', 'Liga Profesional'); case and accents don't matter. Turns on includeStats.")]
+        List<string>? leagues = null,
+        [Description("Keep only players with at least these minutes this season. Turns on includeStats.")]
+        int? minMinutes = null,
+        [Description("Keep only players with at least this average rating this season (e.g. 6.9). Turns on includeStats.")]
+        double? minAverageRating = null,
+        [Description("With a filter on the search: how many of its results to read before cutting, 1-1000 (300 by " +
+                     "default). Reading takes about a second per 20 players with their numbers.")]
+        int? scan = null)
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
 
@@ -87,7 +109,14 @@ public static class ScoutingTools
                     $"&includeAttributes={includeAttributes.ToString().ToLowerInvariant()}" +
                     $"&includeHidden={includeHidden.ToString().ToLowerInvariant()}" +
                     $"&includeReport={includeReport.ToString().ToLowerInvariant()}" +
-                    (limit is { } max ? $"&limit={max}" : string.Empty);
+                    (limit is { } max ? $"&limit={max}" : string.Empty) +
+                    $"&includeStats={includeStats.ToString().ToLowerInvariant()}" +
+                    string.Concat((leagues ?? []).Select(league => $"&leagues={Uri.EscapeDataString(league)}")) +
+                    (minMinutes is { } minutes ? $"&minMinutes={minutes}" : string.Empty) +
+                    (minAverageRating is { } rating
+                        ? $"&minAverageRating={rating.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
+                        : string.Empty) +
+                    (scan is { } read ? $"&scan={read}" : string.Empty);
 
         var response = await http.GetAsync($"/api/v1/scouting/players?{query}");
         return await response.ReadContentOrError();

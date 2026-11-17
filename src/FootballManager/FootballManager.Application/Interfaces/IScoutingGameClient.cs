@@ -37,5 +37,6 @@ public interface IScoutingGameClient
         bool includeAbility,
         bool includeReport,
         int? take = null,
+        bool includeStats = false,
         CancellationToken cancellationToken = default);
 }
