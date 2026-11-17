@@ -35,7 +35,7 @@ public class PlayerPerformance
     public int? KeyPasses { get; set; }
     public int? ChancesCreated { get; set; }
     public int? PassesAttempted { get; set; }
-    public double? PassCompletionPercentage { get; set; }
+    public int? PassCompletionPercentage { get; set; }
     public int? ProgressivePasses { get; set; }
     public int? CrossesAttempted { get; set; }
     public int? CrossesCompleted { get; set; }

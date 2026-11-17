@@ -11,7 +11,7 @@ internal static class PerformanceMapper
 
     public static PlayerPerformance? ToPerformance(Dictionary<string, JsonElement> values)
     {
-        if (!values.ContainsKey(PerformanceConstants.Stats[0].Path))
+        if (!values.ContainsKey(PerformanceConstants.Appearances))
         {
             return null;
         }

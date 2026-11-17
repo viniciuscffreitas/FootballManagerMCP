@@ -10,9 +10,12 @@ internal static class PerformanceConstants
     // The competition his club plays its league in: a reference, read by its name.
     public const string League = "Division.Name";
 
+    // Always among the paths read with the numbers: its presence says they were asked for.
+    public const string Appearances = "ClubAppearancesThisSeason";
+
     public static readonly IReadOnlyList<(string Path, Action<PlayerPerformance, double?> Set)> Stats =
     [
-        ("ClubAppearancesThisSeason", (p, v) => p.Appearances = Whole(v)),
+        (Appearances, (p, v) => p.Appearances = Whole(v)),
         ("Minutes", (p, v) => p.Minutes = Whole(v)),
         ("ClubAverageRatingThisSeason", (p, v) => p.AverageRating = v),
 
@@ -33,7 +36,7 @@ internal static class PerformanceConstants
         ("KeyPasses", (p, v) => p.KeyPasses = Whole(v)),
         ("ChancesCreated", (p, v) => p.ChancesCreated = Whole(v)),
         ("PassAttempts", (p, v) => p.PassesAttempted = Whole(v)),
-        ("PassCompletionPercentage", (p, v) => p.PassCompletionPercentage = v),
+        ("PassCompletionPercentage", (p, v) => p.PassCompletionPercentage = Whole(v)),
         ("ProgressivePasses", (p, v) => p.ProgressivePasses = Whole(v)),
         ("CrossAttempts", (p, v) => p.CrossesAttempted = Whole(v)),
         ("CrossesCompleted", (p, v) => p.CrossesCompleted = Whole(v)),

@@ -48,6 +48,13 @@ dele, não lido no save. IDs entre parênteses são vídeos do YouTube.
 - Renovar por ordem de importância, cortando bônus e subindo a multa (jQqDgcYAbIk).
 - Não delegar transferências à diretoria: ela compra caro (jQqDgcYAbIk).
 
-## Limite das tools hoje
-`run_player_search` não filtra por liga nem por minutos, e `get_scouted_players` não traz estatísticas da
-temporada. Só `get_squad includeStats` dá números, e só do próprio elenco.
+## Com as tools
+1. `run_player_search` (dry run, depois `apply`): posição natural, idade, interesse em vir (`interestType`/`interestLevel`).
+   A busca do jogo não tem regra de liga, minutos nem valor.
+2. `get_scouted_players source=search` com `leagues` (nome ou parte, sem acento), `minMinutes` e `minAverageRating`:
+   lê os primeiros `scan` resultados (300 por padrão, até 1000) com os números da temporada e corta na API;
+   `scanned` diz quantos leu. `includeStats` sozinho traz os números sem cortar (vale para shortlist e focos).
+3. Aplicar os cortes por posição acima nos campos de `performance` (totais e por 90; goleiro: `savePercentage`,
+   `expectedGoalsPrevented`).
+4. Limites: os números somam todas as competições do clube na temporada (estadual e copa entram); valor e salário
+   vêm só como texto, então o teto de preço é conferido à mão.
