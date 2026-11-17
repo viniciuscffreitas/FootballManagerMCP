@@ -56,8 +56,9 @@ public class ScoutingController(
         [FromQuery] List<string>? leagues = null,
         [FromQuery] int? minMinutes = null,
         [FromQuery] double? minAverageRating = null,
-        [FromQuery] Dictionary<string, double>? minimums = null,
-        [FromQuery] Dictionary<string, double>? maximums = null,
+        // Named, so a missing dictionary binds empty instead of from the whole query string.
+        [FromQuery(Name = "minimums")] Dictionary<string, double>? minimums = null,
+        [FromQuery(Name = "maximums")] Dictionary<string, double>? maximums = null,
         [FromQuery] int? scan = null,
         CancellationToken cancellationToken = default)
     {
