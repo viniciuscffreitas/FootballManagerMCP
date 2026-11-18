@@ -22,6 +22,16 @@ function Check($name, $ok, $detail) {
     if (-not $ok) { $script:failed++ }
 }
 
+# Every entry of the menu that can be picked, by its full path ("Publicar Anúncio > Treino > Treinador"): one without
+# sub-entries the game doesn't grey out. The service takes only such a path, never a sub-menu's label.
+function Leaves($entries, $above) {
+    foreach ($e in @($entries)) {
+        $path = if ($above) { "$above > $($e.label)" } else { $e.label }
+        if (@($e.children).Count -gt 0) { Leaves $e.children $path }
+        elseif (-not $e.disabled) { $path }
+    }
+}
+
 function AssertTestSave {
     $s = Invoke-RestMethod -UseBasicParsing 'http://localhost:5121/session' -TimeoutSec 20
     if (-not $s.isInvestigationSave) { throw "Not the test save: stop." }
@@ -42,6 +52,10 @@ for ($i = 1; $i -le $Repeat; $i++) {
         Check "member $action dry run #$i" ($r.Status -eq 200 -or ($r.Status -eq 400 -and $r.Body -match "doesn't offer")) "$($r.Status) $($r.Body.Substring(0, [Math]::Min(300, $r.Body.Length)))"
     }
 
+    # Edge case 3: no action named is refused, never read as the first one (Dismiss).
+    $r = Post '/staff/actions' @{ staffId = $member.id }
+    Check "no action #$i" ($r.Status -eq 400 -and $r.Body -match 'action') $r.Body
+
     # Edge case 2: someone not on the staff, and an action that runs on the club given a member.
     $r = Post '/staff/actions' @{ staffId = 1; action = 'Dismiss' }
     Check "not on staff #$i" ($r.Status -eq 400 -and $r.Body -match 'not on the first team') $r.Body
@@ -57,10 +71,14 @@ for ($i = 1; $i -le $Repeat; $i++) {
     if ($Apply -and $dry.Status -eq 200) {
         AssertTestSave
         $plan = $dry.Body | ConvertFrom-Json
-        $entry = if ($plan.choice) { $plan.choice -split ' > ' } else { @($plan.menu[0].label) }
-        $r = Post '/staff/actions?apply=true' @{ action = 'AdvertiseCoachingJob'; entry = $entry }
+        $leaf = if ($plan.choice) { $plan.choice } else { @(Leaves $plan.menu '')[0] }
+        Write-Output "Advert entry picked: $leaf"
+        $r = Post '/staff/actions?apply=true' @{ action = 'AdvertiseCoachingJob'; entry = @($leaf -split ' > ') }
+        Start-Sleep -Seconds 2
         $now = Invoke-RestMethod -UseBasicParsing "$api/staff" -TimeoutSec 60
-        Check "advert apply #$i" ($r.Status -eq 200) "$($r.Status) vacancies $after -> $($now.vacancies) :: $($r.Body)"
+        $applied = $r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).applied
+        # The advert placed must show in the read: one more open staff job than before the apply.
+        Check "advert apply #$i" ($applied -and $now.vacancies -gt $after) "$($r.Status) vacancies $after -> $($now.vacancies) :: $($r.Body)"
     }
 }
 
