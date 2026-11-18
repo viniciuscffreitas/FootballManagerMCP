@@ -69,6 +69,11 @@ for ($i = 1; $i -le $Repeat; $i++) {
         Check "rule break warns #$i" ($r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).warnings.Count -gt 0) $r.Body
     }
 
+    # The use case needs an open window: with it closed, -Apply fails rather than passing without proof.
+    if ($Apply -and -not $cup.windowOpen) {
+        Check "window open for the apply #$i" $false "$($cup.name): $($cup.window)"
+    }
+
     if ($Apply -and $cup.windowOpen) {
         AssertTestSave
         $r = Post '/squad/registration?apply=true' @{ competition = $Competition; unregister = @($out.id) }

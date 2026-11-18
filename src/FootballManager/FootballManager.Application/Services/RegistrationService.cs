@@ -64,10 +64,14 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
         {
             var registration = await game.GetRegistrationAsync(cancellationToken);
 
-            if (Find(registration, competition) is not { } target)
+            var matches = Find(registration, competition);
+
+            if (matches is not [var target])
             {
-                var names = string.Join("; ", registration.Competitions.Select(c => $"'{c.Name}' ({c.Competition})"));
-                return Fail("competition", $"No registration matches '{competition}'; the team has: {names}.");
+                var names = string.Join("; ", (matches.Count > 1 ? matches : registration.Competitions).Select(c => $"'{c.Name}' ({c.Competition})"));
+                return Fail("competition", matches.Count > 1
+                    ? $"'{competition}' matches several registrations: {names}. Name one."
+                    : $"No registration matches '{competition}'; the team has: {names}.");
             }
 
             var change = new RegistrationChange { Competition = target.Name };
@@ -135,7 +139,13 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
 
             change.Notes.Add(SaveNote(clearance.Value));
             change.Applied = await WriteAsync(target, change, cancellationToken);
-            await ReadBackAsync(target.Name, change, cancellationToken);
+
+            // Nothing reached the game: there's nothing to read back.
+            if (change.Applied)
+            {
+                await ReadBackAsync(target.Name, change, cancellationToken);
+            }
+
             return Result.Ok(change);
         }
         catch (GameUnavailableException exception)
@@ -203,7 +213,7 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
 
         try
         {
-            var now = Find(await game.GetRegistrationAsync(cancellationToken), competition);
+            var now = Find(await game.GetRegistrationAsync(cancellationToken), competition).FirstOrDefault(c => c.Name == competition);
 
             if (now is null)
             {
@@ -229,13 +239,15 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
         }
     }
 
-    // The registration by its name or its competition's, case aside; then one whose name holds the text.
-    private static CompetitionRegistration? Find(SquadRegistration registration, string competition)
+    // The registrations named so, by their name or their competition's, case aside; else those whose name holds the text.
+    private static List<CompetitionRegistration> Find(SquadRegistration registration, string competition)
     {
         var wanted = competition.Trim();
+        var exact = registration.Competitions.Where(c => Same(c.Name, wanted) || Same(c.Competition, wanted)).ToList();
 
-        return registration.Competitions.FirstOrDefault(c => Same(c.Name, wanted) || Same(c.Competition, wanted))
-               ?? registration.Competitions.SingleOrDefault(c => c.Name.Contains(wanted, StringComparison.CurrentCultureIgnoreCase));
+        return exact.Count > 0
+            ? exact
+            : registration.Competitions.Where(c => c.Name.Contains(wanted, StringComparison.CurrentCultureIgnoreCase)).ToList();
     }
 
     private static bool Same(string? a, string b)
@@ -250,7 +262,7 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
 
         return target.Rules.Select(rule =>
         {
-            var check = new RuleCheck { Rule = rule.Text ?? rule.Title ?? rule.Type.ToString(CultureInfo.InvariantCulture), Before = rule.Value, Limit = Limit(rule) };
+            var check = new RuleCheck { Rule = rule.Text ?? rule.Title ?? rule.Type?.ToString(CultureInfo.InvariantCulture) ?? "?", Before = rule.Value, Limit = Limit(rule) };
             int? delta = rule.Type switch
             {
                 MaxSquadSize or MinSquadSize => sizeDelta,
@@ -261,7 +273,12 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
             if (delta is { } d && rule.Value is { } before && check.Limit is { } limit)
             {
                 check.After = before + d;
-                check.Broken = rule.Type == MaxSquadSize ? check.After > limit : check.After < limit;
+
+                // Broken only when the change takes the squad past the limit, or further past it: filling a squad still
+                // under its minimum one player at a time breaks nothing.
+                check.Broken = rule.Type == MaxSquadSize
+                    ? check.After > limit && check.After > before
+                    : check.After < limit && check.After < before;
             }
 
             return check;

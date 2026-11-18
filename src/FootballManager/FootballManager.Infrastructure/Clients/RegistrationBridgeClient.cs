@@ -23,6 +23,13 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         var competitions = await Task.WhenAll(sessions.Items.Select(async (item, index) =>
         {
             Answered(item, RegistrationConstants.CompetitionProperties);
+
+            // Without its name or whether its window is open, the registration can't be checked or changed.
+            if (item.Values.Name is null || item.Values.WindowOpen is null)
+            {
+                throw new GameUnavailableException("The game didn't give a registration's name or whether its window is open.");
+            }
+
             var registered = PlayersAsync(index, RegistrationConstants.Registered, cancellationToken);
             var unregistered = PlayersAsync(index, RegistrationConstants.Unregistered, cancellationToken);
             return Competition(index, item.Values, await registered, await unregistered);
@@ -111,7 +118,10 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
             BridgeQuery.FromHuman().WithHumanAndTeam().Props([RegistrationConstants.NeedingNumbers]), cancellationToken);
 
         Answered(record, [RegistrationConstants.NeedingNumbers]);
-        return record.Values.Players?.Count ?? 0;
+
+        // No list at all is an unknown read, not "nobody needs a number".
+        return record.Values.Players?.Count
+               ?? throw new GameUnavailableException("The game didn't say which players need a squad number.");
     }
 
     public Task SetSquadNumberAsync(int playerId, int number, CancellationToken cancellationToken = default)
@@ -181,7 +191,8 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
             Answered(item, [GameConstants.UniqueId, GameConstants.Name]);
             return new RegistrationPlayer
             {
-                Id = item.Values.Id ?? 0,
+                // A player without an id is an unknown read, never player 0.
+                Id = item.Values.Id ?? throw new GameUnavailableException($"The game didn't give the id of a player in {list}."),
                 Name = item.Values.Name ?? string.Empty,
                 SquadNumber = Number(item.Values.SquadNumber),
                 IsGoalkeeper = item.Values.IsGoalkeeper == true
@@ -195,7 +206,7 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         return new CompetitionRegistration
         {
             Index = index,
-            Name = values.Name ?? values.Competition ?? string.Empty,
+            Name = values.Name!,
             Competition = values.Competition,
             CompetitionId = values.CompetitionId,
             WindowOpen = values.WindowOpen == true,
@@ -207,7 +218,7 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
             Notes = values.Notes?.Trim(),
             Rules = (values.Rules ?? []).Select(rule => new RegistrationRule
             {
-                Type = rule.RuleType ?? 0,
+                Type = rule.RuleType,
                 Title = rule.SquadSelectionRuleTitle,
                 Text = rule.SquadSelectionRuleString,
                 Value = rule.PlayerValue,

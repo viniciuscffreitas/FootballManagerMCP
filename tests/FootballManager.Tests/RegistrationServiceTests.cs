@@ -192,6 +192,45 @@ public class RegistrationServiceTests
     }
 
     [Fact]
+    public async Task A_name_several_registrations_hold_is_refused()
+    {
+        var result = await _registration.ChangeRegistrationAsync("Bra", [Youngster], null, apply: false);
+
+        Assert.Contains("several", Assert.IsType<ValidationError>(Assert.Single(result.Errors)).ErrorMessages.Single());
+    }
+
+    [Fact]
+    public async Task A_first_write_the_game_refuses_writes_nothing_and_reads_nothing_back()
+    {
+        _game.SetRegisteredAsync(1, Cup, Youngster, true, Arg.Any<CancellationToken>()).ThrowsAsync(new GameRejectedException("no"));
+
+        var plan = (await _registration.ChangeRegistrationAsync(Cup, [Youngster], null, apply: true)).Value;
+
+        Assert.False(plan.Applied);
+        Assert.Null(plan.Confirmed);
+        Assert.Equal(RegistrationWrite.NotWritten, plan.Writes[Youngster]);
+        await _game.Received(1).GetRegistrationAsync(Arg.Any<CancellationToken>());
+        await _game.DidNotReceiveWithAnyArgs().ConfirmRegistrationAsync(default, default!);
+    }
+
+    [Fact]
+    public async Task Filling_a_squad_still_under_its_minimum_breaks_nothing()
+    {
+        _game.GetRegistrationAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            var registration = Registration(registered: [Neymar]);
+            registration.Competitions[1].Rules[1] = new RegistrationRule { Type = 87, Text = "Mínimo de 2 goleiros no elenco", Value = 0, Display = "0/2 Mín." };
+            return registration;
+        });
+
+        var plan = (await _registration.ChangeRegistrationAsync(Cup, [Keeper], null, apply: false)).Value;
+
+        var keepers = plan.Rules.Single(rule => rule.Rule.Contains("goleiros"));
+        Assert.Equal((0, 1, false), (keepers.Before, keepers.After, keepers.Broken));
+        Assert.Empty(plan.Warnings);
+    }
+
+    [Fact]
     public async Task An_empty_item_in_a_list_is_refused()
     {
         var result = await _registration.ChangeRegistrationAsync(Cup, [Youngster, null], null, apply: false);
