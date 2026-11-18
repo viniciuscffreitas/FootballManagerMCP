@@ -26,9 +26,11 @@ function Check($name, $ok, $detail) {
 # sub-entries the game doesn't grey out. The service takes only such a path, never a sub-menu's label.
 function Leaves($entries, $above) {
     foreach ($e in @($entries)) {
+        # A greyed-out entry is skipped with everything under it, as the API does.
+        if ($e.disabled) { continue }
         $path = if ($above) { "$above > $($e.label)" } else { $e.label }
         if (@($e.children).Count -gt 0) { Leaves $e.children $path }
-        elseif (-not $e.disabled) { $path }
+        else { $path }
     }
 }
 
@@ -77,8 +79,10 @@ for ($i = 1; $i -le $Repeat; $i++) {
         Start-Sleep -Seconds 2
         $now = Invoke-RestMethod -UseBasicParsing "$api/staff" -TimeoutSec 60
         $applied = $r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).applied
-        # The advert placed must show in the read: one more open staff job than before the apply.
-        Check "advert apply #$i" ($applied -and $now.vacancies -gt $after) "$($r.Status) vacancies $after -> $($now.vacancies) :: $($r.Body)"
+        # The advert placed must show in the read: exactly one more open staff job than before the apply.
+        # Limit: get_staff exposes only the club's total of open jobs, not which job each one is. The +1 proves an
+        # advert was placed, not that it is the coaching one; check the job in the game's staff screen.
+        Check "advert apply #$i" ($applied -and $now.vacancies -eq ($after + 1)) "$($r.Status) vacancies $after -> $($now.vacancies) :: $($r.Body)"
     }
 }
 
