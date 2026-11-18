@@ -91,6 +91,10 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_transfer_activity` | Your transfers under way and the offers received, as the transfer activity screen shows them: the counts, what the deals would spend and bring in, and each offer's player, other club, type, fee and status, those awaiting your answer first |
 | Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
 | | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
+| Set pieces | `get_set_pieces` | The captain, the vice, who takes the armband after them, and each set piece taker list (penalties, corners, free kicks) in order |
+| | `set_captains` | Makes a player captain and/or another vice-captain |
+| | `set_set_piece_takers` | Puts players at the top of one taker list, in order (the first penalty taker, say) |
+| | `ask_staff_set_piece_takers` | Has the staff pick every set piece taker |
 | Training | `get_training` | This week's and next week's sessions, and each player's training position, role, additional focus, intensity and rating |
 | | `set_training` | Changes players' additional focus and intensity (or rests them), and sessions of the schedule |
 | Database | `search_database` | The game's search box: any player, staff member, club, competition or nation in the world |
@@ -139,7 +143,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game, or, for
   the contract negotiation of an accepted offer, with `negotiate_contract`.
 - **Your career is checked and copied before a change.** Before any change to your career applies (`set_tactic`,
-  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`, `set_captains`, `set_set_piece_takers`, `ask_staff_set_piece_takers`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
   the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
   Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
   club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on
