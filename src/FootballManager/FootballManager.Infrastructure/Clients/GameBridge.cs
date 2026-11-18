@@ -146,10 +146,13 @@ internal sealed class GameBridge(IHttpClientFactory httpClientFactory, ILogger<G
             return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken)
                    ?? throw new GameUnavailableException("The game sent an empty answer.");
         }
-        catch (JsonException exception) when (write)
+        catch (JsonException exception)
         {
-            // The write went out and the game said OK: an answer that can't be read doesn't say it wasn't taken.
-            throw new GameUnavailableException("The game answered something unreadable after the write was sent.", exception);
+            // An answer that can't be read is the game being unavailable, not a crash. After a write, it doesn't say the
+            // write wasn't taken; after a read (e.g. the read back of a write), it mustn't hide that write behind a 500.
+            throw new GameUnavailableException(write
+                ? "The game answered something unreadable after the write was sent."
+                : "The game answered something unreadable.", exception);
         }
     }
 
