@@ -78,4 +78,38 @@ public static class TransferTools
 
         return await response.ReadContentOrError();
     }
+
+    [McpServerTool(Name = "manage_player_exit")]
+    [Description("Change how one of the club's own players may leave, without the mouse, through his own menu in the " +
+                 "running game (the right click on him): action SetTransferStatus (the menu's transfer statuses, e.g. " +
+                 "transfer list or loan list), RemoveFromTransferList, RemoveFromLoanList, OfferToClubs, Recall (a " +
+                 "player the club has out on loan comes back) or ExtendLoan. The game offers only what fits where he " +
+                 "stands: an action its menu doesn't offer now is refused with where he stands, and nothing is sent. " +
+                 "By default a dry run that sends nothing: it returns choices (every entry the menu offers for the " +
+                 "action, labelled as the game labels each level, e.g. \"Transfer status > Transfer list\"), choice " +
+                 "(the entry picked: the only one, or the one named), confirmation (what the game would ask), and " +
+                 "status (transferListed, loanListed, outOnLoan, read from the same menu). When the menu has more than " +
+                 "one entry, pass one of choices as choice. With apply=true the API first checks and copies the save " +
+                 "(see the README's Safety), runs the entry and returns status as the game then shows him. An entry " +
+                 "that opens a screen of its own (an asking price dialog, the Transfer Room) isn't run: the call is " +
+                 "refused and names it. Use the fm27-guide skill's market rules before listing a player. Refused while " +
+                 "a match is being played.")]
+    public static async Task<string> ManagePlayerExit(
+        IHttpClientFactory httpFactory,
+        [Description("The player's FM id: one of the club's own players, or one it has out on loan.")]
+        int playerId,
+        [Description("SetTransferStatus, RemoveFromTransferList, RemoveFromLoanList, OfferToClubs, Recall or ExtendLoan.")]
+        string action,
+        [Description("The menu entry to pick, exactly as the dry run lists it in choices. Needed when there's more than one.")]
+        string? choice = null,
+        [Description("False (the default) only checks. True runs the entry: only once the user has agreed.")]
+        bool apply = false)
+    {
+        var http = httpFactory.CreateClient("FootballManagerApi");
+
+        var response = await http.PostAsJsonAsync(
+            $"/api/v1/transfers/exit?apply={apply.ToString().ToLowerInvariant()}", new { playerId, action, choice });
+
+        return await response.ReadContentOrError();
+    }
 }

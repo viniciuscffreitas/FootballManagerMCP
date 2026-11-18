@@ -88,6 +88,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `end_trials` | Ends trials, or withdraws offers not yet answered, for up to 50 players at once |
 | Transfers | `make_transfer_offer` | Bids a fee for a player through the game's offer panel, its fee moved with the panel's +/− buttons to exactly the one asked; the club's answer comes in the inbox |
 | | `negotiate_contract` | Once the club accepts, opens the contract negotiation from its message, agrees to the agent's promises, shows the contract's salary and length, and offers the deal at them on a second call |
+| | `manage_player_exit` | Sets one of the club's players' transfer status, takes him off the transfer or loan list, offers him to clubs, recalls or extends a loan, each through his own menu in the game |
 | | `get_transfer_activity` | Your transfers under way and the offers received, as the transfer activity screen shows them: the counts, what the deals would spend and bring in, and each offer's player, other club, type, fee and status, those awaiting your answer first |
 | Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
 | | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
@@ -118,7 +119,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
   `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`,
   `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`,
-  `negotiate_contract`) only check and describe the change unless they're called with `apply: true`. Their
+  `negotiate_contract`, `manage_player_exit`) only check and describe the change unless they're called with `apply: true`. Their
   descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own

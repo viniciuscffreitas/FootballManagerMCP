@@ -173,10 +173,15 @@ internal sealed class ScoutingEditorBridgeClient(
 
     public async Task<Dictionary<int, ScoutedPlayer>> FindPlayersAsync(IReadOnlyCollection<int> playerIds, CancellationToken cancellationToken = default)
     {
-        // The club's own squad (trialists are in it) and the scouting lists first: they reach a player by his id, where
-        // the player search reaches him by his place in its results, which moves as the game updates them.
+        // The club's own squad (trialists are in it), the players it has out on loan (not in the squad while away) and
+        // the scouting lists first: they reach a player by his id, where the player search reaches him by his place in
+        // its results, which moves as the game updates them.
         List<(string Path, int? SearchType)> lists =
-            [($"{TeamConstants.OwnTeam}.{TeamConstants.Players}", null), .. await ScoutingListsAsync(cancellationToken)];
+        [
+            ($"{TeamConstants.OwnTeam}.{TeamConstants.Players}", null),
+            (YouthConstants.Loans, null),
+            .. await ScoutingListsAsync(cancellationToken)
+        ];
 
         var found = await FindInAsync(playerIds, lists, cancellationToken);
 
