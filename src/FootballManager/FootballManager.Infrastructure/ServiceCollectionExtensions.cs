@@ -60,6 +60,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISaveSessionGameClient, SaveSessionBridgeClient>();
         services.AddScoped<IConversationGameClient, ConversationBridgeClient>();
         services.AddScoped<ITransferGameClient, TransferBridgeClient>();
+        services.AddScoped<ISetPiecesGameClient, SetPiecesBridgeClient>();
         services.AddSingleton<ISaveFiles, LocalSaveFiles>();
         services.AddScoped<ICompetitionsGameClient, CompetitionsBridgeClient>();
         services.AddScoped<DatabaseSearchBridgeClient>();
