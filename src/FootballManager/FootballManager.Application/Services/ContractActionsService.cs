@@ -343,8 +343,9 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
             if (entries[i].Children.Count == 0)
             {
-                // An entry that sends no event can't be picked either: the game lets the agreed playing time only go up
-                // from the menu, and the statuses below his own come with Event 0 (test save, 18/11/2026).
+                // An entry that sends no event can't be picked either: the game doesn't offer every status. Andrey
+                // Quintino raised from "Jogador de rotação" to "Jogador do elenco" could go to "Reserva de impacto" and
+                // back, but "Jogador de rotação" and below came with Event 0 (test save, 18/11/2026).
                 yield return new MenuLeaf(path, labels, entries[i], disabled || !entries[i].CanRun);
                 continue;
             }

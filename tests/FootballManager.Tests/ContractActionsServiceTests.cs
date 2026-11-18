@@ -439,8 +439,8 @@ public class ContractActionsServiceTests
         Assert.Contains("Liberar no fim do contrato", Messages(result));
     }
 
-    // The game lets the agreed playing time only go up from the menu: the statuses below his own send no event (Event 0)
-    // and carry no confirmation. Seen on Andrey Quintino in the test save, 18/11/2026, once he was "Jogador do elenco".
+    // The game doesn't offer every status: some send no event (Event 0) and carry no confirmation. Seen on Andrey
+    // Quintino in the test save, 18/11/2026: once "Jogador do elenco", "Jogador de rotação" and below came so.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
