@@ -44,6 +44,21 @@ public class ContractsBridgeClientTests
         await Assert.ThrowsAsync<GameUnavailableException>(() => Client("""{"count":0,"items":null}""").GetContractsAsync());
     }
 
+    // An answer without the list at all would read as an empty squad: a released player would look gone.
+    [Theory]
+    [InlineData("""{"count":0}""")]
+    [InlineData("""{}""")]
+    public async Task An_answer_without_the_list_makes_the_read_unavailable(string answer)
+    {
+        await Assert.ThrowsAsync<GameUnavailableException>(() => Client(answer).GetContractsAsync());
+    }
+
+    [Fact]
+    public async Task An_empty_list_the_game_sent_is_an_empty_squad()
+    {
+        Assert.Empty(await Client("""{"count":0,"items":[]}""").GetContractsAsync());
+    }
+
     [Fact]
     public async Task Rows_with_their_ids_are_read()
     {

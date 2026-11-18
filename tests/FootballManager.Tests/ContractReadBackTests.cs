@@ -60,6 +60,23 @@ public class ContractReadBackTests
         Assert.Contains(result.Value.Notes, note => note.Contains("reading it back failed"));
     }
 
+    // An answer without the list would read as an empty squad, him gone: the release isn't confirmed by it.
+    [Fact]
+    public async Task A_release_read_back_without_the_list_is_not_confirmed()
+    {
+        const string cost = "Isso custará R$120 mil ao clube.";
+        _editor.GetOfferedActionsAsync(Reserve, Arg.Any<CancellationToken>()).Returns([PlayerMenuAction.ReleaseOnFreeTransfer]);
+        _editor.GetMenuAsync(Reserve, PlayerMenuAction.ReleaseOnFreeTransfer, Arg.Any<CancellationToken>())
+            .Returns([new MenuEntry { Label = "Liberar por transferência livre", Confirmation = cost }]);
+        var service = Service(Squad("Reserva"), """{"count":0}""");
+
+        var result = await service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: cost);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(true, result.Value.Confirmed);
+        Assert.Contains(result.Value.Notes, note => note.Contains("reading it back failed"));
+    }
+
     private ContractActionsService Service(params string[] squadAnswers)
     {
         var factory = Substitute.For<IHttpClientFactory>();
