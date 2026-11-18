@@ -117,6 +117,12 @@ for ($i = 1; $i -le $Repeat; $i++) {
     # repetition takes the next one, since a player given a number is locked from then on.
     $candidates = @($squad | Where-Object { (Post '/squad/numbers' @{ playerId = $_.id; number = 97 }).Status -eq 200 })
     $reserve = $candidates[$i - 1]
+    if (-not $reserve) {
+        # Right after loading the save the numbers screen answers nothing until it's opened in the game.
+        $why = (Post '/squad/numbers' @{ playerId = $squad[0].id; number = 97 }).Body
+        Check "number player #$i" $false "no player whose number the game lets change: $why"
+        continue
+    }
     Write-Output "Number player #${i}: $($reserve.name) ($($reserve.id))"
     $r = Post '/squad/numbers' @{}
     Check "number without a request #$i" ($r.Status -eq 400) $r.Body
