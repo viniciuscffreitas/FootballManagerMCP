@@ -54,10 +54,13 @@ $target = if ($suggested -and (Row $current $suggested.playerId)) { Row $current
 Write-Output "Opponent $($current.teamName) ($($current.teamId)); target $($target.name) ($($target.playerId), $($target.position)); marking now $($target.marking)"
 Write-Output "Staff suggestions: $(@($current.staffSuggestions).Count); lineup rows $(@($current.players).Count); position rows $(@($current.positions).Count)"
 
+# The value to give: one the target doesn't hold, so the apply has something to write and the read back proves it.
+$markValue = if ($target.marking -eq 'always') { 'never' } else { 'always' }
+
 for ($i = 1; $i -le $Repeat; $i++) {
     # Use case 1: dry run of a Set lists the instructions, the staff's suggestions and the plan, and changes nothing.
     $before = Snapshot
-    $r = Post '/opposition/instructions' @{ action = 'Set'; player = "$($target.playerId)"; marking = 'always' }
+    $r = Post '/opposition/instructions' @{ action = 'Set'; player = "$($target.playerId)"; marking = $markValue }
     $after = Snapshot
     Check "set dry run #$i" ($r.Status -eq 200 -and -not $r.Json.applied -and @($r.Json.current.players).Count -gt 0 -and $before -eq $after) `
         "$($r.Status) plan=$($r.Json.plan | ConvertTo-Json -Compress) suggestions=$(@($r.Json.current.staffSuggestions).Count) unchanged=$($before -eq $after)"
@@ -68,7 +71,7 @@ for ($i = 1; $i -le $Repeat; $i++) {
         "$($r.Status) plan=$($r.Json.plan | ConvertTo-Json -Compress) notes=$($r.Json.notes -join ' | ')"
 
     # Edge case 2: no action named is refused, never read as the first one.
-    $r = Post '/opposition/instructions?apply=true' @{ player = "$($target.playerId)"; marking = 'always' }
+    $r = Post '/opposition/instructions?apply=true' @{ player = "$($target.playerId)" }
     Check "no action #$i" ($r.Status -eq 400 -and $r.Body -match 'action' -and (Snapshot) -eq $after) "$($r.Status) $($r.Body)"
 
     if (-not $Apply) { continue }
@@ -80,9 +83,9 @@ for ($i = 1; $i -le $Repeat; $i++) {
 
     # Use case 2: tight marking on the target, proven by the read back, then cleared, proven again.
     AssertTestSave
-    $r = Post '/opposition/instructions?apply=true' @{ action = 'Set'; player = "$($target.playerId)"; marking = 'always' }
+    $r = Post '/opposition/instructions?apply=true' @{ action = 'Set'; player = "$($target.playerId)"; marking = $markValue }
     $read = Row $r.Json.after $target.playerId
-    Check "set apply #$i" ($r.Status -eq 200 -and $r.Json.applied -and $read.marking -eq 'always' -and @($r.Json.plan | Where-Object { $_.confirmed -ne $true }).Count -eq 0) `
+    Check "set apply #$i" ($r.Status -eq 200 -and $r.Json.applied -and $read.marking -eq $markValue -and @($r.Json.plan | Where-Object { $_.confirmed -ne $true }).Count -eq 0) `
         "$($r.Status) after.marking=$($read.marking) plan=$($r.Json.plan | ConvertTo-Json -Compress) notes=$($r.Json.notes -join ' | ')"
 
     AssertTestSave
