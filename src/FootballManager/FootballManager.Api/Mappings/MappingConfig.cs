@@ -381,6 +381,11 @@ public class MappingConfig
         Rounded(config.NewConfig<LivePlayer, LivePlayerResponse>())
             .Map(dest => dest.YellowCard, src => src.YellowCard ? true : (bool?)null)
             .Map(dest => dest.RedCard, src => src.RedCard ? true : (bool?)null);
+        config.NewConfig<LiveMatchAction, LiveMatchActionResponse>()
+            .Map(dest => dest.Control, src => src.Control.ToString())
+            .Map(dest => dest.Lines, src => src.Lines.Count > 0 ? src.Lines : null)
+            .Map(dest => dest.Reaction, src => src.Reaction.Count > 0 ? src.Reaction : null)
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
 
         Rounded(config.NewConfig<StyleAverages, StyleAveragesResponse>());
     }

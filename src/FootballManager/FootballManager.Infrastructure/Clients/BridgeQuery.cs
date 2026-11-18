@@ -35,6 +35,12 @@ internal sealed class BridgeQuery
         return new BridgeQuery(GameConstants.MatchRoot);
     }
 
+    /// <summary>The Continue button's record, which says where the match day stands.</summary>
+    public static BridgeQuery FromContinue()
+    {
+        return new BridgeQuery(LiveControlConstants.ContinueRoot);
+    }
+
     /// <summary>
     /// The tactic the team plays. Reads pass the user's manager and team as contexts, like the game's screens; writes
     /// don't, like the tactics screen's controls.

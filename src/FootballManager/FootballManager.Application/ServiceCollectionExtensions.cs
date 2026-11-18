@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISaveGuard, SaveGuard>();
         services.AddScoped<ITacticEditingService, TacticEditingService>();
         services.AddScoped<IMatchesService, MatchesService>();
+        services.AddScoped<ILiveMatchControlService, LiveMatchControlService>();
         services.AddScoped<ITeamsService, TeamsService>();
         services.AddScoped<IOppositionService, OppositionService>();
         services.AddScoped<IScoutingService, ScoutingService>();

@@ -72,6 +72,10 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_fixtures` | Your calendar: the next matches (20 by default, up to 50) in every competition, with date, venue and opponent |
 | | `get_match` | One match in depth: both teams' numbers, goals, substitutions, every player's position, role and stats |
 | | `get_live_match` | The match being played: minute, score, goals, xG, shots, possession, players on the pitch with rating, condition and cards, substitutions made and left, the tactic and mentality in use |
+| | `make_substitution` | Brings a substitute on for a player on the pitch during the match; the game makes it at the next stoppage |
+| | `set_live_mentality` | Changes the mentality of the tactic the match is played with, at once |
+| | `set_live_role` | Changes a player's role on the pitch during the match, with or without the ball |
+| | `give_team_talk` | The team talk before kick-off, at half-time and at full time: reads its lines and says the chosen one to the squad |
 | League | `get_league_table` | Your league's table: every team's position, games, wins, draws, losses, goals, goal difference and points, your line marked, and where the press expects you to finish |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
 | | `get_opposition_report` | The game's own opposition report: expected formation and eleven with positions and roles, its tactic summary, the analysis' points, and the threat level of your next opponent |
@@ -118,7 +122,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
   `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`,
   `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`,
-  `negotiate_contract`) only check and describe the change unless they're called with `apply: true`. Their
+  `negotiate_contract`, `make_substitution`, `set_live_mentality`, `set_live_role`, `give_team_talk`) only check and describe the change unless they're called with `apply: true`. Their
   descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
@@ -139,7 +143,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game, or, for
   the contract negotiation of an accepted offer, with `negotiate_contract`.
 - **Your career is checked and copied before a change.** Before any change to your career applies (`set_tactic`,
-  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`, the live match tools), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
   the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
   Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
   club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on
