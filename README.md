@@ -57,6 +57,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | Squad | `get_squad` | Your first team: positions, condition, morale, season numbers; attributes on request |
 | | `get_availability` | Who can play the next match: the injured and their time out, the suspended (scope, matches left, reason), the match's registration and squad size rules, and every player's condition and sharpness |
 | | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |
+| | `manage_staff` | Runs a staff action from the game's own menu: sack or mutual termination, coaching or leadership course, new contract on a staff member; job adverts (any, coaching, scouting, medical) on the club |
 | | `get_contracts` | Your first team's contracts: wage, end date and time left, type, agreed playing time, release clause, clauses, renewal offer and the staff's advice; optionally only those ending by a date |
 | | `get_squad_dynamics` | The dressing room: the hierarchy by level, the club atmosphere and its reasons, open happiness issues (player, severity), the manager's promises, and each player's level and reasons to be happy or unhappy |
 | | `get_injuries` | The medical centre: each player's injury history, injuries this season and injury risk in the game's words, and the season summary with who's expected back for the next match; one player on request |
@@ -118,7 +119,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
   `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`,
   `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`,
-  `negotiate_contract`) only check and describe the change unless they're called with `apply: true`. Their
+  `negotiate_contract`, `manage_staff`) only check and describe the change unless they're called with `apply: true`. Their
   descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
