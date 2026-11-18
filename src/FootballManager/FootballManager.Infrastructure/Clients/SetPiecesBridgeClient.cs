@@ -116,6 +116,23 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
             throw new GameRejectedException($"The player's menu doesn't offer \"{entry}\" now.");
         }
 
+        // The send picks the menu's first entry (EntryData), so that entry is read right before it: it must be the one
+        // named, not greyed out, and send EventFmxDoAction. The plugin reads a missing event as 0, which would run as
+        // something else, so anything other than that event is refused without sending.
+        var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(playerId, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
+        var item = menu.Values.Items.FirstOrDefault();
+
+        if (item is null
+            || !string.Equals(item.Text ?? item.RowData?.Text, entry, StringComparison.CurrentCultureIgnoreCase)
+            || item.Disabled == true
+            || item.Event != ScoutingConstants.DoActionEventId)
+        {
+            throw new GameRejectedException(
+                $"The player's menu entry for \"{entry}\" isn't the one this tool knows how to send " +
+                $"(found: \"{item?.Text ?? "none"}\", event {item?.Event?.ToString(CultureInfo.InvariantCulture) ?? "none"}" +
+                $"{(item?.Disabled == true ? ", greyed out" : "")}). Nothing was sent.");
+        }
+
         await bridge.WriteAsync<JsonElement>(
             OnAction(playerId, actionId)
                 .ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", SetPieceConstants.EntryData), ("template", "none")),

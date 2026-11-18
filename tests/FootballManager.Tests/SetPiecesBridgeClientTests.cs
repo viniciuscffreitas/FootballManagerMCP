@@ -38,11 +38,61 @@ public class SetPiecesBridgeClientTests
         Assert.Null(setup.ViceCaptain);
     }
 
+    [Fact]
+    public async Task The_menu_entry_is_sent_when_the_menu_still_has_it()
+    {
+        var plugin = new CaptaincyPlugin(items: Entry("Tornar Capitão"));
+
+        await Client(plugin).MakeCaptainAsync(Player);
+
+        Assert.Single(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task The_menu_is_checked_by_the_read_right_before_the_send()
+    {
+        var plugin = new CaptaincyPlugin(items: Entry("Tornar Vice-capitão"));
+
+        await Client(plugin).MakeViceCaptainAsync(Player);
+
+        var send = plugin.Requests.FindIndex(request => request.Method == HttpMethod.Post);
+        Assert.Contains($"props={ScoutingConstants.MenuItems}", Uri.UnescapeDataString(plugin.Requests[send - 1].RequestUri!.Query));
+    }
+
+    [Theory]
+    [InlineData("Tornar Vice-capitão", false, 44)]
+    [InlineData("Tornar Capitão", true, 44)]
+    [InlineData("Tornar Capitão", false, 0)]
+    [InlineData("Tornar Capitão", false, 99)]
+    public async Task An_entry_that_isnt_the_one_expected_is_refused_and_nothing_is_sent(string label, bool disabled, int eventId)
+    {
+        var plugin = new CaptaincyPlugin(items: Entry(label, disabled, eventId));
+
+        await Assert.ThrowsAsync<GameRejectedException>(() => Client(plugin).MakeCaptainAsync(Player));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task A_menu_without_entries_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new CaptaincyPlugin(items: "[]");
+
+        await Assert.ThrowsAsync<GameRejectedException>(() => Client(plugin).MakeCaptainAsync(Player));
+
+        Assert.Empty(plugin.Writes);
+    }
+
     private static SetPiecesBridgeClient Client(CaptaincyPlugin plugin)
     {
         var factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(GameBridge.HttpClientName).Returns(_ => new HttpClient(plugin) { BaseAddress = new Uri("http://localhost:5121") });
         return new SetPiecesBridgeClient(new GameBridge(factory, NullLogger<GameBridge>.Instance));
+    }
+
+    private static string Entry(string label, bool disabled = false, int eventId = ScoutingConstants.DoActionEventId)
+    {
+        return $$"""[{"Text":"{{label}}","Event":{{eventId}},"Disabled":{{(disabled ? "true" : "false")}}}]""";
     }
 
     // The plugin as the client sees it: both captaincy actions offered on the player, with the given entries.
