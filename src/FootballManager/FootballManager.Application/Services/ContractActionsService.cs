@@ -234,7 +234,8 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             change.Menu = MenuWrite.Written;
         }
 
-        change.Applied = change.Confirmed == true || (change.Menu == MenuWrite.Written && change.Dialog switch
+        // A read back that shows otherwise outweighs the pick and its dialog: the game didn't take it as asked.
+        change.Applied = change.Confirmed == true || (change.Confirmed != false && change.Menu == MenuWrite.Written && change.Dialog switch
         {
             DialogState.Answered => true,
             DialogState.NotShown => string.IsNullOrWhiteSpace(confirmation),

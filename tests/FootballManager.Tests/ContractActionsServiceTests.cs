@@ -494,6 +494,20 @@ public class ContractActionsServiceTests
         Assert.Equal(AppliedState.Partial, change.Applied);
     }
 
+    // Andrey Quintino in the test save, 18/11/2026: no confirmation in the menu, no dialog, and the entry still offered.
+    [Fact]
+    public async Task A_change_the_read_back_denies_is_partial_even_without_a_dialog()
+    {
+        Offered(PlayerMenuAction.DofContractRenewal);
+        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { CanRun = true, Label = "Dir. de futebol negocia contrato" });
+        Dialog(DialogState.NotShown, "");
+
+        var change = (await _service.HandRenewalToDofAsync(Reserve, apply: true)).Value;
+
+        Assert.False(change.Confirmed);
+        Assert.Equal(AppliedState.Partial, change.Applied);
+    }
+
     private void FreeRelease()
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);
