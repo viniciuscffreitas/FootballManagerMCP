@@ -61,7 +61,7 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
 
             var entries = Runnable(menu, []).ToList();
 
-            if (entries.Count == 0 && menu.All(entry => entry.IsDisabled))
+            if (entries.Count == 0 && menu.All(entry => entry.Disabled))
             {
                 return Refuse("action",
                     $"The game greys out {Describe(action)} for {player.Name} now ({string.Join(", ", menu.Select(entry => entry.Label))}): " +
@@ -228,7 +228,7 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
         {
             List<int> path = [.. above, i];
 
-            if (entries[i].IsDisabled)
+            if (entries[i].Disabled)
             {
                 continue;
             }
@@ -253,7 +253,7 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
         try
         {
             var menu = await editor.GetMenuAsync(playerId, menuAction, cancellationToken);
-            return menu is { Count: > 0 } && menu.All(entry => entry.IsDisabled);
+            return menu is { Count: > 0 } && menu.All(entry => entry.Disabled);
         }
         catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException)
         {

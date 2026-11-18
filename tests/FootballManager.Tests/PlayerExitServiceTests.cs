@@ -144,7 +144,7 @@ public class PlayerExitServiceTests
     {
         Player(1);
         Offered(1, PlayerMenuAction.RecallFromLoan);
-        Menu(1, PlayerMenuAction.RecallFromLoan, new MenuEntry { Label = "Trazer do empréstimo", IsDisabled = true });
+        Menu(1, PlayerMenuAction.RecallFromLoan, new MenuEntry { Label = "Trazer do empréstimo", Disabled = true });
 
         var result = await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true);
 
@@ -158,7 +158,7 @@ public class PlayerExitServiceTests
         Player(1);
         Offered(1, PlayerMenuAction.SetTransferStatus);
         Menu(1, PlayerMenuAction.SetTransferStatus,
-            new MenuEntry { Label = "Transfer status", IsDisabled = true, Children = [new MenuEntry { Label = "Transfer list", CanRun = true }] },
+            new MenuEntry { Label = "Transfer status", Disabled = true, Children = [new MenuEntry { Label = "Transfer list", CanRun = true }] },
             new MenuEntry { Label = "Loan status", Children = [new MenuEntry { Label = "Loan list", CanRun = true }] });
 
         var plan = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: null, apply: false)).Value;
@@ -373,7 +373,7 @@ public class PlayerExitServiceTests
         Offered(1, PlayerMenuAction.RecallFromLoan);
         _editor.GetMenuAsync(1, PlayerMenuAction.RecallFromLoan, Arg.Any<CancellationToken>()).Returns(
             [new MenuEntry { Label = "Trazer do empréstimo", CanRun = true }],
-            [new MenuEntry { Label = "Trazer do empréstimo", IsDisabled = true }]);
+            [new MenuEntry { Label = "Trazer do empréstimo", Disabled = true }]);
 
         var exit = (await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true)).Value;
 

@@ -452,7 +452,7 @@ public class MappingConfig
         config.NewConfig<BridgeMenuItemDto, MenuEntry>()
             .Map(dest => dest.Label, src => MenuLabel(src))
             .Map(dest => dest.CanRun, src => MenuRuns(src))
-            .Map(dest => dest.IsDisabled, src => MenuFields(src).Disabled == true)
+            .Map(dest => dest.Disabled, src => MenuGreyedOut(src))
             .Map(dest => dest.Confirmation, src => MenuConfirmation(src))
             .Map(dest => dest.ConfirmationIsWarning, src => MenuWarns(src))
             .Map(dest => dest.Children, src => src.ChildList ?? new List<BridgeMenuItemDto>());
@@ -1231,8 +1231,14 @@ public class MappingConfig
 
     private static bool MenuRuns(BridgeMenuItemDto item)
     {
-        var fields = MenuFields(item);
-        return fields.Event == ScoutingConstants.DoActionEventId && fields.Disabled != true;
+        return MenuFields(item).Event == ScoutingConstants.DoActionEventId && !MenuGreyedOut(item);
+    }
+
+    // The game greys out an entry in its RowData or beside it: an advert already placed comes as
+    // {"RowData":{..., "Disabled":false}, "Disabled":true, "Hint":"A vaga já foi anunciada."}.
+    private static bool MenuGreyedOut(BridgeMenuItemDto item)
+    {
+        return item.Disabled == true || item.RowData?.Disabled == true;
     }
 
     private static BridgeMenuItemDto MenuFields(BridgeMenuItemDto item)

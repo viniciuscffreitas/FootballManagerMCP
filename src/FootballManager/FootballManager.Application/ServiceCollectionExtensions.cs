@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFinancesService, FinancesService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IStaffEditingService, StaffEditingService>();
         services.AddScoped<IContractsService, ContractsService>();
         services.AddScoped<ISquadDynamicsService, SquadDynamicsService>();
         services.AddScoped<IInjuriesService, InjuriesService>();
@@ -39,6 +40,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();
         services.AddScoped<ILeagueTableService, LeagueTableService>();
+        services.AddScoped<ISetPiecesService, SetPiecesService>();
         return services;
     }
 }
