@@ -97,6 +97,30 @@ public class ContractMenuClickTests
     }
 
     [Fact]
+    public async Task A_release_whose_cost_changed_since_the_dry_run_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new ContractPlugin(ReleaseMenu("Isso custará R$240 mil ao clube."));
+
+        var refusal = await Assert.ThrowsAsync<GameRejectedException>(() =>
+            Client(plugin).ClickMenuEntryAsync(Reserve, PlayerMenuAction.ReleaseOnFreeTransfer, [0], Release,
+                "Isso custará R$120 mil ao clube."));
+
+        Assert.Contains("R$240 mil", refusal.Message);
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task A_release_whose_cost_is_still_the_approved_one_is_sent()
+    {
+        var plugin = new ContractPlugin(ReleaseMenu("Isso custará\nR$120 mil ao clube."));
+
+        await Client(plugin).ClickMenuEntryAsync(Reserve, PlayerMenuAction.ReleaseOnFreeTransfer, [0], Release,
+            "isso custará R$120 mil ao clube.");
+
+        Assert.Single(plugin.Writes);
+    }
+
+    [Fact]
     public async Task The_menu_is_checked_by_the_read_right_before_the_send()
     {
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"));
@@ -266,6 +290,12 @@ public class ContractMenuClickTests
         return "[{\"Text\":\"Status no elenco\",\"Event\":0,\"Disabled\":" + Json(topDisabled) + ",\"ChildList\":["
                + "{\"RowData\":{\"Text\":\"" + first + "\",\"Event\":44,\"Disabled\":false}},"
                + "{\"RowData\":{\"Text\":\"" + second + "\",\"Event\":44,\"Disabled\":" + Json(lastDisabled) + "}}]}]";
+    }
+
+    private static string ReleaseMenu(string cost)
+    {
+        return "[{\"Text\":\"Liberar por transferência livre\",\"Event\":44,\"Disabled\":false,"
+               + "\"ActionData\":{\"ConfirmationDialogData\":{\"Description\":" + System.Text.Json.JsonSerializer.Serialize(cost) + "}}}]";
     }
 
     private static string Json(bool value)

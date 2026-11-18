@@ -480,7 +480,7 @@ internal sealed class ScoutingEditorBridgeClient(
     // AnswerDialogAsync answers once it's checked to be this entry's.
     public async Task ClickMenuEntryAsync(
         int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
-        CancellationToken cancellationToken = default)
+        string? confirmation = null, CancellationToken cancellationToken = default)
     {
         if (entry.Count == 0 || labels.Count != entry.Count)
         {
@@ -507,11 +507,21 @@ internal sealed class ScoutingEditorBridgeClient(
         // The entry must still be at that place with those labels, greyed out at no level, and run EventFmxDoAction
         // (44), the only event a click is sent with here: the plugin reads a missing event as 0, so any other would run
         // as a context action. A menu the game rebuilds in the few milliseconds before the send isn't caught.
-        if (MenuEntryAt(menu.Values.Items, entry, labels) is null)
+        if (MenuEntryAt(menu.Values.Items, entry, labels) is not { } item)
         {
             throw new GameRejectedException(
                 $"The game's menu for {action} changed since the check: it no longer has '{string.Join(" > ", labels)}' " +
                 "to pick. Nothing was sent; run the dry run again.");
+        }
+
+        // The terms approved in the dry run (for a release, its cost) must still be the ones the entry states now.
+        var now = item.Adapt<MenuEntry>().Confirmation;
+
+        if (confirmation is not null && !ConfirmationText.SameAs(now, confirmation))
+        {
+            throw new GameRejectedException(
+                $"The game's confirmation for '{string.Join(" > ", labels)}' is now \"{now}\", not the one agreed to " +
+                $"(\"{confirmation}\"). Nothing was sent; show the user the new terms and run the dry run again.");
         }
 
         try

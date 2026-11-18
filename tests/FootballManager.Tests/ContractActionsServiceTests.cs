@@ -106,7 +106,7 @@ public class ContractActionsServiceTests
             _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
             _editor.ClickMenuEntryAsync(Reserve, PlayerMenuAction.MutualTermination,
                 Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })),
-                Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Rescindir contrato" })), Arg.Any<CancellationToken>());
+                Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Rescindir contrato" })), Cost, Arg.Any<CancellationToken>());
         });
         Assert.Equal(AppliedState.Yes, change.Applied);
         Assert.Equal(MenuWrite.Written, change.Menu);
@@ -359,7 +359,7 @@ public class ContractActionsServiceTests
 
         await _editor.Received(1).ClickMenuEntryAsync(Reserve, PlayerMenuAction.SetPlayingTime,
             Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0, 1 })),
-            Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Status no elenco", "Rotação" })), Arg.Any<CancellationToken>());
+            Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Status no elenco", "Rotação" })), null, Arg.Any<CancellationToken>());
         Assert.Equal("Reserva", change.AgreedPlayingTime);
         Assert.Equal("Rotação", change.AgreedPlayingTimeAfter);
         Assert.True(change.Confirmed);

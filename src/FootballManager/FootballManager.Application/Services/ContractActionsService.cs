@@ -199,7 +199,9 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     {
         try
         {
-            await editor.ClickMenuEntryAsync(change.PlayerId, change.Action, leaf.Path, leaf.Labels, cancellationToken);
+            // A release is sent only while the entry still states the terms the user approved.
+            await editor.ClickMenuEntryAsync(change.PlayerId, change.Action, leaf.Path, leaf.Labels,
+                IsRelease(change.Action) ? confirmation : null, cancellationToken);
             change.Menu = MenuWrite.Written;
         }
         catch (GameAnswerLostException exception)
