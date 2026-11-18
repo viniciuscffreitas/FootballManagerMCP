@@ -293,6 +293,24 @@ public class PlayerExitServiceTests
         await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
+    [Fact]
+    public async Task An_action_outside_the_list_is_refused_before_any_read()
+    {
+        var result = await _exits.ChangeAsync(1, (PlayerExitAction)999, choice: null, apply: true);
+
+        Assert.Contains("action", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
+        await _editor.DidNotReceiveWithAnyArgs().FindPlayersAsync(default!);
+    }
+
+    [Fact]
+    public async Task A_request_without_a_player_is_refused_before_any_read()
+    {
+        var result = await _exits.ChangeAsync(null, PlayerExitAction.Recall, choice: null, apply: true);
+
+        Assert.Contains("playerId", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
+        await _editor.DidNotReceiveWithAnyArgs().FindPlayersAsync(default!);
+    }
+
     private void LostAnswer()
     {
         _editor.SendMenuEntryAsync(default, default, default!, default!)

@@ -11,5 +11,5 @@ public interface IPlayerExitService
     /// <paramref name="choice"/>: one of the entries the dry run lists, as it labels them. No action is refused.
     /// </summary>
     Task<Result<PlayerExit>> ChangeAsync(
-        int playerId, PlayerExitAction? action, string? choice, bool apply, CancellationToken cancellationToken = default);
+        int? playerId, PlayerExitAction? action, string? choice, bool apply, CancellationToken cancellationToken = default);
 }

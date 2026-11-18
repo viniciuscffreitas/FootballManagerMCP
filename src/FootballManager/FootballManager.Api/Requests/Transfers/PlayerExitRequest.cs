@@ -4,8 +4,8 @@ namespace FootballManager.Api.Requests.Transfers;
 
 public class PlayerExitRequest
 {
-    /// <summary>The FM id of one of the club's own players, or of one it has out on loan.</summary>
-    public int PlayerId { get; set; }
+    /// <summary>Required: the FM id of one of the club's own players, or of one it has out on loan. Left out, it is refused.</summary>
+    public int? PlayerId { get; set; }
 
     /// <summary>Required: left out, it is refused rather than read as the enum's first value (SetTransferStatus).</summary>
     public PlayerExitAction? Action { get; set; }

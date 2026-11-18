@@ -19,12 +19,24 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
     private static readonly TimeSpan StatePoll = TimeSpan.FromMilliseconds(300);
 
     public async Task<Result<PlayerExit>> ChangeAsync(
-        int playerId, PlayerExitAction? requested, string? choice, bool apply, CancellationToken cancellationToken = default)
+        int? requestedPlayer, PlayerExitAction? requested, string? choice, bool apply, CancellationToken cancellationToken = default)
     {
         // No default action: a request that leaves it out must not fall on the enum's first value (SetTransferStatus).
         if (requested is not { } action)
         {
             return Refuse("action", "Name the action to run, e.g. SetTransferStatus or RemoveFromTransferList. Nothing was sent.");
+        }
+
+        // A number outside the list would reach no menu action: refused before anything is read.
+        if (!Enum.IsDefined(action))
+        {
+            return Refuse("action", $"There's no action {(int)action}: use SetTransferStatus, RemoveFromTransferList, RemoveFromLoanList, " +
+                                    "OfferToClubs, Recall or ExtendLoan. Nothing was sent.");
+        }
+
+        if (requestedPlayer is not { } playerId)
+        {
+            return Refuse("playerId", "Name the player: playerId, his FM id. Nothing was sent.");
         }
 
         try
