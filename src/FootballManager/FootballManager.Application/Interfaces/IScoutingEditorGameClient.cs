@@ -70,4 +70,13 @@ public interface IScoutingEditorGameClient
     /// opens a panel with no NewsAction of its own (e.g. a contract negotiation with one of the club's players).
     /// </summary>
     Task RunMenuClickAsync(int playerId, PlayerMenuAction action, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Picks the menu entry at <paramref name="entry"/> (an index per level, from the top) as a click on the menu does,
+    /// then answers "Yes" to the confirmation dialog the game shows for it. Refused while a dialog is already open in
+    /// the game, so that none of the user's is answered. Returns the text of the dialog answered, or null when the game
+    /// showed none.
+    /// </summary>
+    Task<string?> ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default);
 }

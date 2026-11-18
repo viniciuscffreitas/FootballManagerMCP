@@ -23,7 +23,8 @@ internal sealed class ScoutingEditorBridgeClient(
     SearchPositions searchPositions,
     DatabaseSearchBridgeClient databaseSearch,
     TeamsBridgeClient teams,
-    CompetitionPlaces competitionPlaces)
+    CompetitionPlaces competitionPlaces,
+    GameDialogs dialogs)
     : IScoutingEditorGameClient
 {
     // The game shows a change a frame or more after its event.
@@ -391,11 +392,7 @@ internal sealed class ScoutingEditorBridgeClient(
         }
 
         var player = await PlaceAsync(playerId, cancellationToken);
-
-        // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.
-        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
-                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
-                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
+        var payload = PayloadOf(entry);
 
         await bridge.WriteAsync<JsonElement>(
             OnAction(player, ScoutingConstants.ActionIdOf(action)).ToWrite("/native",
@@ -433,6 +430,60 @@ internal sealed class ScoutingEditorBridgeClient(
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)),
                 ("field", $"Data:@{ScoutingConstants.MenuItems}[0].ActionData")),
             cancellationToken);
+    }
+
+    // As the menu's click does: /contextaction runs the entry through PluginContextMenuContributor with the event and the
+    // payload the game built for it. Unlike EventFmxDoAction, a click shows the entry's confirmation dialog, which is
+    // answered here as the user would.
+    public async Task<string?> ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default)
+    {
+        if (entry.Count == 0)
+        {
+            throw new ArgumentException("Name the menu entry to pick.", nameof(entry));
+        }
+
+        if (await dialogs.OpenDialogAsync(cancellationToken) is { } open)
+        {
+            throw new GameRejectedException($"A dialog is open in the game ({open}): ask the user to answer it first.");
+        }
+
+        var player = await PlaceAsync(playerId, cancellationToken);
+        var actionId = ScoutingConstants.ActionIdOf(action);
+        var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
+        var picked = ItemAt(menu.Values.Items, entry)
+                     ?? throw new GameRejectedException("The game's menu no longer has that entry: run the dry run again.");
+
+        await bridge.WriteAsync<JsonElement>(
+            OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
+                ("action", actionId.ToString(CultureInfo.InvariantCulture)),
+                ("eventId", ((picked.RowData ?? picked).Event ?? 0).ToString(CultureInfo.InvariantCulture)),
+                ("field", $"Data:{PayloadOf(entry)}")),
+            cancellationToken);
+
+        return await dialogs.AnswerYesAsync(cancellationToken);
+    }
+
+    // The entry at the path (an index per level), or null when the menu has none there.
+    private static BridgeMenuItemDto? ItemAt(List<BridgeMenuItemDto> items, IReadOnlyList<int> entry)
+    {
+        var item = entry[0] < items.Count ? items[entry[0]] : null;
+
+        foreach (var index in entry.Skip(1))
+        {
+            var children = item?.ChildList ?? item?.RowData?.ChildList;
+            item = children is not null && index < children.Count ? children[index] : null;
+        }
+
+        return item;
+    }
+
+    // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.
+    private static string PayloadOf(IReadOnlyList<int> entry)
+    {
+        return $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
+               + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
+               + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
     }
 
     public async Task<TeamPlayers?> GetTeamPlayersAsync(int teamId, CancellationToken cancellationToken = default)

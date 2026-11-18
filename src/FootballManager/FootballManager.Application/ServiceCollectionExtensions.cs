@@ -33,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INewsService, NewsService>();
         services.AddScoped<IDatabaseSearchService, DatabaseSearchService>();
         services.AddScoped<ITrialsService, TrialsService>();
+        services.AddScoped<IContractActionsService, ContractActionsService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<ITransferService, TransferService>();
         services.AddScoped<ITrainingService, TrainingService>();

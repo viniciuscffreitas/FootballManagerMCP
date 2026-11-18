@@ -21,5 +21,20 @@ public enum PlayerMenuAction
     MakeOffer,
 
     /// <summary>Start a contract negotiation with one of the club's own players: opens the contract negotiation panel.</summary>
-    NegotiateContract
+    NegotiateContract,
+
+    /// <summary>Release one of the club's own players on a free transfer: the club pays off the rest of his contract.</summary>
+    ReleaseOnFreeTransfer,
+
+    /// <summary>Offer one of the club's own players to end his contract by mutual consent: he decides.</summary>
+    MutualTermination,
+
+    /// <summary>Mark one of the club's own players to leave when his contract ends: no renewal is offered.</summary>
+    SetForRelease,
+
+    /// <summary>Change the squad status (playing time) promised to one of the club's own players.</summary>
+    SetPlayingTime,
+
+    /// <summary>Hand the renewal of one of the club's own players' contracts to the director of football.</summary>
+    DofContractRenewal
 }

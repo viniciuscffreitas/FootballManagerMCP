@@ -8,6 +8,9 @@ public class MenuEntry
     /// <summary>The entry does something when picked (it isn't only a sub-menu, or greyed out).</summary>
     public bool CanRun { get; set; }
 
+    /// <summary>The game greys the entry out: it can't be picked now.</summary>
+    public bool IsDisabled { get; set; }
+
     /// <summary>What the game asks the user to confirm before running it, in its display language, when it asks.</summary>
     public string? Confirmation { get; set; }
 

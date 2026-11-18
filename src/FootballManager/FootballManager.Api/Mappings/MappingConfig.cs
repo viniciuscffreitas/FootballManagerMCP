@@ -87,6 +87,7 @@ public class MappingConfig
             .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes.Count > 0 ? src.MedicalAttributes : null);
 
         config.NewConfig<SquadPlayerContract, SquadPlayerContractResponse>();
+        config.NewConfig<ContractChange, ContractChangeResponse>();
 
         config.NewConfig<SquadDynamics, SquadDynamicsResponse>();
         config.NewConfig<PlayerDynamics, PlayerDynamicsResponse>()
