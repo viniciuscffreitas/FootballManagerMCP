@@ -1,7 +1,8 @@
 parallel: 4
 merge: auto
 preflight:
-  - gh run list -R viniciuscffreitas/FootballManagerMCP --workflow ci.yml --branch main --limit 1 --json conclusion -q '.[0].conclusion' | grep -qx success
+  # O fork nunca rodou o GitHub Actions: o CI vale pelos testes locais na main.
+  - export PATH=$HOME/.dotnet:$PATH DOTNET_CLI_TELEMETRY_OPTOUT=1 && dotnet test tests/FootballManager.Tests
 verify:
   - dotnet test tests/FootballManager.Tests
 generated: []
@@ -19,4 +20,5 @@ notes:
   so-save-de-teste: "Escrita no jogo só com GET http://localhost:5121/session -> isInvestigationSave true. Nunca no save real."
   um-jogo-por-vez: "Um agente usa o FM por vez. Pegue o lock C:\\Code\\fm-lock (criação exclusiva) antes de escrever no jogo e solte no fim. Enquanto C:\\Code\\fm-busy-mods.txt existir, ninguém escreve no jogo."
   conflitos: "README, MappingConfig e o registro de tools no Program conflitam entre trilhas. Faça rebase na main antes do PR e rode os testes de novo."
+  sem-ci: "O fork não roda GitHub Actions. CI verde = dotnet test verde na branch rebaseada na main, antes do merge."
   mcp-travado: "Não compile o McpServer no Windows; o fm-deploy cuida disso."
