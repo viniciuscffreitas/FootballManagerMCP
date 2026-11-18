@@ -127,13 +127,19 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
         }
     }
 
-    // Every entry that does something when picked: one without sub-entries the game doesn't grey out.
+    // Every entry that does something when picked: one without sub-entries the game doesn't grey out, under submenus it
+    // doesn't grey out either (a greyed-out submenu can't be opened in the game).
     private static IEnumerable<Choice> Leaves(List<MenuEntry> entries, List<string> above)
     {
         for (var i = 0; i < entries.Count; i++)
         {
             var entry = entries[i];
             var labels = above.Append(entry.Label).ToList();
+
+            if (entry.Disabled)
+            {
+                continue;
+            }
 
             if (entry.Children.Count > 0)
             {
@@ -142,7 +148,7 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
                     yield return (label, path.Prepend(i).ToList(), levels, leaf);
                 }
             }
-            else if (!entry.Disabled)
+            else
             {
                 yield return (string.Join(Separator, labels), [i], labels, entry);
             }

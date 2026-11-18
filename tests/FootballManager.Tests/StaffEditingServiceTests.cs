@@ -181,6 +181,23 @@ public class StaffEditingServiceTests
         Assert.Contains(result.Value.Notes, note => note.Contains("read back"));
     }
 
+    [Fact]
+    public async Task An_entry_under_a_submenu_the_game_greyed_out_cant_be_picked()
+    {
+        _game.GetMenuAsync(Coach, StaffMenuAction.CoachingCourse, Arg.Any<CancellationToken>())
+            .Returns(_ => [new MenuEntry
+            {
+                Label = "Curso de treinador",
+                Disabled = true,
+                Children = [new MenuEntry { Label = "Licença A" }]
+            }]);
+
+        var result = await _staff.RunActionAsync(Coach, StaffMenuAction.CoachingCourse, ["Curso de treinador", "Licença A"], apply: true);
+
+        Assert.Contains("no entry", Messages(result));
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
+    }
+
     private static string Messages<T>(Result<T> result)
     {
         Assert.True(result.IsFailed);
