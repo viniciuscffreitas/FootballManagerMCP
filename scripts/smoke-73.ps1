@@ -33,6 +33,12 @@ function AssertTestSave {
 
 function Registration { Invoke-RestMethod -UseBasicParsing "$api/squad/registration" -TimeoutSec 120 }
 function Cup($reg) { $reg.competitions | Where-Object { $_.competition -eq $Competition -or $_.name -eq $Competition } | Select-Object -First 1 }
+# The registered ids that differ between two reads, other than the player asked: a confirm sends every tick on the
+# screen, so another player moving with him is a failure (seen 18/11/2026).
+function Others($before, $after, $asked) {
+    $a = @($before.registered | ForEach-Object { $_.id }); $b = @($after.registered | ForEach-Object { $_.id })
+    @(Compare-Object $a $b | Where-Object { $_.InputObject -ne $asked } | ForEach-Object { $_.InputObject })
+}
 
 $failed = 0
 AssertTestSave
@@ -89,16 +95,20 @@ for ($i = 1; $i -le $Repeat; $i++) {
 
     if ($Apply -and $cup.windowOpen) {
         AssertTestSave
+        $was = Cup (Registration)
         $r = Post '/squad/registration?apply=true' @{ competition = $Competition; unregister = @($out.id) }
         $now = Cup (Registration)
         $gone = -not ($now.registered | Where-Object { $_.id -eq $out.id })
-        Check "unregister apply #$i" ($r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).confirmed -and $gone) "$($r.Status) $($r.Body)"
+        $moved = Others $was $now $out.id
+        Check "unregister apply #$i" ($r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).confirmed -and $gone -and $moved.Count -eq 0 -and $now.registered.Count -eq $was.registered.Count - 1) "$($r.Status) others moved [$($moved -join ',')] $($was.registered.Count)->$($now.registered.Count) $($r.Body)"
 
         AssertTestSave
+        $was = $now
         $r = Post '/squad/registration?apply=true' @{ competition = $Competition; register = @($out.id) }
         $now = Cup (Registration)
         $back = [bool]($now.registered | Where-Object { $_.id -eq $out.id })
-        Check "register apply #$i" ($r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).confirmed -and $back) "$($r.Status) $($r.Body)"
+        $moved = Others $was $now $out.id
+        Check "register apply #$i" ($r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).confirmed -and $back -and $moved.Count -eq 0 -and $now.registered.Count -eq $was.registered.Count + 1) "$($r.Status) others moved [$($moved -join ',')] $($was.registered.Count)->$($now.registered.Count) $($r.Body)"
     }
 
     # Use case 3 and edge cases 2-3: squad numbers.

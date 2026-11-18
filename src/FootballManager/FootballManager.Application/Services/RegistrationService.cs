@@ -151,7 +151,7 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
             // Nothing reached the game: there's nothing to read back.
             if (change.Applied)
             {
-                await ReadBackAsync(target.Name, change, cancellationToken);
+                await ReadBackAsync(target, change, cancellationToken);
             }
 
             return Result.Ok(change);
@@ -213,11 +213,13 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
         }
     }
 
-    // The registration read again: every player asked must be where asked. A read the game doesn't answer leaves it
-    // unconfirmed, never failed: the change may be in.
-    private async Task ReadBackAsync(string competition, RegistrationChange change, CancellationToken cancellationToken)
+    // The registration read again: every player asked must be where asked, and nobody else may have moved (a confirm
+    // sends every tick on the screen: seen 18/11/2026, unregistering one player took another out too). A read the game
+    // doesn't answer leaves it unconfirmed, never failed: the change may be in.
+    private async Task ReadBackAsync(CompetitionRegistration target, RegistrationChange change, CancellationToken cancellationToken)
     {
         await Task.Delay(SettlePause, cancellationToken);
+        var competition = target.Name;
 
         try
         {
@@ -234,11 +236,24 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
                 .Concat(change.Unregister.Where(p => registered.Contains(p.Id)))
                 .ToList();
 
-            change.Confirmed = wrong.Count == 0;
+            var asked = change.Register.Concat(change.Unregister).Select(p => p.Id).ToHashSet();
+            var before = target.Registered.Select(p => p.Id).ToHashSet();
+            var others = target.Registered.Where(p => !asked.Contains(p.Id) && !registered.Contains(p.Id))
+                .Concat(now.Registered.Where(p => !asked.Contains(p.Id) && !before.Contains(p.Id)))
+                .ToList();
+
+            change.Confirmed = wrong.Count == 0 && others.Count == 0;
 
             if (wrong.Count > 0)
             {
                 change.Warnings.Add($"Read back, not as asked: {string.Join(", ", wrong.Select(p => $"{p.Name} ({p.Id})"))}.");
+            }
+
+            if (others.Count > 0)
+            {
+                change.Warnings.Add("Read back, players not asked changed too: " +
+                                    string.Join(", ", others.Select(p => $"{p.Name} ({p.Id}) {(registered.Contains(p.Id) ? "registered" : "unregistered")}")) +
+                                    ". Check get_squad_registration and put them back if that wasn't meant.");
             }
         }
         catch (GameUnavailableException exception)

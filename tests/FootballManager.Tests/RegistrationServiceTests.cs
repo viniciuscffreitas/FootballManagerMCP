@@ -134,6 +134,20 @@ public class RegistrationServiceTests
     }
 
     [Fact]
+    public async Task A_read_back_where_another_player_also_moved_is_not_confirmed()
+    {
+        // Seen 18/11/2026 in the smoke: unregistering Nicola Profeta also took Andrey Quintino out, and it read as confirmed.
+        _game.GetRegistrationAsync(Arg.Any<CancellationToken>())
+            .Returns(Registration(), Registration(registered: [21, Youngster]));
+
+        var plan = (await _registration.ChangeRegistrationAsync(Cup, [Youngster], [Neymar], apply: true)).Value;
+
+        Assert.True(plan.Applied);
+        Assert.False(plan.Confirmed);
+        Assert.Contains(plan.Warnings, warning => warning.Contains("Diógenes (20)") && warning.Contains("not asked"));
+    }
+
+    [Fact]
     public async Task A_read_back_the_game_does_not_answer_still_reports_the_apply()
     {
         _game.GetRegistrationAsync(Arg.Any<CancellationToken>())
