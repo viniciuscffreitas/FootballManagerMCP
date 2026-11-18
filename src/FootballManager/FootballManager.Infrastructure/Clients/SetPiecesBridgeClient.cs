@@ -25,6 +25,21 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
                 [SetPieceConstants.CaptainId, SetPieceConstants.CaptainName, SetPieceConstants.ViceCaptainId, SetPieceConstants.ViceCaptainName]),
             cancellationToken);
 
+        // A role the game didn't answer, or failed to read, is unknown: read as none, the plan and the read-back after a
+        // write would both go wrong (a vice that is the captain, a lost write taken as not written).
+        foreach (var role in new[] { SetPieceConstants.CaptainId, SetPieceConstants.ViceCaptainId })
+        {
+            if (team.Pending?.Contains(role) == true)
+            {
+                throw new GameUnavailableException($"The game didn't answer {role} (it may be busy).");
+            }
+
+            if (team.Errors?.TryGetValue(role, out var error) == true)
+            {
+                throw new GameUnavailableException($"The game failed to read {role}: {error}");
+            }
+        }
+
         var squad = await bridge.GetListAsync<BridgeConversationPlayerDto>(
             BridgeQuery.FromHuman().List(SetPieceConstants.Squad).Props([GameConstants.UniqueId, GameConstants.Name]),
             cancellationToken);
@@ -102,11 +117,7 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
         }
 
         await bridge.WriteAsync<JsonElement>(
-            BridgeQuery.FromGame()
-                .Base(ScoutingConstants.Action)
-                .Context(ScoutingConstants.ActionId, actionId)
-                .RefList(ScoutingConstants.Records, GameConstants.HumanRoot, PlayerPath(playerId))
-                .WithHumanAndTeam()
+            OnAction(playerId, actionId)
                 .ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", SetPieceConstants.EntryData), ("template", "none")),
             cancellationToken);
     }
@@ -120,6 +131,15 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
             cancellationToken);
 
         return offered.Values.Actions?.Keys.ToHashSet() ?? [];
+    }
+
+    private static BridgeQuery OnAction(int playerId, uint actionId)
+    {
+        return BridgeQuery.FromGame()
+            .Base(ScoutingConstants.Action)
+            .Context(ScoutingConstants.ActionId, actionId)
+            .RefList(ScoutingConstants.Records, GameConstants.HumanRoot, PlayerPath(playerId))
+            .WithHumanAndTeam();
     }
 
     private static string ActionKey(uint actionId)
