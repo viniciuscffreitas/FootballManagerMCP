@@ -116,6 +116,59 @@ public class ScoutingEditorBridgeClientTests
         Assert.Single(plugin.Writes);
     }
 
+    [Theory]
+    [InlineData("""{"values":{},"pending":["Actions"]}""")]
+    [InlineData("""{"values":{},"errors":{"Actions":"Reading the value failed"}}""")]
+    [InlineData("""{"values":{}}""")]
+    public async Task Actions_the_game_didnt_read_are_unknown_not_none(string actions)
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida"), actions: actions);
+        var client = plugin.Client();
+        await client.FindPlayersAsync([Player]);
+
+        await Assert.ThrowsAsync<GameUnavailableException>(() => client.GetOfferedActionsAsync(Player));
+    }
+
+    [Theory]
+    [InlineData("""{"values":{},"pending":["Items"]}""")]
+    [InlineData("""{"values":{},"errors":{"Items":"Reading the value failed"}}""")]
+    [InlineData("""{"values":{}}""")]
+    [InlineData("""{"values":{"Items":[null]}}""")]
+    [InlineData("""{"values":{"Items":[{"Text":"Situação de transferência","Event":0,"ChildList":[null]}]}}""")]
+    public async Task A_menu_the_game_didnt_read_is_unknown_not_empty(string menu)
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida"), menu: menu);
+        var client = await plugin.FoundAsync();
+
+        await Assert.ThrowsAsync<GameUnavailableException>(() => client.GetMenuAsync(Player, PlayerMenuAction.SetTransferStatus));
+    }
+
+    [Theory]
+    [InlineData("""{"values":{},"pending":["Items"]}""")]
+    [InlineData("""{"values":{"Items":[null]}}""")]
+    public async Task A_menu_the_game_didnt_read_right_before_the_send_sends_nothing(string menu)
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências"), menu: menu);
+        var client = await plugin.FoundAsync();
+
+        await Assert.ThrowsAsync<GameUnavailableException>(() =>
+            client.SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task A_send_answered_with_something_unreadable_is_a_lost_answer()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências"), sendAnswer: "<html>oops</html>");
+        var client = await plugin.FoundAsync();
+
+        await Assert.ThrowsAsync<GameAnswerLostException>(() =>
+            client.SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Single(plugin.Writes);
+    }
+
     private static string StatusMenu(string first, string? second = null, bool leafDisabled = false, bool topDisabled = false)
     {
         var levels = new List<string> { Level(first, leafDisabled && second is null) };
@@ -135,7 +188,9 @@ public class ScoutingEditorBridgeClientTests
 
     // The plugin as the client sees it: the player in the club's squad, his menu offering the transfer status entries;
     // or out on loan, his menu offering the recall, and back in the squad once the recall is sent.
-    private sealed class PlayerPlugin(string items, bool outOnLoan = false, bool sendTimesOut = false) : HttpMessageHandler
+    private sealed class PlayerPlugin(
+        string items, bool outOnLoan = false, bool sendTimesOut = false, string? actions = null, string? menu = null, string? sendAnswer = null)
+        : HttpMessageHandler
     {
         private bool _outOnLoan = outOnLoan;
 
@@ -174,7 +229,7 @@ public class ScoutingEditorBridgeClientTests
                 _outOnLoan = false;
 
                 // The request went out; its answer never comes back.
-                return sendTimesOut ? Task.FromException<HttpResponseMessage>(new TaskCanceledException("timeout")) : Answer("{}");
+                return sendTimesOut ? Task.FromException<HttpResponseMessage>(new TaskCanceledException("timeout")) : Answer(sendAnswer ?? "{}");
             }
 
             var url = Uri.UnescapeDataString(request.RequestUri!.Query);
@@ -182,7 +237,7 @@ public class ScoutingEditorBridgeClientTests
 
             if (url.Contains($"props={ScoutingConstants.MenuItems}"))
             {
-                return Answer($$$"""{"values":{"Items":{{{items}}}}}""");
+                return Answer(menu ?? $$$"""{"values":{"Items":{{{items}}}}}""");
             }
 
             if (url.Contains($"props={ScoutingConstants.Actions}"))
@@ -191,6 +246,11 @@ public class ScoutingEditorBridgeClientTests
                 if (url.Contains(YouthConstants.Loans) != _outOnLoan)
                 {
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("No item has that UniqueId") });
+                }
+
+                if (actions is not null)
+                {
+                    return Answer(actions);
                 }
 
                 var action = _outOnLoan ? ScoutingConstants.RecallFromLoanAction : ScoutingConstants.SetTransferStatusAction;

@@ -7,5 +7,6 @@ namespace FootballManager.Infrastructure.Dtos.Scouting;
 internal sealed class BridgeMenuDto
 {
     [JsonPropertyName(ScoutingConstants.MenuItems)]
-    public List<BridgeMenuItemDto> Items { get; set; } = [];
+    /// <summary>Null when the game left the entries out: unknown, not an empty menu.</summary>
+    public List<BridgeMenuItemDto>? Items { get; set; }
 }

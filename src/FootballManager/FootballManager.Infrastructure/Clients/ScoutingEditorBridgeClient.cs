@@ -368,8 +368,36 @@ internal sealed class ScoutingEditorBridgeClient(
             return null;
         }
 
+        return (await MenuItemsAsync(player, actionId, cancellationToken)).Adapt<List<MenuEntry>>();
+    }
+
+    // The menu's entries as the game reads them now. Entries it didn't answer, failed to read or left out are unknown,
+    // not an empty menu, and so is a menu with an empty slot at any level.
+    private async Task<List<BridgeMenuItemDto>> MenuItemsAsync(PlayerPlace player, uint actionId, CancellationToken cancellationToken)
+    {
         var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
-        return menu.Values.Items.Adapt<List<MenuEntry>>();
+
+        if (menu.Pending?.Contains(ScoutingConstants.MenuItems) == true)
+        {
+            throw new GameUnavailableException("The game didn't answer the player's menu in time (it may be busy).");
+        }
+
+        if (menu.Errors?.TryGetValue(ScoutingConstants.MenuItems, out var error) == true)
+        {
+            throw new GameUnavailableException($"The game failed to read the player's menu: {error}");
+        }
+
+        if (menu.Values.Items is not { } items || HasEmptySlot(items))
+        {
+            throw new GameUnavailableException("The game sent the player's menu incomplete.");
+        }
+
+        return items;
+    }
+
+    private static bool HasEmptySlot(IEnumerable<BridgeMenuItemDto?> items)
+    {
+        return items.Any(item => item is null || HasEmptySlot(item.ChildList ?? []) || item.RowData is { ChildList: { } below } && HasEmptySlot(below));
     }
 
     // The menu actions the game offers for the player now, keyed as the game lists them ("#<action id>").
@@ -382,7 +410,19 @@ internal sealed class ScoutingEditorBridgeClient(
                 .Props([ScoutingConstants.Actions]),
             cancellationToken);
 
-        return offered.Values.Actions?.Keys.ToHashSet() ?? [];
+        // Actions the game didn't answer, failed to read or left out are unknown: read as none, the menu would look empty.
+        if (offered.Pending?.Contains(ScoutingConstants.Actions) == true)
+        {
+            throw new GameUnavailableException("The game didn't answer which actions it offers for the player in time (it may be busy).");
+        }
+
+        if (offered.Errors?.TryGetValue(ScoutingConstants.Actions, out var error) == true)
+        {
+            throw new GameUnavailableException($"The game failed to read which actions it offers for the player: {error}");
+        }
+
+        return offered.Values.Actions?.Keys.ToHashSet()
+               ?? throw new GameUnavailableException("The game left out which actions it offers for the player.");
     }
 
     private static string ActionKey(uint actionId)
@@ -440,12 +480,12 @@ internal sealed class ScoutingEditorBridgeClient(
             throw new GameRejectedException($"The game's menu no longer offers {action}. Nothing was sent; run the dry run again.");
         }
 
-        var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
+        var menu = await MenuItemsAsync(player, actionId, cancellationToken);
 
         // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
         // The entry must still be at that place with those labels, greyed out at no level, and send the event this
         // client sends, or nothing is sent. A menu the game rebuilds in the few milliseconds before the send isn't caught.
-        if (MenuEntryAt(menu.Values.Items, entry, labels) is null)
+        if (MenuEntryAt(menu, entry, labels) is null)
         {
             throw new GameRejectedException(
                 $"The game's menu for {action} changed since the check: it no longer has '{string.Join(" > ", labels)}' " +
