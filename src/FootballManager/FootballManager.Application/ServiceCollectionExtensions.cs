@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();
         services.AddScoped<ILeagueTableService, LeagueTableService>();
+        services.AddScoped<ISetPiecesService, SetPiecesService>();
         return services;
     }
 }
