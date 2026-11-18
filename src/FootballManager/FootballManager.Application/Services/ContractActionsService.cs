@@ -18,7 +18,7 @@ public interface IContractActionsService
     /// <paramref name="apply"/> and <paramref name="confirmRelease"/> are both set: a release can't be undone.
     /// </summary>
     Task<Result<ContractChange>> ReleaseAsync(
-        int playerId, ReleaseKind how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default);
+        int playerId, ReleaseKind? how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Changes the squad status (the playing time his contract promises) of one of the club's own players to the
@@ -44,9 +44,10 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     private static readonly TimeSpan StatePoll = TimeSpan.FromMilliseconds(400);
 
     public Task<Result<ContractChange>> ReleaseAsync(
-        int playerId, ReleaseKind how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default)
+        int playerId, ReleaseKind? how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default)
     {
-        if (!Enum.IsDefined(how))
+        // Required: the enum's 0 is Free, the release the club pays for, so an omitted kind must not read as it.
+        if (how is not { } kind || !Enum.IsDefined(kind))
         {
             return Task.FromResult(Result.Fail<ContractChange>(new ValidationError(nameof(how), ["Say how: Free, Mutual or EndOfContract."])));
         }
@@ -57,12 +58,12 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
                 ["Letting a player go can't be undone: apply needs confirmRelease=true, once the user has agreed to the dry run's terms."])));
         }
 
-        var action = how switch
+        var action = kind switch
         {
             ReleaseKind.Mutual => PlayerMenuAction.MutualTermination,
             ReleaseKind.EndOfContract => PlayerMenuAction.SetForRelease,
             ReleaseKind.Free => PlayerMenuAction.ReleaseOnFreeTransfer,
-            _ => throw new ArgumentOutOfRangeException(nameof(how), how, null)
+            _ => throw new ArgumentOutOfRangeException(nameof(how), kind, null)
         };
 
         return ChangeAsync(playerId, action, null, apply, cancellationToken);

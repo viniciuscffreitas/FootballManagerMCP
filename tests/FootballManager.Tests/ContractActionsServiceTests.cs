@@ -55,6 +55,16 @@ public class ContractActionsServiceTests
     }
 
     [Fact]
+    public async Task A_release_without_how_is_refused_before_the_save_is_touched()
+    {
+        var result = await _service.ReleaseAsync(Reserve, null, apply: true, confirmRelease: true);
+
+        Assert.True(result.HasError<ValidationError>());
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().GetMenuAsync(default, default);
+    }
+
+    [Fact]
     public async Task Applying_a_release_needs_its_explicit_confirmation()
     {
         var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: false);
