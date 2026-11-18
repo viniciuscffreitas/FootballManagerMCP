@@ -42,10 +42,12 @@ public static class ContractsTools
                  "his contract ends. Player by FM id from get_squad or get_contracts. By default a dry run: it reads " +
                  "his menu and returns the entry it would pick and the game's confirmation in the game's language (for " +
                  "a release, its cost), writing nothing. A release CAN'T BE UNDONE: show the user the player, how and " +
-                 "the cost, and apply only once the user has explicitly agreed, with apply=true AND confirmRelease=true. " +
-                 "Applying copies the real save first, checks the menu entry again, picks it as a click does and " +
-                 "answers \"Yes\" to the game's confirmation dialog only when it names him and holds the dry run's " +
-                 "confirmation (dialogText has its text); refused while another dialog is open. " + Outcome +
+                 "the cost, and apply only once the user has explicitly agreed, with apply=true AND confirmRelease=true " +
+                 "AND expectedConfirmation set to the dry run's confirmation, unchanged. Applying refuses (400, nothing " +
+                 "sent) when the game's menu now shows another confirmation or none (then the user lets him go in the " +
+                 "game). It copies the real save first, checks the menu entry again, picks it as a click does and " +
+                 "answers \"Yes\" only to a dialog whose text is that confirmation or holds the whole of it " +
+                 "(dialogText has its text); refused while another dialog is open. " + Outcome +
                  " stillInSquad says whether the first team still lists him afterwards. Fails with a clear error when " +
                  "the game's menu doesn't offer that for him now. Refused while a match is being played.")]
     public static async Task<string> ReleasePlayer(
@@ -54,11 +56,14 @@ public static class ContractsTools
         [Description("Free, Mutual or EndOfContract.")] string how,
         [Description("False (the default) only checks. True lets him go: only once the user has agreed.")] bool apply = false,
         [Description("Needed with apply=true: true once the user has explicitly agreed to let him go at the dry run's terms.")]
-        bool confirmRelease = false)
+        bool confirmRelease = false,
+        [Description("Needed with apply=true: the dry run's confirmation (its cost), exactly as it returned it and the user agreed to.")]
+        string? expectedConfirmation = null)
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
         var response = await http.PostAsJsonAsync(
-            $"/api/v1/contracts/release?apply={apply.ToString().ToLowerInvariant()}&confirmRelease={confirmRelease.ToString().ToLowerInvariant()}", new { playerId, how });
+            $"/api/v1/contracts/release?apply={apply.ToString().ToLowerInvariant()}&confirmRelease={confirmRelease.ToString().ToLowerInvariant()}",
+            new { playerId, how, expectedConfirmation });
         return await response.ReadContentOrError();
     }
 
@@ -69,8 +74,9 @@ public static class ContractsTools
                  "default a dry run: it returns his current status, every status the menu offers him (choices; his own " +
                  "is greyed out) and the game's confirmation, writing nothing. Lowering a promised status can upset him: " +
                  "show the user first. Apply with apply=true: it copies the real save first, picks the status as a click " +
-                 "does and answers the game's confirmation dialog only when it names him; agreedPlayingTimeAfter is " +
-                 "read back from his contract. " + Outcome + " Fails with the menu's statuses when none matches. Refused while a match is being played.")]
+                 "does and answers \"Yes\" only to a dialog that holds the menu's confirmation (with none, the dialog is " +
+                 "left for the user: applied Partial); agreedPlayingTimeAfter is read back from his contract. " + Outcome +
+                 " Fails with the menu's statuses when none matches, and when he already has that status. Refused while a match is being played.")]
     public static async Task<string> SetSquadStatus(
         IHttpClientFactory httpFactory,
         [Description("The player's FM id.")] int playerId,
@@ -87,8 +93,8 @@ public static class ContractsTools
                  "menu in the running game: the DoF then negotiates it. For the user to negotiate it himself, use " +
                  "negotiate_contract instead. By default a dry run: it returns the menu entry it would pick and the " +
                  "game's confirmation, writing nothing. Apply with apply=true once the user agrees: it copies the real " +
-                 "save first, picks the entry as a click does and answers the game's confirmation dialog only when it " +
-                 "names him. " + Outcome + " Fails with a " +
+                 "save first, picks the entry as a click does and answers \"Yes\" only to a dialog that holds the menu's " +
+                 "confirmation (with none, the dialog is left for the user: applied Partial). " + Outcome + " Fails with a " +
                  "clear error when the game's menu doesn't offer it for him now (e.g. already handed over). Refused " +
                  "while a match is being played.")]
     public static async Task<string> HandRenewalToDof(

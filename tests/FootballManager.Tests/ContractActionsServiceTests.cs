@@ -13,6 +13,7 @@ namespace FootballManager.Tests;
 public class ContractActionsServiceTests
 {
     private const int Reserve = 7;
+    private const string Cost = "Isso custará R$120 mil ao clube.";
 
     private readonly IScoutingEditorGameClient _editor = Substitute.For<IScoutingEditorGameClient>();
     private readonly IContractsGameClient _contracts = Substitute.For<IContractsGameClient>();
@@ -35,7 +36,7 @@ public class ContractActionsServiceTests
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);
         Menu(PlayerMenuAction.ReleaseOnFreeTransfer,
-            new MenuEntry { Label = "Liberar por transferência livre", Confirmation = "Isso custará R$120 mil ao clube." });
+            new MenuEntry { Label = "Liberar por transferência livre", Confirmation = Cost });
 
         var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: false, confirmRelease: false)).Value;
 
@@ -95,10 +96,10 @@ public class ContractActionsServiceTests
     public async Task Applying_a_release_clears_the_save_then_clicks_and_answers_the_dialog()
     {
         Offered(PlayerMenuAction.MutualTermination);
-        Menu(PlayerMenuAction.MutualTermination, new MenuEntry { Label = "Rescindir contrato" });
+        Menu(PlayerMenuAction.MutualTermination, new MenuEntry { Label = "Rescindir contrato", Confirmation = Cost });
         Dialog(DialogState.Answered, "Rescindir o contrato de Reserva?");
 
-        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Mutual, apply: true, confirmRelease: true)).Value;
+        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Mutual, apply: true, confirmRelease: true, expectedConfirmation: Cost)).Value;
 
         Received.InOrder(() =>
         {
@@ -115,16 +116,69 @@ public class ContractActionsServiceTests
     }
 
     [Fact]
-    public async Task Only_the_dialog_naming_him_with_the_dry_runs_cost_is_answered()
+    public async Task Only_the_dialog_holding_the_confirmation_approved_in_the_dry_run_is_answered()
     {
         FreeRelease();
-        Dialog(DialogState.Answered, "Liberar Reserva? Isso custará R$120 mil ao clube.");
+        Dialog(DialogState.Answered, "Liberar Reserva? " + Cost);
 
-        await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true);
+        await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: "  isso custará   R$120 MIL ao clube. ");
 
-        await _editor.Received(1).AnswerDialogAsync(
-            Arg.Is<IReadOnlyList<string>>(expected => expected.SequenceEqual(new[] { "Reserva", "Isso custará R$120 mil ao clube." })),
-            Arg.Any<CancellationToken>());
+        await _editor.Received(1).AnswerDialogAsync("  isso custará   R$120 MIL ao clube. ", Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Applying_a_release_without_the_dry_runs_confirmation_is_refused_before_the_save_is_touched(string? expected)
+    {
+        FreeRelease();
+
+        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: expected);
+
+        Assert.Contains(result.Errors.OfType<ValidationError>(), error => error.PropertyName == "expectedConfirmation");
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
+    public async Task A_release_whose_confirmation_changed_since_the_dry_run_is_refused_and_nothing_is_sent()
+    {
+        FreeRelease();
+
+        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true,
+            expectedConfirmation: "Isso custará R$90 mil ao clube.");
+
+        Assert.Contains(Cost, Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
+    public async Task A_release_whose_menu_states_no_confirmation_is_refused_and_nothing_is_sent()
+    {
+        Offered(PlayerMenuAction.SetForRelease);
+        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { Label = "Liberar no fim do contrato" });
+
+        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.EndOfContract, apply: true, confirmRelease: true, expectedConfirmation: "Reserva");
+
+        Assert.True(result.HasError<ValidationError>());
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
+    public async Task A_change_whose_menu_states_no_confirmation_never_has_its_dialog_answered()
+    {
+        Offered(PlayerMenuAction.DofContractRenewal);
+        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { Label = "Pedir ao DoF para renovar" });
+        Dialog(DialogState.NotAnswered, "Pedir ao DoF para renovar com Reserva?");
+
+        var change = (await _service.HandRenewalToDofAsync(Reserve, apply: true)).Value;
+
+        await _editor.Received(1).AnswerDialogAsync("", Arg.Any<CancellationToken>());
+        Assert.Equal(AppliedState.Partial, change.Applied);
+        Assert.Contains(change.Notes, note => note.Contains("answer it in the game"));
     }
 
     [Fact]
@@ -133,7 +187,7 @@ public class ContractActionsServiceTests
         FreeRelease();
         Dialog(DialogState.NotAnswered, "Enviar a numeração atual do elenco?");
 
-        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true);
+        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: Cost);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(AppliedState.Partial, result.Value.Applied);
@@ -148,7 +202,7 @@ public class ContractActionsServiceTests
         FreeRelease();
         Dialog(DialogState.Unknown, "Liberar Reserva? Isso custará R$120 mil ao clube.");
 
-        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true);
+        var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: Cost);
 
         Assert.Equal(AppliedState.Partial, result.Value.Applied);
         Assert.Equal(DialogState.Unknown, result.Value.Dialog);
@@ -209,7 +263,7 @@ public class ContractActionsServiceTests
         _editor.ClickMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameAnswerLostException("timed out")));
         _contracts.GetContractsAsync(Arg.Any<CancellationToken>()).Returns(new List<SquadPlayerContract>());
 
-        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true)).Value;
+        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: Cost)).Value;
 
         Assert.Equal(MenuWrite.Unknown, change.Menu);
         Assert.Equal(AppliedState.Partial, change.Applied);
@@ -240,7 +294,7 @@ public class ContractActionsServiceTests
         FreeRelease();
         Dialog(DialogState.Answered, "Liberar Reserva? Isso custará R$120 mil ao clube.");
 
-        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true)).Value;
+        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: Cost)).Value;
 
         Assert.True(change.StillInSquad);
         Assert.False(change.Confirmed);
@@ -254,7 +308,7 @@ public class ContractActionsServiceTests
         Dialog(DialogState.Answered, "Liberar Reserva? Isso custará R$120 mil ao clube.");
         _contracts.GetContractsAsync(Arg.Any<CancellationToken>()).Returns([Contract("Reserva")], new List<SquadPlayerContract>());
 
-        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true)).Value;
+        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: Cost)).Value;
 
         Assert.False(change.StillInSquad);
         Assert.True(change.Confirmed);
@@ -370,12 +424,12 @@ public class ContractActionsServiceTests
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);
         Menu(PlayerMenuAction.ReleaseOnFreeTransfer,
-            new MenuEntry { Label = "Liberar por transferência livre", Confirmation = "Isso custará R$120 mil ao clube." });
+            new MenuEntry { Label = "Liberar por transferência livre", Confirmation = Cost });
     }
 
     private void Dialog(DialogState state, string text)
     {
-        _editor.AnswerDialogAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
+        _editor.AnswerDialogAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new DialogAnswer { State = state, Text = text });
     }
 

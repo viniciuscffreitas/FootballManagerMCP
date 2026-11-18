@@ -530,9 +530,9 @@ internal sealed class ScoutingEditorBridgeClient(
         }
     }
 
-    public Task<DialogAnswer> AnswerDialogAsync(IReadOnlyList<string> expected, CancellationToken cancellationToken = default)
+    public Task<DialogAnswer> AnswerDialogAsync(string confirmation, CancellationToken cancellationToken = default)
     {
-        return dialogs.AnswerYesAsync(expected, cancellationToken);
+        return dialogs.AnswerYesAsync(confirmation, cancellationToken);
     }
 
     // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.

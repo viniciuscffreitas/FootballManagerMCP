@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using System.Text.Json;
 using FootballManager.Application.Exceptions;
 using FootballManager.Domain.Scouting;
@@ -24,11 +22,11 @@ internal sealed class GameDialogs(GameBridge bridge)
     }
 
     /// <summary>
-    /// Waits for a dialog to show and answers "Yes" to it only when its text holds every one of
-    /// <paramref name="expected"/> (case, accents and line breaks aside), so that a dialog other than the action's is
-    /// never answered. Never throws for the game: what it could tell is in the answer's state.
+    /// Waits for a dialog to show and answers "Yes" to it only when its text is <paramref name="confirmation"/> or holds
+    /// the whole of it (case and white space aside), so that a dialog other than the action's is never answered. An
+    /// empty confirmation never answers one. Never throws for the game: what it could tell is in the answer's state.
     /// </summary>
-    public async Task<DialogAnswer> AnswerYesAsync(IReadOnlyList<string> expected, CancellationToken cancellationToken)
+    public async Task<DialogAnswer> AnswerYesAsync(string confirmation, CancellationToken cancellationToken)
     {
         (string Text, string? Yes)? dialog = null;
 
@@ -51,9 +49,7 @@ internal sealed class GameDialogs(GameBridge bridge)
             return new DialogAnswer { State = DialogState.NotShown };
         }
 
-        var text = Plain(shown.Text);
-
-        if (shown.Yes is null || !expected.All(part => text.Contains(Plain(part), StringComparison.Ordinal)))
+        if (shown.Yes is null || !ConfirmationText.IsHeldBy(shown.Text, confirmation))
         {
             return new DialogAnswer { State = DialogState.NotAnswered, Text = shown.Text };
         }
@@ -91,14 +87,6 @@ internal sealed class GameDialogs(GameBridge bridge)
         }
 
         return new DialogAnswer { State = DialogState.Unknown, Text = shown.Text };
-    }
-
-    // Lower case, without accents, every run of white space as one space.
-    private static string Plain(string text)
-    {
-        var letters = text.ToLowerInvariant().Normalize(NormalizationForm.FormD)
-            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark);
-        return string.Join(' ', new string(letters.ToArray()).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 
     // The shown dialog's texts ("Confirme, por favor: Enviar a numeração atual do elenco?") and its Yes button's path.

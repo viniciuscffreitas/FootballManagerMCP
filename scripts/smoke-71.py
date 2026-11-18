@@ -5,7 +5,7 @@ Run on the Windows PC, with the test save 'MCPFM investigation' loaded and no ma
     python smoke-71.py status <playerId> <status> <original>  # x2: apply <status>, then back to <original> (menu labels)
     python smoke-71.py gone <playerId>               # he's no longer in get_squad
     python smoke-71.py dof <playerId>                # dry run, apply, then the menu no longer offers it (x2)
-    python smoke-71.py release <playerId>            # dry run with a cost, refusals (x2), apply; exit 2 until he's gone
+    python smoke-71.py release <playerId>            # dry run with a cost, refusals, apply with its confirmation; exit 2 until he's gone
 A case passes only when the game's read back shows the exact change asked for; HTTP 200 alone never passes.
 Every write first checks GET /session -> isInvestigationSave true, and stops otherwise.
 """
@@ -129,10 +129,17 @@ def release_case(player):
     for _ in range(2):
         status, _ = post("release", {"playerId": player, "how": "Free"}, "?apply=true")
         check(status == 400 and in_squad(player), "apply without confirmRelease is refused and he stays")
-    status, _ = post("release", {"playerId": player}, "?apply=true&confirmRelease=true")
+    agreed = plan["confirmation"]
+    status, _ = post("release", {"playerId": player, "expectedConfirmation": agreed}, "?apply=true&confirmRelease=true")
     check(status == 400 and in_squad(player), "apply without how is refused and he stays")
+    status, _ = post("release", {"playerId": player, "how": "Free"}, "?apply=true&confirmRelease=true")
+    check(status == 400 and in_squad(player), "apply without expectedConfirmation is refused and he stays")
+    status, _ = post("release", {"playerId": player, "how": "Free", "expectedConfirmation": agreed + " R$1"},
+                     "?apply=true&confirmRelease=true")
+    check(status == 400 and in_squad(player), "apply with another confirmation than the menu's is refused and he stays")
     guard()
-    status, change = post("release", {"playerId": player, "how": "Free"}, "?apply=true&confirmRelease=true")
+    status, change = post("release", {"playerId": player, "how": "Free", "expectedConfirmation": agreed},
+                          "?apply=true&confirmRelease=true")
     check(status == 200 and applied(change) and change.get("dialog") == "Answered"
           and plain(cost.group(0)) in plain(change.get("dialogText")),
           f"released, dialog with the dry run's cost {cost.group(0)}: {change.get('dialogText')}")

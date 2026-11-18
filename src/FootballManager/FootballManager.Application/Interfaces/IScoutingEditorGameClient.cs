@@ -83,8 +83,9 @@ public interface IScoutingEditorGameClient
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Waits for the game's confirmation dialog and answers "Yes" to it only when its text holds every one of
-    /// <paramref name="expected"/> (case and accents aside): the dialog of the action asked for, not another one.
+    /// Waits for the game's confirmation dialog and answers "Yes" to it only when its text is
+    /// <paramref name="confirmation"/> or holds the whole of it (case and white space aside): the dialog of the action
+    /// asked for, not another one. An empty confirmation never answers a dialog: it only reports the one that showed.
     /// </summary>
-    Task<DialogAnswer> AnswerDialogAsync(IReadOnlyList<string> expected, CancellationToken cancellationToken = default);
+    Task<DialogAnswer> AnswerDialogAsync(string confirmation, CancellationToken cancellationToken = default);
 }

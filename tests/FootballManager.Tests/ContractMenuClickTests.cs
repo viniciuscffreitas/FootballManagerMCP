@@ -134,7 +134,7 @@ public class ContractMenuClickTests
             StaysOpen = true
         };
 
-        var answer = await Client(plugin).AnswerDialogAsync(["Reserva"]);
+        var answer = await Client(plugin).AnswerDialogAsync("Mudar o status de Reserva para Rotação?");
 
         Assert.Equal(DialogState.Unknown, answer.State);
     }
@@ -172,7 +172,7 @@ public class ContractMenuClickTests
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"),
             Dialog("Liberar Reserva por transferência livre? Isso custará R$120 mil ao clube."));
 
-        var answer = await Client(plugin).AnswerDialogAsync(["Reserva", "Isso custará R$120 mil ao clube."]);
+        var answer = await Client(plugin).AnswerDialogAsync("Isso custará R$120 mil ao clube.");
 
         Assert.Equal(DialogState.Answered, answer.State);
         Assert.Contains("R$120 mil", answer.Text);
@@ -180,15 +180,37 @@ public class ContractMenuClickTests
     }
 
     [Fact]
-    public async Task A_dialog_that_doesnt_name_the_player_is_not_answered()
+    public async Task A_dialog_holding_the_confirmation_with_other_case_and_spaces_is_answered()
     {
-        var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"),
-            Dialog("Liberar Outro por transferência livre? Isso custará R$120 mil ao clube."));
+        var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"), Dialog("Liberar Reserva?  ISSO custará R$120 mil ao clube."));
 
-        var answer = await Client(plugin).AnswerDialogAsync(["Reserva", "Isso custará R$120 mil ao clube."]);
+        var answer = await Client(plugin).AnswerDialogAsync("isso custará\nR$120 mil ao clube.");
+
+        Assert.Equal(DialogState.Answered, answer.State);
+    }
+
+    [Fact]
+    public async Task A_dialog_holding_only_part_of_the_confirmation_is_not_answered()
+    {
+        var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"), Dialog("Liberar Reserva por transferência livre?"));
+
+        var answer = await Client(plugin).AnswerDialogAsync("Liberar Reserva por transferência livre? Isso custará R$120 mil ao clube.");
 
         Assert.Equal(DialogState.NotAnswered, answer.State);
-        Assert.Contains("Outro", answer.Text);
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public async Task An_empty_confirmation_never_answers_a_dialog(string confirmation)
+    {
+        var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"), Dialog("Liberar Reserva por transferência livre?"));
+
+        var answer = await Client(plugin).AnswerDialogAsync(confirmation);
+
+        Assert.Equal(DialogState.NotAnswered, answer.State);
+        Assert.Contains("Reserva", answer.Text);
         Assert.Empty(plugin.Writes);
     }
 
@@ -198,7 +220,7 @@ public class ContractMenuClickTests
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"),
             Dialog("Liberar Reserva por transferência livre? Isso custará R$900 mil ao clube."));
 
-        var answer = await Client(plugin).AnswerDialogAsync(["Reserva", "Isso custará R$120 mil ao clube."]);
+        var answer = await Client(plugin).AnswerDialogAsync("Isso custará R$120 mil ao clube.");
 
         Assert.Equal(DialogState.NotAnswered, answer.State);
         Assert.Empty(plugin.Writes);
@@ -209,7 +231,7 @@ public class ContractMenuClickTests
     {
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"));
 
-        var answer = await Client(plugin).AnswerDialogAsync(["Reserva"]);
+        var answer = await Client(plugin).AnswerDialogAsync("Mudar o status de Reserva para Rotação?");
 
         Assert.Equal(DialogState.NotShown, answer.State);
         Assert.Empty(plugin.Writes);
@@ -220,7 +242,7 @@ public class ContractMenuClickTests
     {
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"), Dialog("Mudar o status de Reserva para Rotação?")) { StaysOpen = true };
 
-        var answer = await Client(plugin).AnswerDialogAsync(["Reserva"]);
+        var answer = await Client(plugin).AnswerDialogAsync("Mudar o status de Reserva para Rotação?");
 
         Assert.Equal(DialogState.Unknown, answer.State);
         Assert.Single(plugin.Writes);

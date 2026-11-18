@@ -23,7 +23,8 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     private static readonly TimeSpan StatePoll = TimeSpan.FromMilliseconds(400);
 
     public Task<Result<ContractChange>> ReleaseAsync(
-        int? playerId, ReleaseKind? how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default)
+        int? playerId, ReleaseKind? how, bool apply, bool confirmRelease, string? expectedConfirmation = null,
+        CancellationToken cancellationToken = default)
     {
         if (playerId is not { } id)
         {
@@ -42,6 +43,13 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
                 ["Letting a player go can't be undone: apply needs confirmRelease=true, once the user has agreed to the dry run's terms."])));
         }
 
+        // The terms the user agreed to: the dry run's confirmation, sent back as it was shown.
+        if (apply && string.IsNullOrWhiteSpace(expectedConfirmation))
+        {
+            return Task.FromResult(Result.Fail<ContractChange>(new ValidationError(nameof(expectedConfirmation),
+                ["Applying a release needs expectedConfirmation: the dry run's confirmation (its cost), as the user agreed to it."])));
+        }
+
         var action = kind switch
         {
             ReleaseKind.Mutual => PlayerMenuAction.MutualTermination,
@@ -50,7 +58,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             _ => throw new ArgumentOutOfRangeException(nameof(how), kind, null)
         };
 
-        return ChangeAsync(id, action, null, apply, cancellationToken);
+        return ChangeAsync(id, action, null, apply ? expectedConfirmation : null, apply, cancellationToken);
     }
 
     public Task<Result<ContractChange>> SetSquadStatusAsync(int? playerId, string? status, bool apply, CancellationToken cancellationToken = default)
@@ -66,7 +74,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
                 ["Name the squad status as the game's menu labels it, e.g. \"Rotação\"."])));
         }
 
-        return ChangeAsync(id, PlayerMenuAction.SetPlayingTime, status, apply, cancellationToken);
+        return ChangeAsync(id, PlayerMenuAction.SetPlayingTime, status, null, apply, cancellationToken);
     }
 
     public Task<Result<ContractChange>> HandRenewalToDofAsync(int? playerId, bool apply, CancellationToken cancellationToken = default)
@@ -76,13 +84,13 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             return Task.FromResult(NoPlayer());
         }
 
-        return ChangeAsync(id, PlayerMenuAction.DofContractRenewal, null, apply, cancellationToken);
+        return ChangeAsync(id, PlayerMenuAction.DofContractRenewal, null, null, apply, cancellationToken);
     }
 
     // The entry: the one labelled `wanted` among the menu's statuses, or else the menu's first entry the game lets be
-    // picked.
+    // picked. `approved`: for a release, the confirmation the user agreed to in the dry run.
     private async Task<Result<ContractChange>> ChangeAsync(
-        int playerId, PlayerMenuAction action, string? wanted, bool apply, CancellationToken cancellationToken)
+        int playerId, PlayerMenuAction action, string? wanted, string? approved, bool apply, CancellationToken cancellationToken)
     {
         try
         {
@@ -119,6 +127,23 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             {
                 return Fail("status", $"{player.Name}'s contract already promises '{now}': there is nothing to change.");
             }
+            // A release is sent only on the terms the user agreed to: the confirmation the menu shows now must be the one
+            // approved. Without one, its dialog couldn't be told from another one, so it isn't sent at all.
+            if (apply && IsRelease(action))
+            {
+                if (string.IsNullOrWhiteSpace(entry.Confirmation))
+                {
+                    return Fail("expectedConfirmation", $"The game's menu states no confirmation for {Describe(action)} of {player.Name}, " +
+                                                        "so its dialog can't be told from another one: nothing was sent. Ask the user to do it in the game.");
+                }
+
+                if (!ConfirmationText.SameAs(entry.Confirmation, approved))
+                {
+                    return Fail("expectedConfirmation", $"The game's confirmation is now \"{entry.Confirmation}\", not the one agreed to " +
+                                                        $"(\"{approved}\"): nothing was sent. Show the user the new terms and run the dry run again.");
+                }
+            }
+
             var change = new ContractChange
             {
                 PlayerId = player.Id,
@@ -133,12 +158,16 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
             if (!apply)
             {
-                change.Notes.Add(entry.Confirmation is not null
-                    ? "Show the user the game's confirmation first: applying answers \"Yes\" to the game's dialog only when it names him and holds that confirmation."
+                change.Notes.Add(!string.IsNullOrWhiteSpace(entry.Confirmation)
+                    ? IsRelease(action)
+                        ? "Show the user the game's confirmation (its cost) first. To apply, send it back unchanged as expectedConfirmation: " +
+                          "the release is sent only while the menu still shows it, and \"Yes\" is answered only to a dialog that holds it."
+                        : "Show the user the game's confirmation first: applying answers \"Yes\" only to a dialog that holds it."
                     : IsRelease(action)
-                        ? "The game's menu doesn't state what letting him go costs: tell the user the cost isn't known before applying " +
-                          "(get_contracts shows his wage and time left). Applying answers \"Yes\" to the game's dialog only when it names him, and returns its text."
-                        : "The game's menu states no confirmation for it: applying answers \"Yes\" to the game's dialog only when it names him, and returns its text.");
+                        ? "The game's menu states no confirmation (no cost) for it, so its dialog can't be told from another one: " +
+                          "the tool can't apply it. Ask the user to do it in the game (get_contracts shows his wage and time left)."
+                        : "The game's menu states no confirmation for it: applying picks the entry but doesn't answer its dialog " +
+                          "(nothing to tell it from another one by); the user answers it in the game.");
                 return Result.Ok(change);
             }
 
@@ -150,7 +179,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             }
 
             change.Notes.Add(SaveNote(clearance.Value));
-            await ApplyAsync(change, leaf, current is not null, cancellationToken);
+            await ApplyAsync(change, leaf, approved ?? entry.Confirmation ?? string.Empty, current is not null, cancellationToken);
             return Result.Ok(change);
         }
         catch (GameUnavailableException exception)
@@ -166,7 +195,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     // Picks the entry, answers its dialog, and reads the change back. From the pick on, nothing fails the call: each step
     // says what it did, so that the caller doesn't send again what the game may have taken. A refusal before the pick
     // (the menu changed, a dialog already open) throws: nothing was sent.
-    private async Task ApplyAsync(ContractChange change, MenuLeaf leaf, bool wasInSquad, CancellationToken cancellationToken)
+    private async Task ApplyAsync(ContractChange change, MenuLeaf leaf, string confirmation, bool wasInSquad, CancellationToken cancellationToken)
     {
         try
         {
@@ -181,10 +210,9 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
         if (change.Menu == MenuWrite.Written)
         {
-            // Only the dialog of this action is answered: it names him and, when the menu stated one, holds the
-            // confirmation the dry run showed (for a release, its cost).
-            List<string> expected = [change.PlayerName, .. leaf.Entry.Confirmation is { } confirmation ? [confirmation] : Array.Empty<string>()];
-            var dialog = await editor.AnswerDialogAsync(expected, cancellationToken);
+            // Only the dialog of this action is answered: the one that holds the confirmation (for a release, the one
+            // agreed to in the dry run). Without one, the dialog is only read, never answered.
+            var dialog = await editor.AnswerDialogAsync(confirmation, cancellationToken);
             change.Dialog = dialog.State;
             change.DialogText = dialog.Text;
         }
@@ -199,7 +227,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         change.Applied = change.Confirmed == true || (change.Menu == MenuWrite.Written && change.Dialog switch
         {
             DialogState.Answered => true,
-            DialogState.NotShown => leaf.Entry.Confirmation is null,
+            DialogState.NotShown => string.IsNullOrWhiteSpace(confirmation),
             _ => false
         })
             ? AppliedState.Yes
@@ -209,9 +237,12 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         {
             change.Notes.Add(change.Dialog switch
             {
+                DialogState.NotAnswered when change.DialogText is not null && string.IsNullOrWhiteSpace(confirmation) =>
+                    "The game's menu states no confirmation for it, so its dialog wasn't answered: " +
+                    $"\"{change.DialogText}\". Ask the user to answer it in the game.",
                 DialogState.NotAnswered when change.DialogText is not null =>
-                    $"The game showed a dialog that isn't this action's (it doesn't name {change.PlayerName} or hold the dry run's " +
-                    $"confirmation), so it wasn't answered: \"{change.DialogText}\". Ask the user to resolve it in the game.",
+                    "The game showed a dialog that doesn't hold the confirmation agreed to, so it wasn't answered: " +
+                    $"\"{change.DialogText}\". Ask the user to resolve it in the game.",
                 DialogState.NotAnswered =>
                     "The game's dialog couldn't be read, so it wasn't answered. Ask the user to check the game for an open dialog.",
                 DialogState.Unknown =>

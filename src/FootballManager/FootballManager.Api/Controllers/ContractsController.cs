@@ -33,8 +33,8 @@ public class ContractsController(IContractsService contractsService, IContractAc
     /// <summary>
     /// Lets one of the club's own players go through his menu in the game: released on a free transfer (Free), his
     /// contract ended by mutual consent (Mutual), or marked to leave when it ends (EndOfContract). A dry run shows the
-    /// game's confirmation (the cost); it writes only with apply=true and confirmRelease=true, and answers the game's
-    /// Yes/No dialog.
+    /// game's confirmation (the cost); it writes only with apply=true, confirmRelease=true and that confirmation sent back
+    /// as expectedConfirmation, and answers "Yes" only to the game's dialog that holds it.
     /// </summary>
     [HttpPost("release")]
     public async Task<Results<Ok<ContractChangeResponse>, BadRequest, NotFound, ProblemHttpResult>> ReleaseAsync(
@@ -43,7 +43,8 @@ public class ContractsController(IContractsService contractsService, IContractAc
         [FromQuery] bool confirmRelease = false,
         CancellationToken cancellationToken = default)
     {
-        var result = await contractActions.ReleaseAsync(request.PlayerId, request.How, apply, confirmRelease, cancellationToken);
+        var result = await contractActions.ReleaseAsync(
+            request.PlayerId, request.How, apply, confirmRelease, request.ExpectedConfirmation, cancellationToken);
         return result.ToGetResult<ContractChange, ContractChangeResponse>(change => change.Adapt<ContractChangeResponse>());
     }
 
