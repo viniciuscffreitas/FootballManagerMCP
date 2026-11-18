@@ -116,6 +116,8 @@ public class MappingConfig
             .Map(dest => dest.Advice, src => src.Advice.Count > 0 ? src.Advice : null)
             .Map(dest => dest.Response, src => src.Response.Count > 0 ? src.Response : null)
             .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
+        config.NewConfig<TransferTargetChange, TransferTargetResponse>()
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
         config.NewConfig<ContractNegotiation, ContractNegotiationResponse>()
             .Map(dest => dest.Steps, src => src.Steps.Count > 0 ? src.Steps : null)
             .Map(dest => dest.Terms, src => src.Terms.Count > 0 ? src.Terms : null)
