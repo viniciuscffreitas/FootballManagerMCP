@@ -63,7 +63,6 @@ internal static class MatchConstants
     public const string PlayerOfTheMatchId = "PlayerOfTheMatch." + GameConstants.UniqueId;
     public const string PlayerOfTheMatchName = "PlayerOfTheMatch." + GameConstants.Name;
     public const string PlayerOfTheMatchRating = "PlayerOfTheMatchRating";
-    public const int GoalIncident = 0;
 
     public static readonly string[] Events = [Incidents, PlayerOfTheMatchId, PlayerOfTheMatchName, PlayerOfTheMatchRating];
 }

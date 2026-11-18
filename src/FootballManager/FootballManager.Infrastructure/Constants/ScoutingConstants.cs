@@ -192,6 +192,11 @@ internal static class ScoutingConstants
     // "Make offer" (PersonMakeOfferForPlayer): its first entry opens the transfer offer panel (NewsAction 6).
     public const uint MakeOfferAction = 1933656696;
 
+    // "Iniciar negociação de contrato", on the club's own player: opens the contract negotiation panel on the agent's
+    // promises (seen on 11/04/2026, Arthur). Its entry sends no event; it runs as the menu's click does.
+    public const uint NegotiateContractAction = 2000111204;
+    public const string ContextActionEndpoint = "/contextaction";
+
     public static uint ActionIdOf(PlayerMenuAction action)
     {
         return action switch
@@ -202,6 +207,7 @@ internal static class ScoutingConstants
             PlayerMenuAction.WithdrawOffer => WithdrawOfferAction,
             PlayerMenuAction.EndTrial => EndTrialAction,
             PlayerMenuAction.MakeOffer => MakeOfferAction,
+            PlayerMenuAction.NegotiateContract => NegotiateContractAction,
             _ => AssignScoutAction
         };
     }

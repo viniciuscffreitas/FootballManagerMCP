@@ -88,6 +88,49 @@ public class ContractNegotiationTests
         await _game.DidNotReceiveWithAnyArgs().PressAsync(default);
     }
 
+    // Seen on 11/04/2026 in the investigation save: Arthur's menu has "Iniciar negociação de contrato", which opens the
+    // same panel on the agent's promises.
+    private const int Arthur = 19259600;
+
+    private void OwnPlayer()
+    {
+        _game.FindPlayerAsync(Arthur, Arg.Any<CancellationToken>())
+            .Returns(new TransferTarget { Id = Arthur, Name = "Arthur", Club = "Santos", CanNegotiateContract = true });
+        var promises = Panel([ContractStep.FinalisePromises], [new NegotiationTerm { Label = "Tempo de jogo", Value = "Jogador Importante" }]);
+        promises.Player = "(Arthur)";
+        promises.Club = "Santos";
+        _game.OpenRenewalPanelAsync(Arthur, Arg.Any<CancellationToken>()).Returns(promises);
+    }
+
+    [Fact]
+    public async Task The_dry_run_for_the_clubs_own_player_says_his_menu_opens_it_and_opens_nothing()
+    {
+        OwnPlayer();
+
+        var negotiation = (await _transfers.NegotiateContractAsync(Arthur, apply: false)).Value;
+
+        Assert.False(negotiation.Applied);
+        Assert.Null(negotiation.MessageId);
+        Assert.Contains(negotiation.Notes, note => note.Contains("player's menu"));
+        await _game.DidNotReceiveWithAnyArgs().OpenRenewalPanelAsync(default);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
+
+    [Fact]
+    public async Task Applying_for_the_clubs_own_player_opens_the_panel_from_his_menu_and_stops_on_the_promises()
+    {
+        OwnPlayer();
+
+        var negotiation = (await _transfers.NegotiateContractAsync(Arthur, apply: true)).Value;
+
+        Assert.True(negotiation.Applied);
+        Assert.Equal("Jogador Importante", negotiation.Terms[0].Value);
+        Assert.Contains(negotiation.Notes, note => note.Contains("promises"));
+        await _game.Received(1).OpenRenewalPanelAsync(Arthur, Arg.Any<CancellationToken>());
+        await _game.DidNotReceiveWithAnyArgs().OpenContractPanelAsync(default, default);
+        await _game.DidNotReceiveWithAnyArgs().PressAsync(default);
+    }
+
     [Fact]
     public async Task A_player_no_list_holds_is_not_found()
     {

@@ -337,10 +337,11 @@ internal sealed partial class MatchesBridgeClient(GameBridge bridge, GameVocabul
     }
 
     // An incident's side is 0 for the home team and 1 for the away team. Only the user's own players have names.
-    private static List<MatchGoal> Goals(BridgeMatchEventsDto events, bool isHome, IReadOnlyDictionary<int, SquadMember> squad)
+    private static List<MatchGoal> Goals(
+        BridgeMatchEventsDto events, bool isHome, IReadOnlyDictionary<int, SquadMember> squad, bool live = false)
     {
         return (events.Incidents ?? [])
-            .Where(incident => incident.IncidentType == MatchConstants.GoalIncident)
+            .Where(incident => MatchIncidents.IsGoal(incident.IncidentType, live))
             .Select(incident =>
             {
                 var isOurs = (incident.TeamSelectionIndex == 0) == isHome;

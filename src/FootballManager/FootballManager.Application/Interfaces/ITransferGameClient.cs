@@ -38,6 +38,12 @@ public interface ITransferGameClient
     /// </summary>
     Task<ContractPanel?> OpenContractPanelAsync(int messageId, int option, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Opens the contract negotiation panel for one of the club's own players from his menu ("Iniciar negociação de
+    /// contrato"); the panel once it shows, or null if it didn't.
+    /// </summary>
+    Task<ContractPanel?> OpenRenewalPanelAsync(int playerId, CancellationToken cancellationToken = default);
+
     /// <summary>Presses the panel's button for <paramref name="step"/>; the panel once it changed, or null if it closed.</summary>
     Task<ContractPanel?> PressAsync(ContractStep step, CancellationToken cancellationToken = default);
 }
