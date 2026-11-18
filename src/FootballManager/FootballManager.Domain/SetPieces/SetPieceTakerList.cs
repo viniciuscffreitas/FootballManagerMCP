@@ -12,5 +12,11 @@ public class SetPieceTakerList
     /// <summary>The list's name in the game's display language.</summary>
     public string? Label { get; set; }
 
+    /// <summary>
+    /// For a left or right list: false until the game's side values (0 and 1) are checked against the set piece screen,
+    /// so "left" may be the screen's right. Null for a list without a side.
+    /// </summary>
+    public bool? SideVerified { get; set; }
+
     public List<SetPiecePlayer> Takers { get; set; } = [];
 }

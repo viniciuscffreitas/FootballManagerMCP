@@ -33,6 +33,9 @@ internal static class SetPieceConstants
     public const int LeftSide = 0;
     public const int RightSide = 1;
 
+    // Sent with every side list (sideVerified) until a smoke checks the sides against the screen.
+    public const bool SidesVerified = false;
+
     public const string PenaltiesKey = "Penalties";
 
     // The taker lists of the set piece screen's dropdown (SetPieceTypeDropdownList): its value, the key the tools

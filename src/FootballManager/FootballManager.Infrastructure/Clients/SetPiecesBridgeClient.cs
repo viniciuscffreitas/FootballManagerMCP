@@ -47,6 +47,7 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
                 {
                     Key = key + sideName,
                     Label = $"{label}, {sideName.ToLowerInvariant()}",
+                    SideVerified = SetPieceConstants.SidesVerified,
                     Takers = await ListedAsync(
                         OnSetPiece(SetPieceConstants.SideTakers)
                             .Context(SetPieceConstants.TypeContext, type)

@@ -13,7 +13,8 @@ public static class SetPiecesTools
                  "(who takes the armband when both are off the pitch, in order) and takerLists: one per list of the " +
                  "game's set piece screen (penalties, corners left and right, free kicks), each with its key, " +
                  "a label, and its takers in the order the game " +
-                 "tries them. Fails with a 503 when the game isn't running or no save is loaded.")]
+                 "tries them. A side list's sideVerified is false while its left and right aren't checked against the " +
+                 "screen yet: they may be swapped, so say so before relying on a side. Fails with a 503 when the game isn't running or no save is loaded.")]
     public static async Task<string> GetSetPieces(IHttpClientFactory httpFactory)
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
