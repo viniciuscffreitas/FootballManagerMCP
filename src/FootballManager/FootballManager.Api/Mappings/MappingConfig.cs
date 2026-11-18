@@ -107,6 +107,7 @@ public class MappingConfig
         config.NewConfig<OppositionReport, OppositionReportResponse>();
         config.NewConfig<ExpectedPlayer, ExpectedPlayerResponse>();
         config.NewConfig<ReportPoint, ReportPointResponse>();
+        config.NewConfig<OppositionInstructionsChange, OppositionInstructionsChangeResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
         config.NewConfig<PlayerTalk, PlayerTalkResponse>()
             .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)
