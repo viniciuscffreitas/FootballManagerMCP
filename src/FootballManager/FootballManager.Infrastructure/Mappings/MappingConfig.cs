@@ -452,6 +452,7 @@ public class MappingConfig
         config.NewConfig<BridgeMenuItemDto, MenuEntry>()
             .Map(dest => dest.Label, src => MenuLabel(src))
             .Map(dest => dest.CanRun, src => MenuRuns(src))
+            .Map(dest => dest.Disabled, src => MenuFields(src).Disabled == true)
             .Map(dest => dest.Confirmation, src => MenuConfirmation(src))
             .Map(dest => dest.ConfirmationIsWarning, src => MenuWarns(src))
             .Map(dest => dest.Children, src => src.ChildList ?? new List<BridgeMenuItemDto>());

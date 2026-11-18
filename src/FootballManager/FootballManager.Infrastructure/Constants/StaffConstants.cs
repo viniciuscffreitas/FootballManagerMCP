@@ -1,3 +1,6 @@
+using System.Globalization;
+using FootballManager.Domain.Staff;
+
 namespace FootballManager.Infrastructure.Constants;
 
 // The first team's staff, as the game's staff screen reads it. Stars (CoachCurrentAbilityStarRange) come back null and
@@ -36,4 +39,40 @@ internal static class StaffConstants
     // Staff jobs the club has open, read on the club.
     public const string Club = "Club";
     public const string Vacancies = "StaffVacancies";
+
+    // A staff member as the record a menu action applies to: his item in the first team's staff list.
+    public static string MemberRecord(int staffId)
+    {
+        return $"{Members}[{GameConstants.UniqueId}={staffId.ToString(CultureInfo.InvariantCulture)}]";
+    }
+
+    // Job adverts are the club's; the game may hang them on the club or on its first team, so both are tried.
+    public static readonly string[] ClubRecords = [Club, TeamConstants.OwnTeam];
+
+    // FM.GamePlugin.ActionID values of the staff screen's menus.
+    public const uint DismissAction = 1701671793;
+    public const uint MutualTerminationAction = 1632134254;
+    public const uint CoachingCourseAction = 1900504944;
+    public const uint LeadershipCourseAction = 1297173097;
+    public const uint OfferContractAction = 2000111204;
+    public const uint AdvertiseJobAction = 880036918;
+    public const uint AdvertiseCoachingJobAction = 1951295084;
+    public const uint AdvertiseScoutingJobAction = 1852196152;
+    public const uint AdvertiseMedicalJobAction = 1816937269;
+
+    public static uint ActionIdOf(StaffMenuAction action)
+    {
+        return action switch
+        {
+            StaffMenuAction.Dismiss => DismissAction,
+            StaffMenuAction.MutualTermination => MutualTerminationAction,
+            StaffMenuAction.CoachingCourse => CoachingCourseAction,
+            StaffMenuAction.LeadershipCourse => LeadershipCourseAction,
+            StaffMenuAction.OfferContract => OfferContractAction,
+            StaffMenuAction.AdvertiseJob => AdvertiseJobAction,
+            StaffMenuAction.AdvertiseCoachingJob => AdvertiseCoachingJobAction,
+            StaffMenuAction.AdvertiseScoutingJob => AdvertiseScoutingJobAction,
+            _ => AdvertiseMedicalJobAction
+        };
+    }
 }
