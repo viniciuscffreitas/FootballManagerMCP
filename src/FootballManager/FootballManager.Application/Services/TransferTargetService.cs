@@ -20,8 +20,13 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
     private static readonly TimeSpan StatePoll = TimeSpan.FromMilliseconds(300);
 
     public async Task<Result<TransferTargetChange>> ChangeAsync(
-        int playerId, TransferTargetAction? action, bool apply, CancellationToken cancellationToken = default)
+        int? playerId, TransferTargetAction? action, bool apply, CancellationToken cancellationToken = default)
     {
+        if (playerId is not { } id)
+        {
+            return Refuse("playerId", "Name the player: his FM id. Nothing was sent.");
+        }
+
         if (action is not { } wanted || !Enum.IsDefined(wanted))
         {
             return Refuse("action", $"Name the action: one of {string.Join(", ", Enum.GetNames<TransferTargetAction>())}. Nothing was sent.");
@@ -29,13 +34,13 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
 
         try
         {
-            if (!(await editor.FindPlayersAsync([playerId], cancellationToken)).TryGetValue(playerId, out var player))
+            if (!(await editor.FindPlayersAsync([id], cancellationToken)).TryGetValue(id, out var player))
             {
                 return Result.Fail<TransferTargetChange>(new EntityDoesNotExistError());
             }
 
             var menuAction = MenuActionOf(wanted);
-            var offered = await editor.GetOfferedActionsAsync(playerId, cancellationToken);
+            var offered = await editor.GetOfferedActionsAsync(id, cancellationToken);
             var change = new TransferTargetChange { PlayerId = player.Id, PlayerName = player.Name, Club = player.Club, Action = wanted };
             Show(change, offered);
 
@@ -44,7 +49,7 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
                 return Refuse("action", $"The game's menu doesn't offer {Describe(wanted)} for {player.Name} now ({Describe(change)}). Nothing was sent.");
             }
 
-            var planned = await PlanAsync(playerId, menuAction, cancellationToken);
+            var planned = await PlanAsync(id, menuAction, cancellationToken);
 
             if (planned.IsFailed)
             {
@@ -81,9 +86,11 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
             change.Notes.Add(SaveNote(clearance.Value));
 
             // The menu again, just before sending: the entry run is the one the plan showed, or nothing is.
-            var again = await PlanAsync(playerId, menuAction, cancellationToken);
+            var again = await PlanAsync(id, menuAction, cancellationToken);
 
-            if (again.IsFailed || PlayerMenus.Label(again.Value.Menu, again.Value.Path) != change.Choice)
+            if (again.IsFailed
+                || PlayerMenus.Label(again.Value.Menu, again.Value.Path) != change.Choice
+                || PlayerMenus.ConfirmationOf(again.Value.Menu, again.Value.Path) != confirmation)
             {
                 return Refuse("action", $"The game's menu for {player.Name} changed since it was read ({change.Choice}): nothing was sent.");
             }
@@ -125,8 +132,8 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
         return Result.Ok((menu, entries[0]));
     }
 
-    // Sends the entry, then reads the menu back. A refusal by the game is no write; a call that didn't answer may have
-    // written, and the read back decides; a read back that fails after a write still reports the write.
+    // Sends the entry, then reads the menu back. The client reads the player again after the write, so a refusal or no
+    // answer may come after the game wrote: the read back decides; one that fails after a write still reports it.
     private async Task<TransferTargetChange> SendAsync(
         TransferTargetChange change, PlayerMenuAction menuAction, List<int> path, CancellationToken cancellationToken)
     {
@@ -135,10 +142,10 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
             await editor.RunMenuEntryAsync(change.PlayerId, menuAction, path, cancellationToken);
             change.Write = WriteState.Written;
         }
-        catch (GameUnavailableException exception)
+        catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException)
         {
             change.Write = WriteState.Unknown;
-            change.Notes.Add($"The game didn't answer the write ({exception.Message}): its menu read back decides whether it took.");
+            change.Notes.Add($"The game didn't take the write cleanly ({exception.Message}): its menu read back decides whether it took.");
         }
 
         change.Applied = true;
@@ -151,6 +158,12 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
             {
                 await Task.Delay(StatePoll, cancellationToken);
                 offered = await editor.GetOfferedActionsAsync(change.PlayerId, cancellationToken);
+
+                // A player of another club always has some menu (scouting, shortlist): none is a read that failed.
+                if (offered.Count == 0)
+                {
+                    throw new GameUnavailableException("the game listed no menu actions for him");
+                }
 
                 if (Reached(change.Action, offered))
                 {
@@ -184,14 +197,13 @@ public class TransferTargetService(IScoutingEditorGameClient editor, ISaveGuard 
         return change;
     }
 
-    // Where the menu shows him once the action took: no offer to withdraw, or the target's removal offered (or the
-    // marking no longer), or the marking offered again.
+    // Where the menu shows him once the action took: no offer to withdraw, the target's removal offered, or no removal.
     private static bool Reached(TransferTargetAction action, HashSet<PlayerMenuAction> offered)
     {
         return action switch
         {
             TransferTargetAction.WithdrawOffer => !offered.Contains(PlayerMenuAction.WithdrawOffer),
-            TransferTargetAction.MarkDofTarget => offered.Contains(PlayerMenuAction.UnmarkDofTarget) || !offered.Contains(PlayerMenuAction.MarkDofTarget),
+            TransferTargetAction.MarkDofTarget => offered.Contains(PlayerMenuAction.UnmarkDofTarget),
             TransferTargetAction.UnmarkDofTarget => !offered.Contains(PlayerMenuAction.UnmarkDofTarget),
             _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
         };

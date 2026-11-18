@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FootballManager.Domain.Transfers;
 
 namespace FootballManager.Api.Responses.Transfers;
@@ -21,6 +22,7 @@ public class TransferTargetResponse
     public WriteState Write { get; set; }
 
     /// <summary>The menu read back shows the change; null when nothing was sent or it couldn't be read back.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     public bool? Confirmed { get; set; }
 
     public bool OfferPending { get; set; }

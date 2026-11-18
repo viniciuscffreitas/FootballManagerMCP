@@ -187,16 +187,61 @@ public class TransferTargetServiceTests
     }
 
     [Fact]
-    public async Task A_refusal_by_the_game_on_sending_is_not_a_write()
+    public async Task A_refusal_on_sending_that_left_the_menu_as_it_was_is_not_a_write()
     {
         Offered(PlayerMenuAction.MarkDofTarget);
         Menu(PlayerMenuAction.MarkDofTarget, "Adicionar como alvo de transferência");
         _editor.RunMenuEntryAsync(Walter, PlayerMenuAction.MarkDofTarget, Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new GameRejectedException("no"));
 
-        var result = await _targets.ChangeAsync(Walter, TransferTargetAction.MarkDofTarget, apply: true);
+        var change = (await _targets.ChangeAsync(Walter, TransferTargetAction.MarkDofTarget, apply: true)).Value;
+
+        Assert.Equal(WriteState.NotWritten, change.Write);
+        Assert.False(change.Confirmed);
+        Assert.False(change.IsDofTarget);
+    }
+
+    [Fact]
+    public async Task An_empty_menu_read_back_is_no_confirmation()
+    {
+        Offered(PlayerMenuAction.WithdrawOffer);
+        Menu(PlayerMenuAction.WithdrawOffer, "Retirar proposta");
+        _editor.RunMenuEntryAsync(Walter, PlayerMenuAction.WithdrawOffer, Arg.Any<IReadOnlyList<int>>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                Offered();
+                return (ScoutedPlayer?)null;
+            });
+
+        var change = (await _targets.ChangeAsync(Walter, TransferTargetAction.WithdrawOffer, apply: true)).Value;
+
+        Assert.True(change.Applied);
+        Assert.Null(change.Confirmed);
+        Assert.True(change.OfferPending);
+    }
+
+    [Fact]
+    public async Task Nothing_is_sent_when_the_game_turned_its_confirmation_into_a_warning_since_the_plan()
+    {
+        Offered(PlayerMenuAction.WithdrawOffer);
+        _editor.GetMenuAsync(Walter, PlayerMenuAction.WithdrawOffer, Arg.Any<CancellationToken>())
+            .Returns(
+                [new MenuEntry { Label = "Retirar proposta", CanRun = true }],
+                [new MenuEntry { Label = "Retirar proposta", CanRun = true, Confirmation = "Isso irrita o clube.", ConfirmationIsWarning = true }]);
+
+        var result = await _targets.ChangeAsync(Walter, TransferTargetAction.WithdrawOffer, apply: true);
 
         Assert.True(result.IsFailed);
+        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+    }
+
+    [Fact]
+    public async Task A_missing_player_is_refused_before_the_game_is_read()
+    {
+        var result = await _targets.ChangeAsync(null, TransferTargetAction.MarkDofTarget, apply: true);
+
+        Assert.True(result.IsFailed);
+        await _editor.DidNotReceiveWithAnyArgs().FindPlayersAsync(default!);
     }
 
     [Fact]
