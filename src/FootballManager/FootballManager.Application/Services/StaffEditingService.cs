@@ -103,7 +103,17 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
             plan.Applied = true;
 
             await Task.Delay(SettlePause, cancellationToken);
-            plan.StillOffered = (await game.GetOfferedActionsAsync(staffId, cancellationToken)).Contains(action);
+
+            // The action is sent by now: a read back the game doesn't answer must not report the apply as failed.
+            try
+            {
+                plan.StillOffered = (await game.GetOfferedActionsAsync(staffId, cancellationToken)).Contains(action);
+            }
+            catch (GameUnavailableException exception)
+            {
+                plan.Notes.Add($"Sent, but the menu couldn't be read back ({exception.Message}): check it with get_staff before sending it again.");
+            }
+
             return Result.Ok(plan);
         }
         catch (GameUnavailableException exception)

@@ -1,4 +1,5 @@
 using FluentResults;
+using FootballManager.Application.Exceptions;
 using FootballManager.Application.Interfaces;
 using FootballManager.Application.ResultErrors;
 using FootballManager.Application.Services;
@@ -160,6 +161,20 @@ public class StaffEditingServiceTests
         Assert.Contains("action", Messages(result));
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
         await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+    }
+
+    [Fact]
+    public async Task An_apply_whose_read_back_fails_still_reports_it_sent()
+    {
+        _game.GetOfferedActionsAsync(Coach, Arg.Any<CancellationToken>())
+            .Returns(_ => new HashSet<StaffMenuAction> { StaffMenuAction.Dismiss }, _ => throw new GameUnavailableException("The game didn't answer."));
+
+        var result = await _staff.RunActionAsync(Coach, StaffMenuAction.Dismiss, null, apply: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Applied);
+        Assert.Null(result.Value.StillOffered);
+        Assert.Contains(result.Value.Notes, note => note.Contains("read back"));
     }
 
     private static string Messages<T>(Result<T> result)
