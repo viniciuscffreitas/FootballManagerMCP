@@ -154,17 +154,17 @@ public class BoardEditingServiceTests
     {
         _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
         _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>())
-            .Returns(new BudgetPanel { SliderValue = 0.5f, CanEdit = true, TransferBudget = "R$30 MI" });
-        _game.MoveBudgetAsync(-2, Arg.Any<CancellationToken>())
-            .Returns(new BudgetPanel { SliderValue = 0.4f, CanEdit = true, TransferBudget = "R$25 MI" });
+            .Returns(new BudgetPanel { SliderPosition = 1, CanMoveToWages = true, TransferBudget = "R$30 MI" });
+        _game.MoveBudgetAsync(2, Arg.Any<CancellationToken>())
+            .Returns(new BudgetPanel { SliderPosition = 0.9f, CanMoveToWages = true, CanMoveToTransfers = true, TransferBudget = "R$25 MI" });
 
-        var plan = (await _board.AdjustBudgetAsync(-2, apply: true)).Value;
+        var plan = (await _board.AdjustBudgetAsync(2, apply: true)).Value;
 
         Received.InOrder(() =>
         {
             _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
             _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>());
-            _game.MoveBudgetAsync(-2, Arg.Any<CancellationToken>());
+            _game.MoveBudgetAsync(2, Arg.Any<CancellationToken>());
         });
         Assert.True(plan.Applied);
         Assert.Equal("R$30 MI", plan.Before!.TransferBudget);
@@ -172,10 +172,10 @@ public class BoardEditingServiceTests
     }
 
     [Fact]
-    public async Task A_budget_the_board_does_not_let_the_user_edit_fails()
+    public async Task Moving_money_the_way_the_board_blocks_fails()
     {
         _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
-        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>()).Returns(new BudgetPanel { SliderValue = 0.5f, CanEdit = false });
+        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>()).Returns(new BudgetPanel { SliderPosition = 1, CanMoveToWages = true, CanMoveToTransfers = false });
 
         var result = await _board.AdjustBudgetAsync(-2, apply: true);
 
@@ -221,12 +221,12 @@ public class BoardEditingServiceTests
     public async Task Opening_the_budget_panel_reads_it_and_changes_no_budget()
     {
         _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
-        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>()).Returns(new BudgetPanel { SliderValue = 0.5f, CanEdit = true });
+        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>()).Returns(new BudgetPanel { SliderPosition = 0.5f, CanMoveToWages = true });
 
         var plan = (await _board.AdjustBudgetAsync(null, apply: true)).Value;
 
         Assert.False(plan.Applied);
-        Assert.Equal(0.5f, plan.Before!.SliderValue);
+        Assert.Equal(0.5f, plan.Before!.SliderPosition);
         await _game.DidNotReceiveWithAnyArgs().MoveBudgetAsync(default);
     }
 }

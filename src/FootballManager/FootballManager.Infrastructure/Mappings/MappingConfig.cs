@@ -802,16 +802,6 @@ public class MappingConfig
     // The club vision screen. An objective the game leaves unnamed isn't shown; the culture texts hold one item a line.
     private static void RegisterBoard(TypeAdapterConfig config)
     {
-        // The budget adjustment panel: a flag the game leaves out reads as not allowed.
-        config.NewConfig<BridgeBudgetPanelDto, BudgetPanel>()
-            .Map(dest => dest.SliderValue, src => src.SliderValue ?? 0)
-            .Map(dest => dest.TransferBudget, src => Text(src.TransferBudget))
-            .Map(dest => dest.WageBudget, src => Text(src.WageBudget))
-            .Map(dest => dest.CanEdit, src => src.CanEdit == true)
-            .Map(dest => dest.CanEditUp, src => src.CanEditUp == true)
-            .Map(dest => dest.CanEditDown, src => src.CanEditDown == true)
-            .Map(dest => dest.Board, src => Text(src.Board));
-
         config.NewConfig<BridgeTeamConfidenceDto, BoardConfidence>()
             .Map(dest => dest.Grade, src => src.BoardGrade)
             .Map(dest => dest.Summary, src => Text(src.BoardSummary))

@@ -31,24 +31,27 @@ internal static class BoardEditingConstants
         };
     }
 
-    // The budget adjustment panel. Its record answers only while the panel is open (pending otherwise). The menu entry's
-    // SecondaryText sums up both budgets ("R$30 MI / R$52.5 mil p/s"); its references open the panel through /newsaction.
+    // The budget adjustment panel (NewsAction 18), opened with the menu entry's references through /newsaction; the
+    // entry's SecondaryText sums up both budgets ("R$30 MI / R$52.5 mil p/s"). The panel is a modal dialog read from
+    // the /ui tree (seen 18/11/2026): the wage budget on the left, the transfer budget on the right, a slider between
+    // them with a button each side. "Down" moves one step of money from transfers to wages, "Up" back (the game sends
+    // EventFmxBudgetAdjustmentAdjust with -1 or 1); a side the board won't let grow is greyed out (unity-disabled).
+    // The primary button confirms and closes the panel; until then the edited values carry a "*".
     public const int BudgetPanelNewsAction = 18;
-    public const string BudgetPanel = Club + ".BudgetAdjustment";
-    public const string SliderValue = "BudgetAdjustmentSliderValue";
-    public const string TransferValue = "BudgetAdjustmentEditedTransferValue";
-    public const string WageValue = "BudgetAdjustmentEditedOtherValue";
-    public const string CanEdit = "BudgetAdjustmentCanEditBudgets";
-    public const string CanEditUp = "BudgetAdjustmentCanEditBudgetUp";
-    public const string CanEditDown = "BudgetAdjustmentCanEditBudgetDown";
-    public const string BoardText = "BudgetAdjustmentBoardString";
-
-    public static readonly string[] PanelProperties = [SliderValue, TransferValue, WageValue, CanEdit, CanEditUp, CanEditDown, BoardText];
-
-    // The panel's events (InteropEventIDs), not yet seen sent by a click: each step sends Adjust with +1 or -1 on the
-    // panel's record, then Confirm with no data, as the game's confirm events usually go.
-    public const string AdjustEvent = "EventFmxBudgetAdjustmentAdjust";
-    public const string ConfirmEvent = "EventFmxBudgetAdjustmentConfirm";
+    public const string BudgetPanelUiPath = "/ui?maxDepth=40";
+    public const string BudgetDialog = "Panel#ClubBudgetAdjustmentDialog";
+    public const string WageLabel = "Orçamento salarial";
+    public const string TransferLabel = "Orçamento de transferências";
+    public const string BoardText = "SIText#BoardText";
+    public const string DownEnabled = "SIEnabled#AdjustDownEnabled";
+    public const string UpEnabled = "SIEnabled#AdjustUpEnabled";
+    public const string DownButton = "SIButton#AdjustDownButton";
+    public const string UpButton = "SIButton#AdjustUpButon";
+    public const string Disabled = "unity-disabled";
+    public const string ConfirmButton = "SIButton#button-primary";
+    public const string SliderTracker = "VisualElement#unity-tracker";
+    public const string SliderDragger = "VisualElement#unity-dragger";
+    public const string EditedMark = "*";
 
     // A talk with the board on screen. The vision and expectations meeting's lines are #SpeakToMeetingAnswerActionButton;
     // the first SIButton inside one is what takes the click (the inner one does nothing). A

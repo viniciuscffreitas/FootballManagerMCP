@@ -203,9 +203,10 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
                 return Result.Ok(plan);
             }
 
-            if (!panel.CanEdit)
+            if (value > 0 ? !panel.CanMoveToWages : !panel.CanMoveToTransfers)
             {
-                return Fail<BudgetAdjustment>("steps", $"The board doesn't let the user move the budgets now: {panel.Board}");
+                var way = value > 0 ? "from transfers to wages" : "from wages to transfers";
+                return Fail<BudgetAdjustment>("steps", $"The board doesn't let money move {way} now: {panel.Board}");
             }
 
             plan.After = await game.MoveBudgetAsync(value, cancellationToken);
@@ -213,7 +214,7 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
 
             if (plan.After is null)
             {
-                plan.Notes.Add("The panel closed after the change: read the budgets with get_finances.");
+                plan.Notes.Add("The panel showed nothing to confirm: read the budgets with get_finances.");
             }
             return Result.Ok(plan);
         }

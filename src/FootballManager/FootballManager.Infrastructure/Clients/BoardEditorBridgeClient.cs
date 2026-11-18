@@ -5,7 +5,6 @@ using FootballManager.Application.Interfaces;
 using FootballManager.Domain.Board;
 using FootballManager.Domain.Scouting;
 using FootballManager.Infrastructure.Constants;
-using FootballManager.Infrastructure.Dtos.Board;
 using FootballManager.Infrastructure.Dtos.Scouting;
 using Mapster;
 
@@ -72,9 +71,7 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
 
         var before = lines.Select(item => item.Text).ToList();
 
-        await bridge.WriteAsync<JsonElement>(
-            BridgeQuery.Write(ConversationConstants.ClickEndpoint, [("path", lines[line].Click), ("how", ConversationConstants.ClickHow)]),
-            cancellationToken);
+        await ClickAsync(lines[line].Click, cancellationToken);
 
         // The board answers after the line, sometimes in steps: wait until the lines change, then until they hold still.
         List<string> last = before;
@@ -104,7 +101,7 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
 
     public async Task<BudgetPanel?> OpenBudgetPanelAsync(CancellationToken cancellationToken = default)
     {
-        if (await ReadPanelAsync(cancellationToken) is { } open)
+        if (Panel(await BudgetDialogAsync(cancellationToken)) is { } open)
         {
             return open;
         }
@@ -120,7 +117,7 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
         {
             await Task.Delay(Poll, cancellationToken);
 
-            if (await ReadPanelAsync(cancellationToken) is { } panel)
+            if (Panel(await BudgetDialogAsync(cancellationToken)) is { } panel)
             {
                 return panel;
             }
@@ -131,32 +128,98 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
 
     public async Task<BudgetPanel?> MoveBudgetAsync(int steps, CancellationToken cancellationToken = default)
     {
-        var panel = BridgeQuery.FromHuman().Base(BoardEditingConstants.BudgetPanel).WithHumanAndTeam();
-        var step = steps > 0 ? "1" : "-1";
+        var button = steps > 0 ? BoardEditingConstants.DownButton : BoardEditingConstants.UpButton;
 
         for (var i = 0; i < Math.Abs(steps); i++)
         {
-            await bridge.WriteAsync<JsonElement>(
-                panel.ToWrite("/native", ("event", BoardEditingConstants.AdjustEvent), ("field", $"Data:{step}"), ("template", "none")),
-                cancellationToken);
+            var dialog = await BudgetDialogAsync(cancellationToken)
+                         ?? throw new GameRejectedException("The budget panel closed before the change.");
+            await ClickAsync(Find(dialog, button)?.Path ?? throw new GameRejectedException("The budget panel has no button to move the split."), cancellationToken);
+            await Task.Delay(Poll, cancellationToken);
         }
 
-        await bridge.WriteAsync<JsonElement>(
-            panel.ToWrite("/native", ("event", BoardEditingConstants.ConfirmEvent), ("data", "null"), ("template", "none")),
-            cancellationToken);
+        // The edited split, as the panel shows it before the confirm closes it.
+        var edited = await BudgetDialogAsync(cancellationToken)
+                     ?? throw new GameRejectedException("The budget panel closed before the confirm.");
+        var confirm = Find(edited, BoardEditingConstants.ConfirmButton)
+                      ?? throw new GameRejectedException("The budget panel has no confirm button.");
+        var after = Panel(edited);
 
+        await ClickAsync(confirm.Path, cancellationToken);
         await Task.Delay(Poll, cancellationToken);
-        return await ReadPanelAsync(cancellationToken);
+        return after;
     }
 
-    // The panel as it reads now; null while it's closed (its record answers nothing then).
-    private async Task<BudgetPanel?> ReadPanelAsync(CancellationToken cancellationToken)
+    // The budget panel's elements, the dialog first; null while it's closed.
+    private async Task<List<UiElementLine>?> BudgetDialogAsync(CancellationToken cancellationToken)
     {
-        var panel = await bridge.GetRecordAsync<BridgeBudgetPanelDto>(
-            BridgeQuery.FromHuman().Base(BoardEditingConstants.BudgetPanel).WithHumanAndTeam().Props(BoardEditingConstants.PanelProperties),
-            cancellationToken);
+        var elements = (await bridge.GetTextAsync(BoardEditingConstants.BudgetPanelUiPath, cancellationToken))
+            .Split('\n')
+            .Select(UiElementLine.Parse)
+            .OfType<UiElementLine>()
+            .ToList();
 
-        return panel.Values.SliderValue is null ? null : panel.Values.Adapt<BudgetPanel>();
+        var dialog = elements.FirstOrDefault(element => element.Type == BoardEditingConstants.BudgetDialog && element.IsShown);
+        return dialog is null ? null : elements.Where(element => element.IsWithin(dialog.Path)).ToList();
+    }
+
+    private static BudgetPanel? Panel(List<UiElementLine>? dialog)
+    {
+        if (dialog is null)
+        {
+            return null;
+        }
+
+        var texts = dialog.Where(element => !string.IsNullOrEmpty(element.Text)).ToList();
+
+        return new BudgetPanel
+        {
+            WageBudget = After(texts, BoardEditingConstants.WageLabel),
+            TransferBudget = After(texts, BoardEditingConstants.TransferLabel),
+            Board = dialog.FirstOrDefault(element => element.Type == BoardEditingConstants.BoardText)?.Text,
+            CanMoveToWages = IsEnabled(dialog, BoardEditingConstants.DownEnabled),
+            CanMoveToTransfers = IsEnabled(dialog, BoardEditingConstants.UpEnabled),
+            SliderPosition = SliderPosition(dialog)
+        };
+    }
+
+    // A budget's value is the text right after its label; the "*" the panel adds to an edited one is left out.
+    private static string? After(List<UiElementLine> texts, string label)
+    {
+        var at = texts.FindIndex(element => element.Text == label);
+        return at >= 0 && at + 1 < texts.Count ? texts[at + 1].Text!.TrimEnd(BoardEditingConstants.EditedMark[0]) : null;
+    }
+
+    private static bool IsEnabled(List<UiElementLine> dialog, string enabler)
+    {
+        return dialog.FirstOrDefault(element => element.Type == enabler) is { } found
+               && !found.Classes.Contains(BoardEditingConstants.Disabled);
+    }
+
+    // The dragger's place along the slider's track: 0 at the wage end (left), 1 at the transfer end (right).
+    private static float SliderPosition(List<UiElementLine> dialog)
+    {
+        var track = dialog.FirstOrDefault(element => element.Type == BoardEditingConstants.SliderTracker)?.Bounds;
+        var dragger = dialog.FirstOrDefault(element => element.Type == BoardEditingConstants.SliderDragger)?.Bounds;
+
+        if (track is not { Width: > 0 } line || dragger is not { } knob || line.Width <= knob.Width)
+        {
+            return 0;
+        }
+
+        return Math.Clamp((knob.X - line.X) / (line.Width - knob.Width), 0, 1);
+    }
+
+    private Task<JsonElement> ClickAsync(string path, CancellationToken cancellationToken)
+    {
+        return bridge.WriteAsync<JsonElement>(
+            BridgeQuery.Write(ConversationConstants.ClickEndpoint, [("path", path), ("how", ConversationConstants.ClickHow)]),
+            cancellationToken);
+    }
+
+    private static UiElementLine? Find(List<UiElementLine> dialog, string type)
+    {
+        return dialog.FirstOrDefault(element => element.Type.StartsWith(type, StringComparison.Ordinal));
     }
 
     // The talk's lines on screen, in order: the text to show and the path that takes the click.
