@@ -113,7 +113,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
             if (picked is not { IsDisabled: false } leaf)
             {
-                var labels = string.Join(", ", leaves.Select(each => each.Entry.Label + (each.IsDisabled ? " (greyed out)" : "")));
+                var labels = string.Join(", ", leaves.Select(each => each.Entry.Label + Unpickable(each)));
                 return Fail(wanted is null ? "game" : "status", wanted is null
                     ? $"The game's menu for {player.Name} has no entry it lets be picked now: {labels}."
                     : $"The game's menu offers {player.Name} none of '{wanted}' it lets be picked now. Its entries: {labels}.");
@@ -326,6 +326,11 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         return (await contracts.GetContractsAsync(cancellationToken)).FirstOrDefault(contract => contract.PlayerId == playerId);
     }
 
+    private static string Unpickable(MenuLeaf leaf)
+    {
+        return !leaf.IsDisabled ? string.Empty : leaf.Entry.CanRun || leaf.Entry.IsDisabled ? " (greyed out)" : " (can't be picked)";
+    }
+
     // Every entry that does something rather than open a sub-menu, with its path (an index per level, from the top), its
     // label at each level, and whether it or a level above it is greyed out.
     private static IEnumerable<MenuLeaf> Leaves(List<MenuEntry> entries, List<int> above, List<string> labelsAbove, bool disabledAbove)
@@ -338,7 +343,9 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
             if (entries[i].Children.Count == 0)
             {
-                yield return new MenuLeaf(path, labels, entries[i], disabled);
+                // An entry that sends no event can't be picked either: the game lets the agreed playing time only go up
+                // from the menu, and the statuses below his own come with Event 0 (test save, 18/11/2026).
+                yield return new MenuLeaf(path, labels, entries[i], disabled || !entries[i].CanRun);
                 continue;
             }
 

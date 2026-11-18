@@ -2,7 +2,7 @@
 
 Run on the Windows PC, with the test save 'MCPFM investigation' loaded and no match being played:
     python smoke-71.py menus <playerId>...           # read only: what each contract action's menu offers him
-    python smoke-71.py status <playerId> <status> <original>  # x2: apply <status>, then back to <original> (menu labels)
+    python smoke-71.py status <playerId> <status> <original>  # raise to <status>, then back to <original> (refused: it only goes up)
     python smoke-71.py gone <playerId>               # he's no longer in get_squad
     python smoke-71.py dof <playerId>                # dry run, apply, then the menu no longer offers it (x2)
     python smoke-71.py release <playerId>            # dry run with a cost, refusals, apply with its confirmation; exit 2 until he's gone
@@ -83,24 +83,28 @@ def applied(change):
 
 
 def status_case(player, wanted, original_label):
+    """One raise of his agreed playing time, read back, then the way back. The game lets it only go up from the menu:
+    the statuses below his own send no event, so the way back is refused before anything is sent (test save, 18/11)."""
     original = contract(player)["agreedPlayingTime"]
     check(plain(original) == plain(original_label), f"his status now is {original_label}: {original}")
     check(plain(wanted) != plain(original), f"{wanted} differs from his status now ({original})")
-    for _ in range(2):
-        status, plan = post("squad-status", {"playerId": player, "status": wanted})
-        check(status == 200 and plan["applied"] == "No", "dry run plans and writes nothing")
-        check(plain(contract(player)["agreedPlayingTime"]) == plain(original), "the dry run left his status as it was")
-        guard()
-        status, change = post("squad-status", {"playerId": player, "status": wanted}, "?apply=true")
-        check(status == 200 and applied(change) and change.get("confirmed") is True, f"applied and confirmed: {change}")
-        now = contract(player)["agreedPlayingTime"]
-        check(plain(now) == plain(wanted) and plain(now) != plain(original), f"get_contracts shows exactly {wanted}: {now}")
-        check(no_dialog(), "no dialog left open")
-        guard()
-        status, back = post("squad-status", {"playerId": player, "status": original_label}, "?apply=true")
+    status, plan = post("squad-status", {"playerId": player, "status": wanted})
+    check(status == 200 and plan["applied"] == "No", "dry run plans and writes nothing")
+    check(plain(contract(player)["agreedPlayingTime"]) == plain(original), "the dry run left his status as it was")
+    guard()
+    status, change = post("squad-status", {"playerId": player, "status": wanted}, "?apply=true")
+    check(status == 200 and applied(change) and change.get("confirmed") is True, f"applied and confirmed: {change}")
+    now = contract(player)["agreedPlayingTime"]
+    check(plain(now) == plain(wanted) and plain(now) != plain(original), f"get_contracts shows exactly {wanted}: {now}")
+    check(no_dialog(), "no dialog left open")
+    guard()
+    status, back = post("squad-status", {"playerId": player, "status": original_label}, "?apply=true")
+    if status == 400 and "can't be picked" in str(back):
+        check(plain(contract(player)["agreedPlayingTime"]) == plain(wanted), "the way back down is refused and nothing changed")
+    else:
         check(status == 200 and applied(back) and back.get("confirmed") is True, f"back applied and confirmed: {back}")
         check(plain(contract(player)["agreedPlayingTime"]) == plain(original), f"status back to {original}")
-        check(no_dialog(), "no dialog left open")
+    check(no_dialog(), "no dialog left open")
     status, _ = post("squad-status", {"playerId": player, "status": "Inexistente"})
     check(status == 400, "a status the menu doesn't have is refused")
 

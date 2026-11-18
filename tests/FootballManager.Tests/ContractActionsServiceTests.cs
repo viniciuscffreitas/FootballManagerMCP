@@ -36,7 +36,7 @@ public class ContractActionsServiceTests
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);
         Menu(PlayerMenuAction.ReleaseOnFreeTransfer,
-            new MenuEntry { Label = "Liberar por transferência livre", Confirmation = Cost });
+            new MenuEntry { CanRun = true, Label = "Liberar por transferência livre", Confirmation = Cost });
 
         var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: false, confirmRelease: false)).Value;
 
@@ -96,7 +96,7 @@ public class ContractActionsServiceTests
     public async Task Applying_a_release_clears_the_save_then_clicks_and_answers_the_dialog()
     {
         Offered(PlayerMenuAction.MutualTermination);
-        Menu(PlayerMenuAction.MutualTermination, new MenuEntry { Label = "Rescindir contrato", Confirmation = Cost });
+        Menu(PlayerMenuAction.MutualTermination, new MenuEntry { CanRun = true, Label = "Rescindir contrato", Confirmation = Cost });
         Dialog(DialogState.Answered, "Rescindir o contrato de Reserva?");
 
         var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Mutual, apply: true, confirmRelease: true, expectedConfirmation: Cost)).Value;
@@ -158,7 +158,7 @@ public class ContractActionsServiceTests
     public async Task A_release_whose_menu_states_no_confirmation_is_refused_and_nothing_is_sent()
     {
         Offered(PlayerMenuAction.SetForRelease);
-        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { Label = "Liberar no fim do contrato" });
+        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { CanRun = true, Label = "Liberar no fim do contrato" });
 
         var result = await _service.ReleaseAsync(Reserve, ReleaseKind.EndOfContract, apply: true, confirmRelease: true, expectedConfirmation: "Reserva");
 
@@ -171,7 +171,7 @@ public class ContractActionsServiceTests
     public async Task A_change_whose_menu_states_no_confirmation_never_has_its_dialog_answered()
     {
         Offered(PlayerMenuAction.DofContractRenewal);
-        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { Label = "Pedir ao DoF para renovar" });
+        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { CanRun = true, Label = "Pedir ao DoF para renovar" });
         Dialog(DialogState.NotAnswered, "Pedir ao DoF para renovar com Reserva?");
 
         var change = (await _service.HandRenewalToDofAsync(Reserve, apply: true)).Value;
@@ -318,7 +318,7 @@ public class ContractActionsServiceTests
     public async Task A_refused_save_writes_nothing()
     {
         Offered(PlayerMenuAction.DofContractRenewal);
-        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { Label = "Pedir ao DoF para renovar" });
+        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { CanRun = true, Label = "Pedir ao DoF para renovar" });
         _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>()).Returns(Result.Fail<SaveClearance>(new SaveRefusedError("real save")));
 
         var result = await _service.HandRenewalToDofAsync(Reserve, apply: true);
@@ -407,7 +407,7 @@ public class ContractActionsServiceTests
         {
             Label = "Status no elenco",
             IsDisabled = true,
-            Children = [new MenuEntry { Label = "Titular" }, new MenuEntry { Label = "Rotação" }]
+            Children = [new MenuEntry { CanRun = true, Label = "Titular" }, new MenuEntry { CanRun = true, Label = "Rotação" }]
         });
 
         var result = await _service.SetSquadStatusAsync(Reserve, "Rotação", apply: true);
@@ -432,18 +432,44 @@ public class ContractActionsServiceTests
     public async Task A_greyed_out_entry_is_not_picked()
     {
         Offered(PlayerMenuAction.SetForRelease);
-        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { Label = "Liberar no fim do contrato", IsDisabled = true });
+        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { CanRun = true, Label = "Liberar no fim do contrato", IsDisabled = true });
 
         var result = await _service.ReleaseAsync(Reserve, ReleaseKind.EndOfContract, apply: false, confirmRelease: false);
 
         Assert.Contains("Liberar no fim do contrato", Messages(result));
     }
 
+    // The game lets the agreed playing time only go up from the menu: the statuses below his own send no event (Event 0)
+    // and carry no confirmation. Seen on Andrey Quintino in the test save, 18/11/2026, once he was "Jogador do elenco".
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_status_whose_entry_sends_no_event_is_refused_and_nothing_is_sent(bool apply)
+    {
+        Offered(PlayerMenuAction.SetPlayingTime);
+        Menu(PlayerMenuAction.SetPlayingTime, new MenuEntry
+        {
+            Label = "Tempo de Jogo Acordado",
+            Children =
+            [
+                new MenuEntry { CanRun = true, Label = "Titular Regular", Confirmation = "Alterar?" },
+                new MenuEntry { CanRun = false, Label = "Jogador de rotação" }
+            ]
+        });
+
+        var result = await _service.SetSquadStatusAsync(Reserve, "Jogador de rotação", apply: apply);
+
+        Assert.True(result.IsFailed);
+        Assert.Contains("Jogador de rotação (can't be picked)", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
+    }
+
     private void FreeRelease()
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);
         Menu(PlayerMenuAction.ReleaseOnFreeTransfer,
-            new MenuEntry { Label = "Liberar por transferência livre", Confirmation = Cost });
+            new MenuEntry { CanRun = true, Label = "Liberar por transferência livre", Confirmation = Cost });
     }
 
     private void Dialog(DialogState state, string text)
@@ -475,9 +501,9 @@ public class ContractActionsServiceTests
             Label = "Status no elenco",
             Children =
             [
-                new MenuEntry { Label = "Titular" },
-                new MenuEntry { Label = "Rotação" },
-                new MenuEntry { Label = "Reserva", IsDisabled = true }
+                new MenuEntry { CanRun = true, Label = "Titular" },
+                new MenuEntry { CanRun = true, Label = "Rotação" },
+                new MenuEntry { CanRun = true, Label = "Reserva", IsDisabled = true }
             ]
         });
     }

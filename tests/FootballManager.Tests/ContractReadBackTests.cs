@@ -38,7 +38,7 @@ public class ContractReadBackTests
             new MenuEntry
             {
                 Label = "Status no elenco",
-                Children = [new MenuEntry { Label = "Titular" }, new MenuEntry { Label = "Rotação" }]
+                Children = [new MenuEntry { CanRun = true, Label = "Titular" }, new MenuEntry { CanRun = true, Label = "Rotação" }]
             }
         ]);
         _editor.AnswerDialogAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -67,7 +67,7 @@ public class ContractReadBackTests
         const string cost = "Isso custará R$120 mil ao clube.";
         _editor.GetOfferedActionsAsync(Reserve, Arg.Any<CancellationToken>()).Returns([PlayerMenuAction.ReleaseOnFreeTransfer]);
         _editor.GetMenuAsync(Reserve, PlayerMenuAction.ReleaseOnFreeTransfer, Arg.Any<CancellationToken>())
-            .Returns([new MenuEntry { Label = "Liberar por transferência livre", Confirmation = cost }]);
+            .Returns([new MenuEntry { CanRun = true, Label = "Liberar por transferência livre", Confirmation = cost }]);
         var service = Service(Squad("Reserva"), """{"count":0}""");
 
         var result = await service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: cost);
