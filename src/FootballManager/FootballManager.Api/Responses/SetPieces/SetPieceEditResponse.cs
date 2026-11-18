@@ -1,10 +1,13 @@
+using FootballManager.Domain.SetPieces;
+
 namespace FootballManager.Api.Responses.SetPieces;
 
 public class SetPieceEditResponse
 {
-    public bool Applied { get; set; }
-    public bool CaptainWritten { get; set; }
-    public bool ViceCaptainWritten { get; set; }
+    /// <summary>Written, NotWritten (also a dry run) or Unknown: then check with get_set_pieces before trying again.</summary>
+    public WriteState Applied { get; set; }
+    public WriteState CaptainWritten { get; set; }
+    public WriteState ViceCaptainWritten { get; set; }
 
     /// <summary>True only when the read-back shows every role asked for; see notes when false after an apply.</summary>
     public bool Confirmed { get; set; }

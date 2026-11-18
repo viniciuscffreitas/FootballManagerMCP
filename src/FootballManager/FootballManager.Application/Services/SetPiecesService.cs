@@ -58,12 +58,12 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
                     [$"{vice.Name} is the captain: making him vice would leave the club without one. Name a new captain too."]));
             }
 
-            var writes = new List<(string Role, Func<Task> Write, Action Written)>();
+            var writes = new List<(string Role, Func<Task> Write, Action<WriteState> Record)>();
 
-            foreach (var (player, role, now, offered, write, written) in new (SetPiecePlayer?, string, SetPiecePlayer?, Func<CaptaincyOffer, bool>, Func<int, Task>, Action)[]
+            foreach (var (player, role, now, offered, write, record) in new (SetPiecePlayer?, string, SetPiecePlayer?, Func<CaptaincyOffer, bool>, Func<int, Task>, Action<WriteState>)[]
                      {
-                         (captain, "captain", before.Captain, offer => offer.MakeCaptain, playerId => game.MakeCaptainAsync(playerId, cancellationToken), () => edit.CaptainWritten = true),
-                         (vice, "vice-captain", before.ViceCaptain, offer => offer.MakeViceCaptain, playerId => game.MakeViceCaptainAsync(playerId, cancellationToken), () => edit.ViceCaptainWritten = true)
+                         (captain, "captain", before.Captain, offer => offer.MakeCaptain, playerId => game.MakeCaptainAsync(playerId, cancellationToken), state => edit.CaptainWritten = state),
+                         (vice, "vice-captain", before.ViceCaptain, offer => offer.MakeViceCaptain, playerId => game.MakeViceCaptainAsync(playerId, cancellationToken), state => edit.ViceCaptainWritten = state)
                      })
             {
                 if (player is null)
@@ -80,7 +80,7 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
                 if (planned.Value)
                 {
-                    writes.Add((role, () => write(player.Id), written));
+                    writes.Add((role, () => write(player.Id), record));
                 }
             }
 
@@ -98,24 +98,43 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
             edit.Notes.Add(SaveNote(clearance.Value));
 
-            foreach (var (role, write, written) in writes)
+            var lost = false;
+
+            foreach (var (role, write, record) in writes)
             {
+                if (lost)
+                {
+                    edit.Notes.Add($"Warning: the {role} change was not sent: the game's answer to the earlier change was lost.");
+                    continue;
+                }
+
                 try
                 {
                     await write();
-                    written();
-                    edit.Applied = true;
+                    record(WriteState.Written);
                 }
-                catch (Exception exception) when (edit.Applied && exception is GameRejectedException or GameUnavailableException)
+                catch (GameRejectedException exception) when (Sent(edit))
                 {
                     // An earlier role already went into the game: say what changed instead of failing, so nobody repeats it.
                     edit.Notes.Add($"Warning: the {role} change was not written ({exception.Message}); " +
                                    "the earlier change stays in the game.");
                     break;
                 }
+                catch (GameUnavailableException exception)
+                {
+                    // A timeout or an error after the write went out doesn't say the game didn't take it: the read-back
+                    // decides. Nothing more is sent to a game that isn't answering.
+                    record(WriteState.Unknown);
+                    lost = true;
+                    edit.Notes.Add($"Warning: the game's answer to the {role} change was lost ({exception.Message}); " +
+                                   "the read-back decides whether it was written.");
+                }
             }
 
             await ReadBackAsync(edit, before, captain, vice, cancellationToken);
+            edit.Applied = edit.CaptainWritten == WriteState.Written || edit.ViceCaptainWritten == WriteState.Written
+                ? WriteState.Written
+                : Sent(edit) ? WriteState.Unknown : WriteState.NotWritten;
             return Result.Ok(edit);
         }
         catch (GameUnavailableException exception)
@@ -162,10 +181,17 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
         }
         catch (GameUnavailableException exception)
         {
-            edit.Notes.Add($"Warning: written, but the setup could not be read back ({exception.Message}); " +
-                           "read it again before changing anything.");
+            edit.Notes.Add(edit.CaptainWritten == WriteState.Unknown || edit.ViceCaptainWritten == WriteState.Unknown
+                ? $"Warning: whether the change was written is unknown: the setup could not be read back either " +
+                  $"({exception.Message}). Check with get_set_pieces before trying again."
+                : $"Warning: written, but the setup could not be read back ({exception.Message}); " +
+                  "read it again before changing anything.");
             return;
         }
+
+        // A write whose answer was lost counts as written when the read-back shows the player in the role.
+        edit.CaptainWritten = Resolve(edit, "captain", edit.CaptainWritten, captain, edit.After.Captain);
+        edit.ViceCaptainWritten = Resolve(edit, "vice-captain", edit.ViceCaptainWritten, vice, edit.After.ViceCaptain);
 
         var mismatches = new List<string>();
 
@@ -187,6 +213,29 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
         {
             edit.Notes.Add($"Warning: the read-back doesn't match the request: {string.Join("; ", mismatches)}.");
         }
+    }
+
+    private static WriteState Resolve(
+        SetPieceEdit edit, string role, WriteState state, SetPiecePlayer? wanted, SetPiecePlayer? now)
+    {
+        if (state != WriteState.Unknown)
+        {
+            return state;
+        }
+
+        if (now?.Id == wanted?.Id)
+        {
+            return WriteState.Written;
+        }
+
+        edit.Notes.Add($"Warning: the {role} change was not written: the read-back shows {now?.Name ?? "none"}.");
+        return WriteState.NotWritten;
+    }
+
+    // Whether any write went out, taken or with its answer lost.
+    private static bool Sent(SetPieceEdit edit)
+    {
+        return edit.CaptainWritten != WriteState.NotWritten || edit.ViceCaptainWritten != WriteState.NotWritten;
     }
 
     private static SetPiecePlayer? Find(SetPieceSetup setup, int playerId)

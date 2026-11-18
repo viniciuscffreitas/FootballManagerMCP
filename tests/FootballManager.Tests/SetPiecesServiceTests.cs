@@ -64,7 +64,7 @@ public class SetPiecesServiceTests
     {
         var edit = (await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: false)).Value;
 
-        Assert.False(edit.Applied);
+        Assert.Equal(WriteState.NotWritten, edit.Applied);
         Assert.Equal(Neymar.Id, edit.Before.Captain!.Id);
         Assert.Contains(edit.Steps, step => step.Contains("Agustín Rollheiser") && step.Contains("Neymar"));
         await _game.DidNotReceiveWithAnyArgs().MakeCaptainAsync(default);
@@ -82,7 +82,7 @@ public class SetPiecesServiceTests
             _game.MakeCaptainAsync(Rollheiser.Id, Arg.Any<CancellationToken>());
             _game.MakeViceCaptainAsync(Neymar.Id, Arg.Any<CancellationToken>());
         });
-        Assert.True(edit.Applied);
+        Assert.Equal(WriteState.Written, edit.Applied);
         Assert.NotNull(edit.After);
     }
 
@@ -169,8 +169,8 @@ public class SetPiecesServiceTests
         var edit = (await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true)).Value;
 
         Assert.True(edit.Confirmed);
-        Assert.True(edit.CaptainWritten);
-        Assert.True(edit.ViceCaptainWritten);
+        Assert.Equal(WriteState.Written, edit.CaptainWritten);
+        Assert.Equal(WriteState.Written, edit.ViceCaptainWritten);
     }
 
     [Fact]
@@ -183,9 +183,9 @@ public class SetPiecesServiceTests
         var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true);
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value.Applied);
-        Assert.True(result.Value.CaptainWritten);
-        Assert.False(result.Value.ViceCaptainWritten);
+        Assert.Equal(WriteState.Written, result.Value.Applied);
+        Assert.Equal(WriteState.Written, result.Value.CaptainWritten);
+        Assert.Equal(WriteState.NotWritten, result.Value.ViceCaptainWritten);
         Assert.False(result.Value.Confirmed);
         Assert.Contains(result.Value.Notes, note => note.Contains("vice-captain") && note.Contains("Make vice-captain"));
         Assert.Equal(Rollheiser.Id, result.Value.After!.Captain!.Id);
@@ -201,9 +201,9 @@ public class SetPiecesServiceTests
         var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true);
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value.Applied);
-        Assert.True(result.Value.CaptainWritten);
-        Assert.True(result.Value.ViceCaptainWritten);
+        Assert.Equal(WriteState.Written, result.Value.Applied);
+        Assert.Equal(WriteState.Written, result.Value.CaptainWritten);
+        Assert.Equal(WriteState.Written, result.Value.ViceCaptainWritten);
         Assert.False(result.Value.Confirmed);
         Assert.Null(result.Value.After);
         Assert.Contains(result.Value.Notes, note => note.Contains("read"));
@@ -216,7 +216,7 @@ public class SetPiecesServiceTests
 
         var edit = (await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: true)).Value;
 
-        Assert.True(edit.Applied);
+        Assert.Equal(WriteState.Written, edit.Applied);
         Assert.False(edit.Confirmed);
         Assert.Contains(edit.Notes, note => note.Contains("Agustín Rollheiser") && note.Contains("Neymar"));
     }
@@ -243,6 +243,84 @@ public class SetPiecesServiceTests
         Assert.Contains("captain", Messages(result));
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
         await _game.DidNotReceiveWithAnyArgs().MakeViceCaptainAsync(default);
+    }
+
+    [Fact]
+    public async Task A_lost_answer_the_read_back_shows_written_counts_as_written()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup(Rollheiser));
+        _game.MakeCaptainAsync(Rollheiser.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new GameUnavailableException("The game didn't answer in time."));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(WriteState.Written, result.Value.Applied);
+        Assert.Equal(WriteState.Written, result.Value.CaptainWritten);
+        Assert.True(result.Value.Confirmed);
+    }
+
+    [Fact]
+    public async Task A_lost_answer_the_read_back_shows_unchanged_counts_as_not_written()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup());
+        _game.MakeCaptainAsync(Rollheiser.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new GameUnavailableException("The game didn't answer in time."));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(WriteState.NotWritten, result.Value.Applied);
+        Assert.Equal(WriteState.NotWritten, result.Value.CaptainWritten);
+        Assert.False(result.Value.Confirmed);
+        Assert.Contains(result.Value.Notes, note => note.Contains("captain") && note.Contains("not written"));
+    }
+
+    [Fact]
+    public async Task A_lost_answer_and_a_failed_read_back_leave_the_write_unknown()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(
+            _ => Setup(),
+            _ => throw new GameUnavailableException("down"));
+        _game.MakeCaptainAsync(Rollheiser.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new GameUnavailableException("The game didn't answer in time."));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(WriteState.Unknown, result.Value.Applied);
+        Assert.Equal(WriteState.Unknown, result.Value.CaptainWritten);
+        Assert.False(result.Value.Confirmed);
+        Assert.Contains(result.Value.Notes, note => note.Contains("get_set_pieces"));
+    }
+
+    [Fact]
+    public async Task A_lost_answer_on_the_vice_after_the_captain_is_decided_by_the_read_back()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup(Rollheiser, Gabriel));
+        _game.MakeViceCaptainAsync(Neymar.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new GameUnavailableException("The game didn't answer in time."));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true);
+
+        Assert.Equal(WriteState.Written, result.Value.Applied);
+        Assert.Equal(WriteState.Written, result.Value.CaptainWritten);
+        Assert.Equal(WriteState.NotWritten, result.Value.ViceCaptainWritten);
+        Assert.False(result.Value.Confirmed);
+    }
+
+    [Fact]
+    public async Task No_write_is_sent_after_one_whose_answer_was_lost()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup(Rollheiser));
+        _game.MakeCaptainAsync(Rollheiser.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new GameUnavailableException("The game didn't answer in time."));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true);
+
+        await _game.DidNotReceiveWithAnyArgs().MakeViceCaptainAsync(default);
+        Assert.Equal(WriteState.NotWritten, result.Value.ViceCaptainWritten);
+        Assert.Contains(result.Value.Notes, note => note.Contains("vice-captain") && note.Contains("not sent"));
     }
 
     private static string Messages<T>(Result<T> result)

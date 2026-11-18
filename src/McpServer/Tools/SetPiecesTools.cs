@@ -26,7 +26,9 @@ public static class SetPiecesTools
                  "By default a dry run that writes nothing: it checks the players and returns before (the setup now) " +
                  "and steps (what would change). A player who already holds the role is left as he is. With " +
                  "apply=true the API first checks and copies the save (see the README's Safety), writes, and returns " +
-                 "after, read back from the game, with captainWritten and viceCaptainWritten (what the game took) and " +
+                 "after, read back from the game, with applied, captainWritten and viceCaptainWritten (Written, NotWritten, or " +
+                 "Unknown when the game's answer and the read-back were both lost: then check with get_set_pieces before " +
+                 "trying again) and " +
                  "confirmed (true only when after shows every role asked for and the role left out unchanged; read the notes " +
                  "when false). Refused when the two ids are the same player, when a player isn't in the first team, when " +
                  "the vice named is the captain and no new captain is named (the game would leave the club without one), " +

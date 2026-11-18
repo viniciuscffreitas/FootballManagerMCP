@@ -3,14 +3,17 @@ namespace FootballManager.Domain.SetPieces;
 /// <summary>A change to the captaincy or the takers, or what a dry run says it would do.</summary>
 public class SetPieceEdit
 {
-    /// <summary>False for a dry run, which writes nothing.</summary>
-    public bool Applied { get; set; }
+    /// <summary>
+    /// Written once any change went into the game; NotWritten for a dry run or when none did; Unknown when a write's
+    /// answer was lost and the read-back failed.
+    /// </summary>
+    public WriteState Applied { get; set; }
 
-    /// <summary>True once the game took the captain change; false when none was written.</summary>
-    public bool CaptainWritten { get; set; }
+    /// <summary>Whether the captain change went into the game; NotWritten when none was asked or needed.</summary>
+    public WriteState CaptainWritten { get; set; }
 
-    /// <summary>True once the game took the vice-captain change; false when none was written.</summary>
-    public bool ViceCaptainWritten { get; set; }
+    /// <summary>Whether the vice-captain change went into the game; NotWritten when none was asked or needed.</summary>
+    public WriteState ViceCaptainWritten { get; set; }
 
     /// <summary>True only when the read-back shows every role the call asked for; false for a dry run.</summary>
     public bool Confirmed { get; set; }
