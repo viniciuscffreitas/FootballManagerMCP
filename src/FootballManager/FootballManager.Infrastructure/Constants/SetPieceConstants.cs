@@ -28,7 +28,8 @@ internal static class SetPieceConstants
     public const string SideContext = "SetPiecePitchSide";
     public const int Attacking = 1;
 
-    // SetPiecePitchSide: 0 and 1. Which one the screen shows as left is taken from SI's order (left first).
+    // SetPiecePitchSide: 0 and 1. Which one the screen shows as left hasn't been checked against the screen yet; SI's
+    // order (left first) is assumed.
     public const int LeftSide = 0;
     public const int RightSide = 1;
 

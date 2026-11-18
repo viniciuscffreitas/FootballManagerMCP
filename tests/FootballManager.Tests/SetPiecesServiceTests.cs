@@ -11,8 +11,6 @@ namespace FootballManager.Tests;
 
 public class SetPiecesServiceTests
 {
-    private const string Penalties = "Penalties";
-
     private static readonly SetPiecePlayer Neymar = new() { Id = 10, Name = "Neymar" };
     private static readonly SetPiecePlayer Gabriel = new() { Id = 20, Name = "Gabriel Brazão" };
     private static readonly SetPiecePlayer Rollheiser = new() { Id = 30, Name = "Agustín Rollheiser" };
@@ -25,6 +23,8 @@ public class SetPiecesServiceTests
     {
         _setPieces = new SetPiecesService(_game, _saveGuard);
         _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(_ => Setup());
+        _game.GetCaptaincyOfferAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(new CaptaincyOffer { MakeCaptain = true, MakeViceCaptain = true });
         _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())
             .Returns(Result.Ok(new SaveClearance { SaveName = "MCPFM investigation", IsTestSave = true }));
     }
@@ -35,7 +35,7 @@ public class SetPiecesServiceTests
         {
             Captain = Neymar,
             ViceCaptain = Gabriel,
-            TakerLists = [new SetPieceTakerList { Key = Penalties, Label = "Pênaltis", Takers = [Neymar] }],
+            TakerLists = [new SetPieceTakerList { Key = "Penalties", Label = "Penalties", Takers = [Neymar] }],
             Squad = [Neymar, Gabriel, Rollheiser]
         };
     }
@@ -140,65 +140,25 @@ public class SetPiecesServiceTests
     }
 
     [Fact]
-    public async Task A_takers_dry_run_shows_the_order_and_writes_nothing()
+    public async Task A_role_the_players_menu_does_not_offer_is_refused_before_the_save_is_touched()
     {
-        var edit = (await _setPieces.SetTakersAsync(Penalties, [Rollheiser.Id, Neymar.Id], apply: false)).Value;
+        _game.GetCaptaincyOfferAsync(Rollheiser.Id, Arg.Any<CancellationToken>()).Returns(new CaptaincyOffer());
 
-        Assert.False(edit.Applied);
-        Assert.Contains(edit.Steps, step => step.Contains("Agustín Rollheiser, Neymar"));
-        await _game.DidNotReceiveWithAnyArgs().SetTakersAsync(default!, default!);
-    }
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: true);
 
-    [Fact]
-    public async Task A_takers_apply_clears_the_save_then_writes()
-    {
-        await _setPieces.SetTakersAsync(Penalties, [Rollheiser.Id], apply: true);
-
-        Received.InOrder(() =>
-        {
-            _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
-            _game.SetTakersAsync(Penalties, Arg.Is<IReadOnlyList<int>>(ids => ids.SequenceEqual(new[] { Rollheiser.Id })), Arg.Any<CancellationToken>());
-        });
-    }
-
-    [Fact]
-    public async Task A_list_the_screen_does_not_have_is_refused_with_the_ones_it_has()
-    {
-        var result = await _setPieces.SetTakersAsync("Throw-ins", [Rollheiser.Id], apply: true);
-
-        Assert.Contains(Penalties, Messages(result));
-        await _game.DidNotReceiveWithAnyArgs().SetTakersAsync(default!, default!);
+        Assert.Contains("doesn't offer", Messages(result));
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().MakeCaptainAsync(default);
     }
 
     [Fact]
-    public async Task Takers_need_first_team_players_named_once()
+    public async Task The_dry_run_checks_the_players_menu_too()
     {
-        var unknown = await _setPieces.SetTakersAsync(Penalties, [999], apply: true);
-        var twice = await _setPieces.SetTakersAsync(Penalties, [Neymar.Id, Neymar.Id], apply: true);
-        var none = await _setPieces.SetTakersAsync(Penalties, [], apply: true);
+        _game.GetCaptaincyOfferAsync(Rollheiser.Id, Arg.Any<CancellationToken>()).Returns(new CaptaincyOffer());
 
-        Assert.True(unknown.HasError<EntityDoesNotExistError>());
-        Assert.True(twice.HasError<ValidationError>());
-        Assert.True(none.HasError<ValidationError>());
-        await _game.DidNotReceiveWithAnyArgs().SetTakersAsync(default!, default!);
-    }
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: false);
 
-    [Fact]
-    public async Task Asking_the_staff_is_a_dry_run_unless_applied()
-    {
-        var dry = (await _setPieces.AskStaffAsync(apply: false)).Value;
-        await _game.DidNotReceiveWithAnyArgs().AskStaffToAssignTakersAsync(default);
-
-        var applied = (await _setPieces.AskStaffAsync(apply: true)).Value;
-
-        Assert.False(dry.Applied);
-        Assert.True(applied.Applied);
-        Received.InOrder(() =>
-        {
-            _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
-            _game.AskStaffToAssignTakersAsync(Arg.Any<CancellationToken>());
-        });
+        Assert.True(result.IsFailed);
     }
 
     private static string Messages<T>(Result<T> result)

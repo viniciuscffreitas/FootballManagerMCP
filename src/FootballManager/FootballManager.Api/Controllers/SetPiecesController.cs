@@ -34,25 +34,4 @@ public class SetPiecesController(ISetPiecesService setPiecesService) : Controlle
         var result = await setPiecesService.SetCaptainsAsync(request.CaptainId, request.ViceCaptainId, apply, cancellationToken);
         return result.ToGetResult<SetPieceEdit, SetPieceEditResponse>(edit => edit.Adapt<SetPieceEditResponse>());
     }
-
-    /// <summary>Puts players at the top of one taker list, in order; only with apply=true.</summary>
-    [HttpPost("takers")]
-    public async Task<Results<Ok<SetPieceEditResponse>, BadRequest, NotFound, ProblemHttpResult>> SetTakersAsync(
-        [FromBody] SetTakersRequest request,
-        [FromQuery] bool apply = false,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await setPiecesService.SetTakersAsync(request.List, request.PlayerIds, apply, cancellationToken);
-        return result.ToGetResult<SetPieceEdit, SetPieceEditResponse>(edit => edit.Adapt<SetPieceEditResponse>());
-    }
-
-    /// <summary>Has the staff pick every set piece taker; only with apply=true.</summary>
-    [HttpPost("takers/staff")]
-    public async Task<Results<Ok<SetPieceEditResponse>, BadRequest, NotFound, ProblemHttpResult>> AskStaffAsync(
-        [FromQuery] bool apply = false,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await setPiecesService.AskStaffAsync(apply, cancellationToken);
-        return result.ToGetResult<SetPieceEdit, SetPieceEditResponse>(edit => edit.Adapt<SetPieceEditResponse>());
-    }
 }

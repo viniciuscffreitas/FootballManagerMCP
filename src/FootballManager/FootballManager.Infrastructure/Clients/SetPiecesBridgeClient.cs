@@ -13,6 +13,7 @@ namespace FootballManager.Infrastructure.Clients;
 
 // The captaincy and the set piece takers through the MCPFM plugin. Reads come from the team and the active tactic's
 // SetPiece record; the captain and the vice change through the player's menu, as its "Tornar Capitão" entry does.
+// Changing the takers isn't here yet: the set piece screen's events haven't been proven in the test save.
 internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameClient
 {
     private static readonly string[] ListedPlayer = [SetPieceConstants.PlayerId, SetPieceConstants.PlayerName];
@@ -79,28 +80,22 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
         return RunMenuEntryAsync(playerId, SetPieceConstants.MakeViceCaptainAction, "Tornar Vice-capitão", cancellationToken);
     }
 
-    public Task SetTakersAsync(string list, IReadOnlyList<int> playerIds, CancellationToken cancellationToken = default)
+    public async Task<CaptaincyOffer> GetCaptaincyOfferAsync(int playerId, CancellationToken cancellationToken = default)
     {
-        throw new GameRejectedException(
-            "Changing the takers isn't wired to the game yet: the set piece screen's events haven't been proven in the test save.");
-    }
+        var offered = await OfferedAsync(playerId, cancellationToken);
 
-    public Task AskStaffToAssignTakersAsync(CancellationToken cancellationToken = default)
-    {
-        throw new GameRejectedException(
-            "Asking the staff isn't wired to the game yet: the set piece screen's events haven't been proven in the test save.");
+        return new CaptaincyOffer
+        {
+            MakeCaptain = offered.Contains(ActionKey(SetPieceConstants.MakeCaptainAction)),
+            MakeViceCaptain = offered.Contains(ActionKey(SetPieceConstants.MakeViceCaptainAction))
+        };
     }
 
     // The entry sends EventFmxDoAction with the payload the game built for it; the game asks no confirmation of it
     // (the confirmation dialog is the menu click's).
     private async Task RunMenuEntryAsync(int playerId, uint actionId, string entry, CancellationToken cancellationToken)
     {
-        var offered = await bridge.GetRecordAsync<BridgeActionsDto>(
-            BridgeQuery.FromGame().RefList(ScoutingConstants.Records, GameConstants.HumanRoot, PlayerPath(playerId))
-                .WithHumanAndTeam().Props([ScoutingConstants.Actions]),
-            cancellationToken);
-
-        if (offered.Values.Actions?.ContainsKey($"#{actionId.ToString(CultureInfo.InvariantCulture)}") != true)
+        if (!(await OfferedAsync(playerId, cancellationToken)).Contains(ActionKey(actionId)))
         {
             throw new GameRejectedException($"The player's menu doesn't offer \"{entry}\" now.");
         }
@@ -113,6 +108,22 @@ internal sealed class SetPiecesBridgeClient(GameBridge bridge) : ISetPiecesGameC
                 .WithHumanAndTeam()
                 .ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", SetPieceConstants.EntryData), ("template", "none")),
             cancellationToken);
+    }
+
+    // The menu actions the game offers for the player now, keyed as the game lists them ("#<action id>").
+    private async Task<HashSet<string>> OfferedAsync(int playerId, CancellationToken cancellationToken)
+    {
+        var offered = await bridge.GetRecordAsync<BridgeActionsDto>(
+            BridgeQuery.FromGame().RefList(ScoutingConstants.Records, GameConstants.HumanRoot, PlayerPath(playerId))
+                .WithHumanAndTeam().Props([ScoutingConstants.Actions]),
+            cancellationToken);
+
+        return offered.Values.Actions?.Keys.ToHashSet() ?? [];
+    }
+
+    private static string ActionKey(uint actionId)
+    {
+        return $"#{actionId.ToString(CultureInfo.InvariantCulture)}";
     }
 
     private static BridgeQuery OnSetPiece(string list)

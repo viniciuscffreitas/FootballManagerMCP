@@ -17,17 +17,12 @@ public interface ISetPiecesService
     /// already holds the role is left as he is.
     /// </summary>
     Task<Result<SetPieceEdit>> SetCaptainsAsync(int? captainId, int? viceCaptainId, bool apply, CancellationToken cancellationToken = default);
-
-    /// <summary>Puts these players at the top of one taker list, in order. A dry run unless <paramref name="apply"/>.</summary>
-    Task<Result<SetPieceEdit>> SetTakersAsync(string list, IReadOnlyList<int> playerIds, bool apply, CancellationToken cancellationToken = default);
-
-    /// <summary>Has the staff pick every taker. A dry run unless <paramref name="apply"/>.</summary>
-    Task<Result<SetPieceEdit>> AskStaffAsync(bool apply, CancellationToken cancellationToken = default);
 }
 
-// The game keeps one captain and one vice for the club, and an ordered list of takers per set piece: the first in a
-// list takes it, the next one when he's off the pitch. Every change is checked against what the game holds now, so a
-// dry run shows the before and the after, and an apply goes through the save guard and is read back.
+// The game keeps one captain and one vice for the club; the player's menu makes him either ("Tornar Capitão",
+// "Tornar Vice-capitão") and leaves the entry out for the one already in the role. Every change is checked against the
+// game (the squad, the current holders, the menu) before anything is written, so a dry run shows the before and what
+// would change, and an apply goes through the save guard, writes and reads the setup back.
 public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) : ISetPiecesService
 {
     public async Task<Result<SetPieceSetup>> GetAsync(CancellationToken cancellationToken = default)
@@ -56,100 +51,45 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
                 ["The captain and the vice-captain are the same player: name two players."]));
         }
 
-        return await RunAsync(apply, cancellationToken, (before, edit) =>
+        try
         {
+            var before = await game.ReadAsync(cancellationToken);
+            var edit = new SetPieceEdit { Before = before };
             var captain = captainId is { } id ? Find(before, id) : null;
             var vice = viceCaptainId is { } other ? Find(before, other) : null;
 
             if ((captainId is not null && captain is null) || (viceCaptainId is not null && vice is null))
             {
-                return Result.Fail(new EntityDoesNotExistError());
+                return Result.Fail<SetPieceEdit>(new EntityDoesNotExistError());
             }
 
             var writes = new List<Func<Task>>();
 
-            if (captain is not null)
+            foreach (var (player, role, now, offered, write) in new (SetPiecePlayer?, string, SetPiecePlayer?, Func<CaptaincyOffer, bool>, Func<int, Task>)[]
+                     {
+                         (captain, "captain", before.Captain, offer => offer.MakeCaptain, playerId => game.MakeCaptainAsync(playerId, cancellationToken)),
+                         (vice, "vice-captain", before.ViceCaptain, offer => offer.MakeViceCaptain, playerId => game.MakeViceCaptainAsync(playerId, cancellationToken))
+                     })
             {
-                Plan(edit, writes, "captain", before.Captain, captain, () => game.MakeCaptainAsync(captain.Id, cancellationToken));
+                if (player is null)
+                {
+                    continue;
+                }
+
+                var planned = await PlanAsync(edit, role, now, player, offered, cancellationToken);
+
+                if (planned.IsFailed)
+                {
+                    return Result.Fail<SetPieceEdit>(planned.Errors);
+                }
+
+                if (planned.Value)
+                {
+                    writes.Add(() => write(player.Id));
+                }
             }
 
-            if (vice is not null)
-            {
-                Plan(edit, writes, "vice-captain", before.ViceCaptain, vice, () => game.MakeViceCaptainAsync(vice.Id, cancellationToken));
-            }
-
-            return Result.Ok(writes);
-        });
-    }
-
-    public async Task<Result<SetPieceEdit>> SetTakersAsync(
-        string list, IReadOnlyList<int> playerIds, bool apply, CancellationToken cancellationToken = default)
-    {
-        if (playerIds.Count == 0)
-        {
-            return Result.Fail<SetPieceEdit>(new ValidationError("playerIds", ["Name at least one taker, first to take it first."]));
-        }
-
-        if (playerIds.Distinct().Count() != playerIds.Count)
-        {
-            return Result.Fail<SetPieceEdit>(new ValidationError("playerIds", ["A player is named twice: name each taker once."]));
-        }
-
-        return await RunAsync(apply, cancellationToken, (before, edit) =>
-        {
-            if (before.TakerLists.FirstOrDefault(taker => string.Equals(taker.Key, list, StringComparison.OrdinalIgnoreCase)) is not { } found)
-            {
-                var offered = string.Join(", ", before.TakerLists.Select(taker => taker.Key));
-                return Result.Fail(new ValidationError("list", [$"The set piece screen has no list '{list}' (lists: {offered})."]));
-            }
-
-            var players = playerIds.Select(id => Find(before, id)).ToList();
-
-            if (players.Any(player => player is null))
-            {
-                return Result.Fail(new EntityDoesNotExistError());
-            }
-
-            var current = string.Join(", ", found.Takers.Select(player => player.Name));
-            var wanted = string.Join(", ", players.Select(player => player!.Name));
-
-            if (found.Takers.Select(player => player.Id).Take(playerIds.Count).SequenceEqual(playerIds))
-            {
-                edit.Notes.Add($"{found.Label ?? found.Key} already starts with {wanted}: nothing to change.");
-                return Result.Ok(new List<Func<Task>>());
-            }
-
-            edit.Steps.Add($"{found.Label ?? found.Key}: {wanted} first, in that order (now: {(current.Length > 0 ? current : "none")}).");
-            return Result.Ok(new List<Func<Task>> { () => game.SetTakersAsync(found.Key, playerIds, cancellationToken) });
-        });
-    }
-
-    public async Task<Result<SetPieceEdit>> AskStaffAsync(bool apply, CancellationToken cancellationToken = default)
-    {
-        return await RunAsync(apply, cancellationToken, (_, edit) =>
-        {
-            edit.Steps.Add("The staff picks every set piece taker, as the screen's request to the assistant does.");
-            return Result.Ok(new List<Func<Task>> { () => game.AskStaffToAssignTakersAsync(cancellationToken) });
-        });
-    }
-
-    // Reads the setup, lets the change check itself against it and plan its writes, and on an apply clears the save,
-    // writes in order and reads the setup back. A plan with no writes changes nothing, apply or not.
-    private async Task<Result<SetPieceEdit>> RunAsync(
-        bool apply, CancellationToken cancellationToken, Func<SetPieceSetup, SetPieceEdit, Result<List<Func<Task>>>> plan)
-    {
-        try
-        {
-            var before = await game.ReadAsync(cancellationToken);
-            var edit = new SetPieceEdit { Before = before };
-            var writes = plan(before, edit);
-
-            if (writes.IsFailed)
-            {
-                return Result.Fail<SetPieceEdit>(writes.Errors);
-            }
-
-            if (!apply || writes.Value.Count == 0)
+            if (!apply || writes.Count == 0)
             {
                 return Result.Ok(edit);
             }
@@ -163,7 +103,7 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
             edit.Notes.Add(SaveNote(clearance.Value));
 
-            foreach (var write in writes.Value)
+            foreach (var write in writes)
             {
                 await write();
             }
@@ -182,17 +122,26 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
         }
     }
 
-    private static void Plan(
-        SetPieceEdit edit, List<Func<Task>> writes, string role, SetPiecePlayer? now, SetPiecePlayer wanted, Func<Task> write)
+    // Adds the step for a role change and says to write it, or a note when the player already holds the role; a refusal
+    // when his menu doesn't offer it.
+    private async Task<Result<bool>> PlanAsync(
+        SetPieceEdit edit, string role, SetPiecePlayer? now, SetPiecePlayer wanted, Func<CaptaincyOffer, bool> offered,
+        CancellationToken cancellationToken)
     {
         if (now?.Id == wanted.Id)
         {
             edit.Notes.Add($"{wanted.Name} is already {role}: nothing to change.");
-            return;
+            return Result.Ok(false);
+        }
+
+        if (!offered(await game.GetCaptaincyOfferAsync(wanted.Id, cancellationToken)))
+        {
+            return Result.Fail<bool>(new ValidationError("game",
+                [$"{wanted.Name}'s menu doesn't offer making him {role} now."]));
         }
 
         edit.Steps.Add($"Make {wanted.Name} {role} (now: {now?.Name ?? "none"}).");
-        writes.Add(write);
+        return Result.Ok(true);
     }
 
     private static SetPiecePlayer? Find(SetPieceSetup setup, int playerId)
