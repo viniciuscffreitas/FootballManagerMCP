@@ -117,6 +117,29 @@ public class ContractMenuClickTests
     }
 
     [Fact]
+    public async Task A_send_the_game_answered_unreadably_is_unknown_not_a_crash()
+    {
+        var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação")) { WriteAnswer = "{not json" };
+
+        await Assert.ThrowsAsync<GameAnswerLostException>(() =>
+            Client(plugin).ClickMenuEntryAsync(Reserve, PlayerMenuAction.SetPlayingTime, [0, 1], Rotation));
+    }
+
+    [Fact]
+    public async Task A_yes_the_game_answered_unreadably_is_unknown_not_a_crash()
+    {
+        var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"), Dialog("Mudar o status de Reserva para Rotação?"))
+        {
+            WriteAnswer = "{not json",
+            StaysOpen = true
+        };
+
+        var answer = await Client(plugin).AnswerDialogAsync(["Reserva"]);
+
+        Assert.Equal(DialogState.Unknown, answer.State);
+    }
+
+    [Fact]
     public async Task A_dialog_already_open_is_left_alone_and_nothing_is_sent()
     {
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação"), Dialog("Enviar a numeração atual do elenco?"));
@@ -247,6 +270,7 @@ public class ContractMenuClickTests
 
         public bool StaysOpen { get; init; }
         public bool WriteTimesOut { get; init; }
+        public string WriteAnswer { get; init; } = "{}";
         public List<Uri> Writes { get; } = [];
         public List<HttpRequestMessage> Requests { get; } = [];
 
@@ -264,7 +288,7 @@ public class ContractMenuClickTests
 
                 Writes.Add(request.RequestUri!);
                 _clicked |= request.RequestUri!.AbsolutePath == DialogConstants.ClickEndpoint;
-                return Answer("{}");
+                return Answer(WriteAnswer);
             }
 
             if (url.StartsWith("/ui", StringComparison.Ordinal))
