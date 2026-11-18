@@ -93,4 +93,104 @@ public class BoardEditingServiceTests
         Assert.True(result.IsFailed);
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
     }
+
+    [Fact]
+    public async Task Answering_without_a_talk_open_fails_and_writes_nothing()
+    {
+        var result = await _board.AnswerAsync("0", apply: true);
+
+        Assert.True(result.IsFailed);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SayAsync(default);
+    }
+
+    [Fact]
+    public async Task The_answer_dry_run_shows_the_lines_and_picks_one_by_its_text()
+    {
+        _game.ReadCardAsync(Arg.Any<CancellationToken>())
+            .Returns(new BoardCard { Lines = ["Aceitar Visão Atual", "Negociar"] });
+
+        var plan = (await _board.AnswerAsync("negociar", apply: false)).Value;
+
+        Assert.False(plan.Applied);
+        Assert.Equal("Negociar", plan.Line);
+        await _game.DidNotReceiveWithAnyArgs().SayAsync(default);
+    }
+
+    [Fact]
+    public async Task Applying_an_answer_clears_the_save_then_says_the_line()
+    {
+        _game.ReadCardAsync(Arg.Any<CancellationToken>())
+            .Returns(new BoardCard { Lines = ["Aceitar Visão Atual", "Negociar"] });
+        _game.SayAsync(1, Arg.Any<CancellationToken>()).Returns(new BoardCard { Lines = ["Sem julgamento"] });
+
+        var answer = (await _board.AnswerAsync("1", apply: true)).Value;
+
+        Received.InOrder(() =>
+        {
+            _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
+            _game.SayAsync(1, Arg.Any<CancellationToken>());
+        });
+        Assert.True(answer.Applied);
+        Assert.Equal("Negociar", answer.Line);
+        Assert.Equal("Sem julgamento", answer.After!.Lines[0]);
+    }
+
+    [Fact]
+    public async Task The_budget_dry_run_reads_the_menu_and_opens_nothing()
+    {
+        _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
+
+        var plan = (await _board.AdjustBudgetAsync(0.4f, apply: false)).Value;
+
+        Assert.False(plan.Applied);
+        Assert.Equal("R$30 MI / R$52.5 mil p/s", plan.Budgets);
+        await _game.DidNotReceiveWithAnyArgs().OpenBudgetPanelAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetBudgetSliderAsync(default);
+    }
+
+    [Fact]
+    public async Task Applying_a_budget_split_clears_the_save_then_moves_the_slider()
+    {
+        _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
+        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>())
+            .Returns(new BudgetPanel { SliderValue = 0.5f, CanEdit = true, TransferBudget = "R$30 MI" });
+        _game.SetBudgetSliderAsync(0.4f, Arg.Any<CancellationToken>())
+            .Returns(new BudgetPanel { SliderValue = 0.4f, CanEdit = true, TransferBudget = "R$25 MI" });
+
+        var plan = (await _board.AdjustBudgetAsync(0.4f, apply: true)).Value;
+
+        Received.InOrder(() =>
+        {
+            _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
+            _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>());
+            _game.SetBudgetSliderAsync(0.4f, Arg.Any<CancellationToken>());
+        });
+        Assert.True(plan.Applied);
+        Assert.Equal("R$30 MI", plan.Before!.TransferBudget);
+        Assert.Equal("R$25 MI", plan.After!.TransferBudget);
+    }
+
+    [Fact]
+    public async Task A_budget_the_board_does_not_let_the_user_edit_fails()
+    {
+        _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
+        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>()).Returns(new BudgetPanel { SliderValue = 0.5f, CanEdit = false });
+
+        var result = await _board.AdjustBudgetAsync(0.4f, apply: true);
+
+        Assert.True(result.IsFailed);
+        await _game.DidNotReceiveWithAnyArgs().SetBudgetSliderAsync(default);
+    }
+
+    [Fact]
+    public async Task A_budget_adjustment_the_menu_does_not_offer_fails_before_writing()
+    {
+        _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns((string?)null);
+
+        var result = await _board.AdjustBudgetAsync(0.4f, apply: true);
+
+        Assert.True(result.IsFailed);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
 }
