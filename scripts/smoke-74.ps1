@@ -7,7 +7,9 @@ $api = 'http://localhost:5120/api/v1'
 
 function Post($path, $body) {
     try {
-        $r = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$api$path" -ContentType 'application/json' -Body ($body | ConvertTo-Json -Compress) -TimeoutSec 120
+        # Windows PowerShell 5.1 sends a string body as Latin-1: send UTF-8 bytes, or the menu's accented labels break.
+        $bytes = [Text.Encoding]::UTF8.GetBytes(($body | ConvertTo-Json -Compress))
+        $r = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "$api$path" -ContentType 'application/json; charset=utf-8' -Body $bytes -TimeoutSec 120
         return @{ Status = [int]$r.StatusCode; Body = $r.Content }
     } catch [System.Net.WebException] {
         $resp = $_.Exception.Response
