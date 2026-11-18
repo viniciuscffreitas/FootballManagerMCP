@@ -454,6 +454,8 @@ internal sealed class ScoutingEditorBridgeClient(
         var picked = ItemAt(menu.Values.Items, entry)
                      ?? throw new GameRejectedException("The game's menu no longer has that entry: run the dry run again.");
 
+        // The entry's own event, as a click passes it: EventFmxDoAction (44) for one that does something, 0 for one that
+        // opens a panel or card.
         await bridge.WriteAsync<JsonElement>(
             OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)),
@@ -471,7 +473,7 @@ internal sealed class ScoutingEditorBridgeClient(
 
         foreach (var index in entry.Skip(1))
         {
-            var children = item?.ChildList ?? item?.RowData?.ChildList;
+            var children = item?.ChildList;
             item = children is not null && index < children.Count ? children[index] : null;
         }
 

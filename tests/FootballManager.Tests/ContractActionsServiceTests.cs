@@ -46,6 +46,15 @@ public class ContractActionsServiceTests
     }
 
     [Fact]
+    public async Task A_release_kind_it_doesnt_know_is_refused()
+    {
+        var result = await _service.ReleaseAsync(Reserve, (ReleaseKind)7, apply: false, confirmRelease: false);
+
+        Assert.True(result.HasError<ValidationError>());
+        await _editor.DidNotReceiveWithAnyArgs().GetMenuAsync(default, default);
+    }
+
+    [Fact]
     public async Task Applying_a_release_needs_its_explicit_confirmation()
     {
         var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: false);

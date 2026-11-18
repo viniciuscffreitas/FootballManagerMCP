@@ -46,6 +46,11 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     public Task<Result<ContractChange>> ReleaseAsync(
         int playerId, ReleaseKind how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default)
     {
+        if (!Enum.IsDefined(how))
+        {
+            return Task.FromResult(Result.Fail<ContractChange>(new ValidationError(nameof(how), ["Say how: Free, Mutual or EndOfContract."])));
+        }
+
         if (apply && !confirmRelease)
         {
             return Task.FromResult(Result.Fail<ContractChange>(new ValidationError("confirmRelease",
@@ -56,7 +61,8 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         {
             ReleaseKind.Mutual => PlayerMenuAction.MutualTermination,
             ReleaseKind.EndOfContract => PlayerMenuAction.SetForRelease,
-            _ => PlayerMenuAction.ReleaseOnFreeTransfer
+            ReleaseKind.Free => PlayerMenuAction.ReleaseOnFreeTransfer,
+            _ => throw new ArgumentOutOfRangeException(nameof(how), how, null)
         };
 
         return ChangeAsync(playerId, action, null, apply, cancellationToken);
@@ -126,9 +132,12 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
             if (!apply)
             {
-                change.Notes.Add(entry.Confirmation is null
-                    ? "The game's menu states no confirmation for it: applying answers \"Yes\" to whatever dialog the game shows, and returns its text."
-                    : "Show the user the game's confirmation first: applying answers \"Yes\" to it.");
+                change.Notes.Add(entry.Confirmation is not null
+                    ? "Show the user the game's confirmation first: applying answers \"Yes\" to it."
+                    : IsRelease(action)
+                        ? "The game's menu doesn't state what letting him go costs: tell the user the cost isn't known before applying " +
+                          "(get_contracts shows his wage and time left). Applying answers \"Yes\" to the game's dialog and returns its text."
+                        : "The game's menu states no confirmation for it: applying answers \"Yes\" to whatever dialog the game shows, and returns its text.");
                 return Result.Ok(change);
             }
 
@@ -241,6 +250,11 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         var letters = text.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD)
             .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark);
         return new string(letters.ToArray());
+    }
+
+    private static bool IsRelease(PlayerMenuAction action)
+    {
+        return action is PlayerMenuAction.ReleaseOnFreeTransfer or PlayerMenuAction.MutualTermination or PlayerMenuAction.SetForRelease;
     }
 
     private static string Describe(PlayerMenuAction action)

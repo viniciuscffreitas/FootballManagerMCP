@@ -50,7 +50,7 @@ public static class ContractsTools
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
         var response = await http.PostAsJsonAsync(
-            $"/api/v1/contracts/release?apply={Lower(apply)}&confirmRelease={Lower(confirmRelease)}", new { playerId, how });
+            $"/api/v1/contracts/release?apply={apply.ToString().ToLowerInvariant()}&confirmRelease={confirmRelease.ToString().ToLowerInvariant()}", new { playerId, how });
         return await response.ReadContentOrError();
     }
 
@@ -70,7 +70,7 @@ public static class ContractsTools
         [Description("False (the default) only checks. True changes it: only once the user has agreed.")] bool apply = false)
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
-        var response = await http.PostAsJsonAsync($"/api/v1/contracts/squad-status?apply={Lower(apply)}", new { playerId, status });
+        var response = await http.PostAsJsonAsync($"/api/v1/contracts/squad-status?apply={apply.ToString().ToLowerInvariant()}", new { playerId, status });
         return await response.ReadContentOrError();
     }
 
@@ -88,12 +88,7 @@ public static class ContractsTools
         [Description("False (the default) only checks. True hands it over: only once the user has agreed.")] bool apply = false)
     {
         var http = httpFactory.CreateClient("FootballManagerApi");
-        var response = await http.PostAsJsonAsync($"/api/v1/contracts/dof-renewal?apply={Lower(apply)}", new { playerId });
+        var response = await http.PostAsJsonAsync($"/api/v1/contracts/dof-renewal?apply={apply.ToString().ToLowerInvariant()}", new { playerId });
         return await response.ReadContentOrError();
-    }
-
-    private static string Lower(bool value)
-    {
-        return value.ToString().ToLowerInvariant();
     }
 }
