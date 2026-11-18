@@ -13,6 +13,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFinancesService, FinancesService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddScoped<ISquadNumbersService, SquadNumbersService>();
         services.AddScoped<IStaffEditingService, StaffEditingService>();
         services.AddScoped<IContractsService, ContractsService>();
         services.AddScoped<ISquadDynamicsService, SquadDynamicsService>();

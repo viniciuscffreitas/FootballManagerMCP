@@ -56,6 +56,9 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 |---|---|---|
 | Squad | `get_squad` | Your first team: positions, condition, morale, season numbers; attributes on request |
 | | `get_availability` | Who can play the next match: the injured and their time out, the suspended (scope, matches left, reason), the match's registration and squad size rules, and every player's condition and sharpness |
+| | `get_squad_registration` | Each competition's registration: window and deadline, rules with the squad's value against each, who is registered and who could be |
+| | `register_players` | Registers or unregisters players in one competition while its window is open; the dry run warns of each rule the change breaks (squad size, goalkeepers) |
+| | `set_squad_number` | Gives a player a free squad number; asking the assistant to number everyone is a dry run only for now |
 | | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |
 | | `manage_staff` | Runs a staff action from the game's own menu: sack or mutual termination, coaching or leadership course, new contract on a staff member; job adverts (any, coaching, scouting, medical) on the club |
 | | `get_contracts` | Your first team's contracts: wage, end date and time left, type, agreed playing time, release clause, clauses, renewal offer and the staff's advice; optionally only those ending by a date |
@@ -122,7 +125,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
   `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`,
   `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`,
-  `negotiate_contract`, `manage_player_exit`, `manage_staff`) only check and describe the change unless they're called with `apply: true`. Their
+  `negotiate_contract`, `manage_player_exit`, `register_players`, `set_squad_number`, `manage_staff`) only check and describe the change unless they're called with `apply: true`. Their
   descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
@@ -143,7 +146,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game, or, for
   the contract negotiation of an accepted offer, with `negotiate_contract`.
 - **Your career is checked and copied before a change.** Before any change to your career applies (`set_tactic`,
-  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`, `set_captains`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`, `register_players`, `set_squad_number`, `set_captains`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
   the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
   Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
   club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on
