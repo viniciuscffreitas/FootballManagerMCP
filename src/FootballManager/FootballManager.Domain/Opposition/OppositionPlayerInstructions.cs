@@ -26,7 +26,8 @@ public class OppositionPlayerInstructions
             OppositionInstruction.Marking => Marking,
             OppositionInstruction.Pressing => Pressing,
             OppositionInstruction.Tackling => Tackling,
-            _ => ShowOntoFoot
+            OppositionInstruction.ShowOntoFoot => ShowOntoFoot,
+            _ => throw new ArgumentOutOfRangeException(nameof(instruction), instruction, null)
         };
     }
 }

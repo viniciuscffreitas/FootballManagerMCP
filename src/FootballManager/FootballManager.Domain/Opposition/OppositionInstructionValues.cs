@@ -12,7 +12,7 @@ public static class OppositionInstructionValues
             OppositionInstruction.Marking or OppositionInstruction.Pressing => [None, "never", "always"],
             OppositionInstruction.Tackling => [None, "normal", "soft", "hard"],
             OppositionInstruction.ShowOntoFoot => [None, "left", "right", "weaker"],
-            _ => [None]
+            _ => throw new ArgumentOutOfRangeException(nameof(instruction), instruction, null)
         };
     }
 }

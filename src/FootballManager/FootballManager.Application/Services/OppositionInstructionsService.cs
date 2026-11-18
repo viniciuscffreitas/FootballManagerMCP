@@ -80,8 +80,9 @@ public class OppositionInstructionsService(IOppositionInstructionsGameClient gam
                 }
             }
 
-            await Task.Delay(SettlePause, cancellationToken);
-            await ReadBackAsync(change, cancellationToken);
+            // The writes are in: a caller giving up now must not lose the report of what went in.
+            await Task.Delay(SettlePause, CancellationToken.None);
+            await ReadBackAsync(change, CancellationToken.None);
             return Result.Ok(change);
         }
         catch (GameUnavailableException exception)
@@ -205,7 +206,7 @@ public class OppositionInstructionsService(IOppositionInstructionsGameClient gam
         {
             change.After = await game.GetAsync(cancellationToken);
         }
-        catch (GameUnavailableException exception)
+        catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException or HttpRequestException)
         {
             change.Notes.Add($"Sent, but the instructions couldn't be read back ({exception.Message}): check them with a dry run before sending again.");
             return;

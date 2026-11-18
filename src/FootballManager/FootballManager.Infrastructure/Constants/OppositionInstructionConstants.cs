@@ -31,7 +31,8 @@ internal static class OppositionInstructionConstants
             OppositionInstruction.Marking => "OppositionPlayerMarking",
             OppositionInstruction.Pressing => "OppositionPlayerPressingTrigger",
             OppositionInstruction.Tackling => "OppositionPlayerTackling",
-            _ => "OppositionPlayerShowOnToFoot"
+            OppositionInstruction.ShowOntoFoot => "OppositionPlayerShowOnToFoot",
+            _ => throw new ArgumentOutOfRangeException(nameof(instruction), instruction, null)
         };
     }
 
