@@ -192,6 +192,17 @@ public class RegistrationServiceTests
     }
 
     [Fact]
+    public async Task A_player_the_registration_lists_nowhere_is_found_in_the_club()
+    {
+        // A youth player unticked from the cup shows in neither of its lists, seen 18/11/2026.
+        _game.FindClubPlayerAsync(40, Arg.Any<CancellationToken>()).Returns(new RegistrationPlayer { Id = 40, Name = "Nicola Profeta" });
+
+        var plan = (await _registration.ChangeRegistrationAsync(Cup, [40], null, apply: false)).Value;
+
+        Assert.Equal("Nicola Profeta", Assert.Single(plan.Register).Name);
+    }
+
+    [Fact]
     public async Task A_name_several_registrations_hold_is_refused()
     {
         var result = await _registration.ChangeRegistrationAsync("Bra", [Youngster], null, apply: false);

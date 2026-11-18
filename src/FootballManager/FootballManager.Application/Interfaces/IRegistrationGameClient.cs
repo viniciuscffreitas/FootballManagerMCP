@@ -11,6 +11,12 @@ public interface IRegistrationGameClient
 {
     Task<SquadRegistration> GetRegistrationAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// A player of the club the game lists anywhere (the first team, a registration): someone a registration's own
+    /// lists leave out, e.g. a youth player unticked from it. Null when the game lists no one with that id.
+    /// </summary>
+    Task<RegistrationPlayer?> FindClubPlayerAsync(int playerId, CancellationToken cancellationToken = default);
+
     /// <summary>Whether the game lets the user register or unregister the player in that registration now.</summary>
     Task<bool> CanChangeRegistrationAsync(int competitionIndex, string competitionName, int playerId, CancellationToken cancellationToken = default);
 

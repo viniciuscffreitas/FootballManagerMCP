@@ -83,9 +83,10 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
                     return Fail("register", $"{already.Name} ({id}) is already registered for {target.Name}.");
                 }
 
-                if (target.Unregistered.FirstOrDefault(p => p.Id == id) is not { } player)
+                // The game's unregistered list leaves out players unticked before (a youth player): the club's lists find them.
+                if ((target.Unregistered.FirstOrDefault(p => p.Id == id) ?? await game.FindClubPlayerAsync(id, cancellationToken)) is not { } player)
                 {
-                    return Fail("register", $"{id} isn't a player the game can register for {target.Name} (get_squad_registration lists who is).");
+                    return Fail("register", $"{id} isn't a player of the club the game lists (get_squad_registration and get_squad list who is).");
                 }
 
                 change.Register.Add(player);

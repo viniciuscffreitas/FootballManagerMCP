@@ -24,6 +24,10 @@ internal static class RegistrationConstants
     public const string Registered = "RegisteredPlayers";
     public const string Unregistered = "UnregisteredPlayers";
     public const string CanChange = "CanChangeSelection";
+    public const string Selected = "Selected";
+
+    // Both screens commit their edit session with it, no data.
+    public const string ConfirmEvent = "EventFmxConfirmChanges";
     public const string Person = "Person";
 
     public static readonly string[] CompetitionProperties =
@@ -42,6 +46,7 @@ internal static class RegistrationConstants
     public const string NumbersFilter = "SquadNumbersFilter";
     public const int FirstTeamFilter = 2;
     public const string CanChangeNumber = "CanChangeSquadNumber";
+    public const string NumberSelected = "NumSelected";
     public const string NumberDropdown = "SquadNumbersDropdown";
     public const string SuggestedNumber = "SuggestedNumber.SquadNumber";
     public const string NeedingNumbers = TeamConstants.OwnTeam + ".PlayersThatNeedSquadNumbers";

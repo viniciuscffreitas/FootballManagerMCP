@@ -1,18 +1,24 @@
+using System.Globalization;
+using System.Text.Json;
 using FootballManager.Application.Exceptions;
 using FootballManager.Application.Interfaces;
 using FootballManager.Domain.Registration;
 using FootballManager.Infrastructure.Constants;
 using FootballManager.Infrastructure.Dtos;
 using FootballManager.Infrastructure.Dtos.Registration;
+using FootballManager.Infrastructure.Dtos.Tactics.Editing;
 
 namespace FootballManager.Infrastructure.Clients;
 
-// Registrations and squad numbers through the MCPFM plugin, read from the edit sessions the game's screens bind (seen
-// 18/11/2026). The writes aren't proven in the game yet (ticket #73): each refuses before sending anything.
+// Registrations and squad numbers through the MCPFM plugin, on the edit sessions the game's screens bind (proven
+// 18/11/2026 in the test save): a tick is a /set of the session's "Selected" with the player passed as Person, a number a
+// /set of "NumSelected"; each screen's EventFmxConfirmChanges then commits it. The assistant's numbering (the screen's
+// EventFmxAutoSelect) changed nothing when sent this way, so it refuses before sending.
 internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistrationGameClient
 {
-    private const string NotProven =
-        "This tool can't write it yet: the game's way to do it isn't proven in the test save (ticket #73). Nothing was sent.";
+    private const string AssistantNotProven =
+        "This tool can't ask the assistant yet: the event the screen sends changed nothing in the test save (ticket #73). " +
+        "Nothing was sent; give each player a number instead.";
 
     public async Task<SquadRegistration> GetRegistrationAsync(CancellationToken cancellationToken = default)
     {
@@ -42,11 +48,11 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         int competitionIndex, string competitionName, int playerId, CancellationToken cancellationToken = default)
     {
         var session = await SessionAsync(competitionIndex, competitionName, cancellationToken);
-        var player = await PlayerListAsync(competitionIndex, playerId, cancellationToken)
-                     ?? throw new GameRejectedException($"{playerId} is in neither list of {competitionName}.");
+        var person = await PersonAsync(competitionIndex, playerId, cancellationToken)
+                     ?? throw new GameRejectedException($"{playerId} isn't a player of the club the game lists.");
 
         var tick = await bridge.GetRecordAsync<BridgeRegistrationDto>(
-            session.Ref(RegistrationConstants.Person, RegistrationConstants.ById(player, playerId))
+            session.Ref(RegistrationConstants.Person, person)
                 .Props([RegistrationConstants.Name, RegistrationConstants.CanChange]),
             cancellationToken);
 
@@ -54,17 +60,43 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         return tick.Values.CanChange == true;
     }
 
+    public async Task<RegistrationPlayer?> FindClubPlayerAsync(int playerId, CancellationToken cancellationToken = default)
+    {
+        if (await PersonAsync(null, playerId, cancellationToken) is not { } path)
+        {
+            return null;
+        }
+
+        var person = await bridge.GetRecordAsync<BridgeRegistrationPlayerDto>(
+            BridgeQuery.FromHuman().Base(path).WithHumanAndTeam().Props(RegistrationConstants.PlayerProperties), cancellationToken);
+        Answered(person, RegistrationConstants.PlayerProperties);
+        return Player(person.Values, path);
+    }
+
     public async Task SetRegisteredAsync(
         int competitionIndex, string competitionName, int playerId, bool registered, CancellationToken cancellationToken = default)
     {
-        await SessionAsync(competitionIndex, competitionName, cancellationToken);
-        throw new GameRejectedException(NotProven);
+        var person = await PersonAsync(competitionIndex, playerId, cancellationToken)
+                     ?? throw new GameRejectedException($"{playerId} isn't a player of the club the game lists. Nothing was sent.");
+
+        // The registration is checked last, right before the send.
+        var session = await SessionAsync(competitionIndex, competitionName, cancellationToken);
+        var result = await bridge.WriteAsync<BridgeWriteResultDto>(
+            session.Ref(RegistrationConstants.Person, person)
+                .ToWrite("/set", ("path", RegistrationConstants.Selected), ("value", registered ? "true" : "false")),
+            cancellationToken);
+
+        // The plugin reads the tick back: one the game didn't take is not written.
+        if (result.After is not { } after || after.ValueKind != (registered ? JsonValueKind.True : JsonValueKind.False))
+        {
+            throw new GameRejectedException($"The game didn't take the tick for {playerId} in {competitionName}.");
+        }
     }
 
     public async Task ConfirmRegistrationAsync(int competitionIndex, string competitionName, CancellationToken cancellationToken = default)
     {
-        await SessionAsync(competitionIndex, competitionName, cancellationToken);
-        throw new GameRejectedException(NotProven);
+        var session = await SessionAsync(competitionIndex, competitionName, cancellationToken);
+        await bridge.WriteAsync<JsonElement>(Confirm(session), cancellationToken);
     }
 
     public async Task<PlayerSquadNumber?> GetSquadNumberAsync(int playerId, CancellationToken cancellationToken = default)
@@ -124,14 +156,67 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
                ?? throw new GameUnavailableException("The game didn't say which players need a squad number.");
     }
 
-    public Task SetSquadNumberAsync(int playerId, int number, CancellationToken cancellationToken = default)
+    // As the player's dropdown on the squad numbers screen, then the screen's confirm: the game then gives him the
+    // number (seen 18/11/2026: João Fernandes -1 → 2 → -1). The dropdown takes the number a moment later than it says.
+    public async Task SetSquadNumberAsync(int playerId, int number, CancellationToken cancellationToken = default)
     {
-        throw new GameRejectedException(NotProven);
+        var person = RegistrationConstants.ById(RegistrationConstants.FirstTeamPlayers, playerId);
+        var result = await bridge.WriteAsync<BridgeWriteResultDto>(
+            NumbersSession().Ref(RegistrationConstants.Person, person)
+                .ToWrite("/set", ("path", RegistrationConstants.NumberSelected), ("value", number.ToString(CultureInfo.InvariantCulture))),
+            cancellationToken);
+
+        if (result.Changed != true)
+        {
+            throw new GameRejectedException($"The game didn't take number {number} for {playerId}. Nothing was confirmed.");
+        }
+
+        await bridge.WriteAsync<JsonElement>(Confirm(NumbersSession()), cancellationToken);
     }
 
     public Task AskAssistantToNumberAsync(CancellationToken cancellationToken = default)
     {
-        throw new GameRejectedException(NotProven);
+        throw new GameRejectedException(AssistantNotProven);
+    }
+
+    // The screen's Confirm: EventFmxConfirmChanges on its edit session, with no data. It commits without the dialog the
+    // button shows ("Enviar a numeração atual do elenco?").
+    private static string Confirm(BridgeQuery session)
+    {
+        return session.ToWrite("/native", ("event", RegistrationConstants.ConfirmEvent), ("data", "null"), ("template", "none"));
+    }
+
+    // Where the game lists the player, to pass him as Person: the registration's own lists, the first team, then the
+    // other registrations (a youth player unticked from one shows in no list of it, seen 18/11/2026).
+    private async Task<string?> PersonAsync(int? competitionIndex, int playerId, CancellationToken cancellationToken)
+    {
+        var registrations = await bridge.GetListAsync<BridgeRegistrationDto>(
+            BridgeQuery.FromHuman().List(RegistrationConstants.Competitions).WithHumanAndTeam().Props([RegistrationConstants.Name]),
+            cancellationToken);
+        var lists = new List<string>();
+
+        if (competitionIndex is { } own)
+        {
+            lists.Add($"{RegistrationConstants.Competition(own)}.{RegistrationConstants.Registered}");
+            lists.Add($"{RegistrationConstants.Competition(own)}.{RegistrationConstants.Unregistered}");
+        }
+
+        lists.Add(RegistrationConstants.FirstTeamPlayers);
+        lists.AddRange(Enumerable.Range(0, registrations.Items.Count).Where(i => i != competitionIndex)
+            .Select(i => $"{RegistrationConstants.Competition(i)}.{RegistrationConstants.Registered}"));
+
+        foreach (var list in lists)
+        {
+            var players = await bridge.GetListAsync<BridgeRegistrationPlayerDto>(
+                BridgeQuery.FromHuman().List(list).WithHumanAndTeam().Props([GameConstants.UniqueId]), cancellationToken);
+
+            if (players.Items.Any(item => item.Values.Id == playerId))
+            {
+                return RegistrationConstants.ById(list, playerId);
+            }
+        }
+
+        return null;
     }
 
     private static BridgeQuery NumbersSession()
@@ -161,24 +246,6 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         return BridgeQuery.FromHuman().Base(RegistrationConstants.Competition(index)).WithHumanAndTeam();
     }
 
-    // Which of the registration's lists holds the player: the game passes him from there as Person.
-    private async Task<string?> PlayerListAsync(int index, int playerId, CancellationToken cancellationToken)
-    {
-        foreach (var list in new[] { RegistrationConstants.Registered, RegistrationConstants.Unregistered })
-        {
-            var path = $"{RegistrationConstants.Competition(index)}.{list}";
-            var players = await bridge.GetListAsync<BridgeRegistrationPlayerDto>(
-                BridgeQuery.FromHuman().List(path).WithHumanAndTeam().Props([GameConstants.UniqueId]), cancellationToken);
-
-            if (players.Items.Any(item => item.Values.Id == playerId))
-            {
-                return path;
-            }
-        }
-
-        return null;
-    }
-
     private async Task<List<RegistrationPlayer>> PlayersAsync(int index, string list, CancellationToken cancellationToken)
     {
         var players = await bridge.GetListAsync<BridgeRegistrationPlayerDto>(
@@ -189,15 +256,20 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         return players.Items.Select(item =>
         {
             Answered(item, [GameConstants.UniqueId, GameConstants.Name]);
-            return new RegistrationPlayer
-            {
-                // A player without an id is an unknown read, never player 0.
-                Id = item.Values.Id ?? throw new GameUnavailableException($"The game didn't give the id of a player in {list}."),
-                Name = item.Values.Name ?? string.Empty,
-                SquadNumber = Number(item.Values.SquadNumber),
-                IsGoalkeeper = item.Values.IsGoalkeeper == true
-            };
+            return Player(item.Values, list);
         }).ToList();
+    }
+
+    private static RegistrationPlayer Player(BridgeRegistrationPlayerDto values, string list)
+    {
+        return new RegistrationPlayer
+        {
+            // A player without an id is an unknown read, never player 0.
+            Id = values.Id ?? throw new GameUnavailableException($"The game didn't give the id of a player in {list}."),
+            Name = values.Name ?? string.Empty,
+            SquadNumber = Number(values.SquadNumber),
+            IsGoalkeeper = values.IsGoalkeeper == true
+        };
     }
 
     private static CompetitionRegistration Competition(
