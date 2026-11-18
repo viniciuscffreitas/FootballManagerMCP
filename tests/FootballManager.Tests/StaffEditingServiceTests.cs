@@ -152,6 +152,16 @@ public class StaffEditingServiceTests
             Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task An_apply_without_an_action_is_refused_and_sends_nothing()
+    {
+        var result = await _staff.RunActionAsync(Coach, null, null, apply: true);
+
+        Assert.Contains("action", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+    }
+
     private static string Messages<T>(Result<T> result)
     {
         Assert.True(result.IsFailed);

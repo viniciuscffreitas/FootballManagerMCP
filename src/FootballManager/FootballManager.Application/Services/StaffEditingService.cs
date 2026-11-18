@@ -20,7 +20,7 @@ public interface IStaffEditingService
     /// than one entry it can pick.
     /// </param>
     Task<Result<StaffAction>> RunActionAsync(
-        int? staffId, StaffMenuAction action, IReadOnlyList<string>? entry, bool apply, CancellationToken cancellationToken = default);
+        int? staffId, StaffMenuAction? action, IReadOnlyList<string>? entry, bool apply, CancellationToken cancellationToken = default);
 }
 
 // Staff changes go through the menus the game builds for them, as the staff screen's do: the game offers only what fits
@@ -40,8 +40,14 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
     ];
 
     public async Task<Result<StaffAction>> RunActionAsync(
-        int? staffId, StaffMenuAction action, IReadOnlyList<string>? entry, bool apply, CancellationToken cancellationToken = default)
+        int? staffId, StaffMenuAction? requested, IReadOnlyList<string>? entry, bool apply, CancellationToken cancellationToken = default)
     {
+        // No default action: a request that leaves it out must not fall on the enum's first value (Dismiss).
+        if (requested is not { } action)
+        {
+            return Fail("action", "Name the action to run, e.g. CoachingCourse or AdvertiseCoachingJob.");
+        }
+
         if (OnTheClub.Contains(action) && staffId is not null)
         {
             return Fail("staffId", $"{action} runs on the club, not on a staff member: leave staffId out.");
