@@ -366,6 +366,25 @@ public class ContractActionsServiceTests
         Assert.Equal(["Titular", "Rotação", "Reserva"], change.Choices);
     }
 
+    // Without the status before, a lost pick's read back couldn't tell the change from a status he already had.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_status_change_on_an_unknown_current_status_is_refused_and_nothing_is_written(bool listed)
+    {
+        Offered(PlayerMenuAction.SetPlayingTime);
+        StatusMenu();
+        _contracts.GetContractsAsync(Arg.Any<CancellationToken>())
+            .Returns(listed ? [new SquadPlayerContract { PlayerId = Reserve, Name = "Reserva" }] : new List<SquadPlayerContract>());
+
+        var result = await _service.SetSquadStatusAsync(Reserve, "Rotação", apply: true);
+
+        Assert.Contains(result.Errors.OfType<ValidationError>(), error => error.PropertyName == "status");
+        Assert.Contains("current", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
+    }
+
     [Fact]
     public async Task A_status_read_back_other_than_the_one_asked_for_is_not_confirmed()
     {

@@ -127,6 +127,14 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             {
                 return Fail("status", $"{player.Name}'s contract already promises '{now}': there is nothing to change.");
             }
+
+            // Without the status before, the read back of a pick the game didn't answer can't tell the change from a
+            // status he already had: it isn't sent.
+            if (apply && action == PlayerMenuAction.SetPlayingTime && current?.AgreedPlayingTime is null)
+            {
+                return Fail("status", $"The game didn't give {player.Name}'s current squad status (get_contracts), so the change " +
+                                      "couldn't be told from it: nothing was sent. Read his contracts again and retry.");
+            }
             // A release is sent only on the terms the user agreed to: the confirmation the menu shows now must be the one
             // approved. Without one, its dialog couldn't be told from another one, so it isn't sent at all.
             if (apply && IsRelease(action))
