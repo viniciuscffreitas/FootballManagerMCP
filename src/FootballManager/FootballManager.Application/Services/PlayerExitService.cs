@@ -105,6 +105,16 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             await editor.RunMenuEntryAsync(playerId, menuAction, path, cancellationToken);
 
             exit.Applied = true;
+
+            // An offer to clubs or a loan extension goes to other clubs, who answer in the inbox later: where he
+            // stands doesn't change, so it's read once.
+            if (action is PlayerExitAction.OfferToClubs or PlayerExitAction.ExtendLoan)
+            {
+                exit.Status = StatusOf(await editor.GetOfferedActionsAsync(playerId, cancellationToken));
+                exit.Notes.Add("The clubs answer in the inbox, usually within a few days of the game's calendar: get_inbox.");
+                return Result.Ok(exit);
+            }
+
             exit.Status = await StatusAfterAsync(playerId, before, cancellationToken);
 
             if (SameAs(exit.Status, before))
@@ -207,7 +217,8 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             PlayerExitAction.RemoveFromLoanList => PlayerMenuAction.RemoveFromLoanList,
             PlayerExitAction.OfferToClubs => PlayerMenuAction.OfferToClubs,
             PlayerExitAction.Recall => PlayerMenuAction.RecallFromLoan,
-            _ => PlayerMenuAction.ExtendLoan
+            PlayerExitAction.ExtendLoan => PlayerMenuAction.ExtendLoan,
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
         };
     }
 
@@ -220,7 +231,8 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             PlayerExitAction.RemoveFromLoanList => "taking him off the loan list",
             PlayerExitAction.OfferToClubs => "offering him to clubs",
             PlayerExitAction.Recall => "a recall from loan",
-            _ => "a loan extension"
+            PlayerExitAction.ExtendLoan => "a loan extension",
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
         };
     }
 

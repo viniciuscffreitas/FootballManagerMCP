@@ -2,9 +2,9 @@
 
 Run on the Windows PC, with the test save 'MCPFM investigation' loaded and no match being played:
     python smoke-68.py menus <playerId>...         # read only: every exit action's dry run for each player
-    python smoke-68.py list <playerId> <choice>    # SetTransferStatus to <choice>, the status read back, then off the list
+    python smoke-68.py list <playerId> <choice>    # x2: SetTransferStatus to <choice>, the status read back, then off the list
     python smoke-68.py edges <playerId>            # actions the menu doesn't offer: refused, nothing sent (x2)
-    python smoke-68.py recall                      # recall a player out on loan, only if his menu offers it
+    python smoke-68.py recall                      # recall a player out on loan (apply), only if his menu offers it
 Every write first checks GET /session -> isInvestigationSave true, and stops otherwise.
 """
 import json
@@ -69,7 +69,13 @@ def list_and_back(player, choice):
     check(status == 200 and not (off["status"]["transferListed"] or off["status"]["loanListed"]), "off the list again")
 
 
+def backups():
+    _, listed = call("GET", API + "/saves/backups")
+    return json.dumps(listed, sort_keys=True)
+
+
 def edges(player):
+    before = backups()
     for _ in range(2):
         status, _ = exit_(player, "RemoveFromLoanList", apply=True)
         check(status == 400, "taking him off a list he isn't on is refused")
@@ -77,6 +83,7 @@ def edges(player):
         check(status == 400, "recalling a player not out on loan is refused")
     status, _ = exit_(999999999, "Recall")
     check(status == 404, "an unknown player is not found")
+    check(backups() == before, "no save copy was made for a refused change")
 
 
 def recall():
@@ -87,6 +94,8 @@ def recall():
         status, plan = exit_(player, "Recall")
         if status == 200:
             print(f"menu offers a recall for {player}: {plan['choices']}")
+            status, after = exit_(player, "Recall", apply=True)
+            check(status == 200 and not after["status"]["outOnLoan"], "recalled: no longer out on loan")
             return
     print("no player out on loan has a recall in his menu: not run")
 
@@ -96,7 +105,8 @@ if __name__ == "__main__":
     if command == "menus":
         menus([int(a) for a in args])
     elif command == "list":
-        list_and_back(int(args[0]), args[1])
+        for _ in range(2):
+            list_and_back(int(args[0]), args[1])
     elif command == "edges":
         edges(int(args[0]))
     elif command == "recall":

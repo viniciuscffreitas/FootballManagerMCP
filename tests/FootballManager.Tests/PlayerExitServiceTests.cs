@@ -88,27 +88,35 @@ public class PlayerExitServiceTests
     }
 
     [Fact]
-    public async Task A_menu_of_statuses_lists_them_and_applies_the_one_named()
+    public async Task A_menu_of_statuses_lists_them_on_the_dry_run()
     {
-        Player(1);
-        Offered(1, PlayerMenuAction.SetTransferStatus);
-        Menu(1, PlayerMenuAction.SetTransferStatus, new MenuEntry
-        {
-            Label = "Transfer status",
-            Children =
-            [
-                new MenuEntry { Label = "Transfer list", CanRun = true },
-                new MenuEntry { Label = "Loan list", CanRun = true }
-            ]
-        });
+        StatusMenu(1);
 
         var plan = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: null, apply: false)).Value;
-        var unnamed = await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: null, apply: true);
-        await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "transfer status > loan list", apply: true);
 
         Assert.Equal(["Transfer status > Transfer list", "Transfer status > Loan list"], plan.Choices);
         Assert.Null(plan.Choice);
-        Assert.True(unnamed.IsFailed);
+    }
+
+    [Fact]
+    public async Task Applying_a_menu_of_statuses_needs_a_choice()
+    {
+        StatusMenu(1);
+
+        var result = await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: null, apply: true);
+
+        Assert.True(result.IsFailed);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
+        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+    }
+
+    [Fact]
+    public async Task Applying_a_menu_of_statuses_sends_the_one_named()
+    {
+        StatusMenu(1);
+
+        await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "transfer status > loan list", apply: true);
+
         await _editor.Received(1).RunMenuEntryAsync(1, PlayerMenuAction.SetTransferStatus,
             Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0, 1 })), Arg.Any<CancellationToken>());
     }
@@ -139,6 +147,21 @@ public class PlayerExitServiceTests
     private static HashSet<PlayerMenuAction> Set(params PlayerMenuAction[] actions)
     {
         return actions.ToHashSet();
+    }
+
+    private void StatusMenu(int playerId)
+    {
+        Player(playerId);
+        Offered(playerId, PlayerMenuAction.SetTransferStatus);
+        Menu(playerId, PlayerMenuAction.SetTransferStatus, new MenuEntry
+        {
+            Label = "Transfer status",
+            Children =
+            [
+                new MenuEntry { Label = "Transfer list", CanRun = true },
+                new MenuEntry { Label = "Loan list", CanRun = true }
+            ]
+        });
     }
 
     private void Player(int id)
