@@ -23,8 +23,13 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     private static readonly TimeSpan StatePoll = TimeSpan.FromMilliseconds(400);
 
     public Task<Result<ContractChange>> ReleaseAsync(
-        int playerId, ReleaseKind? how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default)
+        int? playerId, ReleaseKind? how, bool apply, bool confirmRelease, CancellationToken cancellationToken = default)
     {
+        if (playerId is not { } id)
+        {
+            return Task.FromResult(NoPlayer());
+        }
+
         // Required: the enum's 0 is Free, the release the club pays for, so an omitted kind must not read as it.
         if (how is not { } kind || !Enum.IsDefined(kind))
         {
@@ -45,23 +50,33 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             _ => throw new ArgumentOutOfRangeException(nameof(how), kind, null)
         };
 
-        return ChangeAsync(playerId, action, null, apply, cancellationToken);
+        return ChangeAsync(id, action, null, apply, cancellationToken);
     }
 
-    public Task<Result<ContractChange>> SetSquadStatusAsync(int playerId, string status, bool apply, CancellationToken cancellationToken = default)
+    public Task<Result<ContractChange>> SetSquadStatusAsync(int? playerId, string? status, bool apply, CancellationToken cancellationToken = default)
     {
+        if (playerId is not { } id)
+        {
+            return Task.FromResult(NoPlayer());
+        }
+
         if (string.IsNullOrWhiteSpace(status))
         {
             return Task.FromResult(Result.Fail<ContractChange>(new ValidationError(nameof(status),
                 ["Name the squad status as the game's menu labels it, e.g. \"Rotação\"."])));
         }
 
-        return ChangeAsync(playerId, PlayerMenuAction.SetPlayingTime, status, apply, cancellationToken);
+        return ChangeAsync(id, PlayerMenuAction.SetPlayingTime, status, apply, cancellationToken);
     }
 
-    public Task<Result<ContractChange>> HandRenewalToDofAsync(int playerId, bool apply, CancellationToken cancellationToken = default)
+    public Task<Result<ContractChange>> HandRenewalToDofAsync(int? playerId, bool apply, CancellationToken cancellationToken = default)
     {
-        return ChangeAsync(playerId, PlayerMenuAction.DofContractRenewal, null, apply, cancellationToken);
+        if (playerId is not { } id)
+        {
+            return Task.FromResult(NoPlayer());
+        }
+
+        return ChangeAsync(id, PlayerMenuAction.DofContractRenewal, null, apply, cancellationToken);
     }
 
     // The entry: the one labelled `wanted` among the menu's statuses, or else the menu's first entry the game lets be
@@ -316,6 +331,12 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             PlayerMenuAction.DofContractRenewal => "handing his renewal to the director of football",
             _ => action.ToString()
         };
+    }
+
+    // Required: an omitted id would read as 0, a player that doesn't exist.
+    private static Result<ContractChange> NoPlayer()
+    {
+        return Fail("playerId", "Say which player: his FM id, from get_squad or get_contracts.");
     }
 
     private static Result<ContractChange> Fail(string field, string message)

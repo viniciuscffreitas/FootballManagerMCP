@@ -67,6 +67,21 @@ public class ContractActionsServiceTests
     }
 
     [Fact]
+    public async Task A_change_without_the_player_is_refused_before_the_game_is_read()
+    {
+        var results = new[]
+        {
+            await _service.ReleaseAsync(null, ReleaseKind.Free, apply: true, confirmRelease: true),
+            await _service.SetSquadStatusAsync(null, "Rotação", apply: true),
+            await _service.HandRenewalToDofAsync(null, apply: true)
+        };
+
+        Assert.All(results, result => Assert.Contains(result.Errors.OfType<ValidationError>(), error => error.PropertyName == "playerId"));
+        await _editor.DidNotReceiveWithAnyArgs().FindPlayersAsync(default!);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
+
+    [Fact]
     public async Task Applying_a_release_needs_its_explicit_confirmation()
     {
         var result = await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: false);
