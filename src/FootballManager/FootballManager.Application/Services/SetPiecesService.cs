@@ -155,8 +155,8 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
         return Result.Ok(true);
     }
 
-    // Reads the setup after the writes. A read that fails leaves the writes reported: the game holds them whether or not
-    // the read went through.
+    // Reads the setup after the writes and confirms only when it shows every role asked for. A read that fails leaves
+    // the writes reported: the game holds them whether or not the read went through.
     private async Task ReadBackAsync(
         SetPieceEdit edit, SetPiecePlayer? captain, SetPiecePlayer? vice, CancellationToken cancellationToken)
     {
@@ -169,6 +169,25 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
             edit.Notes.Add($"Warning: written, but the setup could not be read back ({exception.Message}); " +
                            "read it again before changing anything.");
             return;
+        }
+
+        var mismatches = new List<string>();
+
+        if (captain is not null && edit.After.Captain?.Id != captain.Id)
+        {
+            mismatches.Add($"captain is {edit.After.Captain?.Name ?? "none"}, not {captain.Name}");
+        }
+
+        if (vice is not null && edit.After.ViceCaptain?.Id != vice.Id)
+        {
+            mismatches.Add($"vice-captain is {edit.After.ViceCaptain?.Name ?? "none"}, not {vice.Name}");
+        }
+
+        edit.Confirmed = mismatches.Count == 0;
+
+        if (!edit.Confirmed)
+        {
+            edit.Notes.Add($"Warning: the read-back doesn't match the request: {string.Join("; ", mismatches)}.");
         }
     }
 

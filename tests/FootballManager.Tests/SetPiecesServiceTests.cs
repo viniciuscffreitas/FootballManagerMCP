@@ -162,6 +162,18 @@ public class SetPiecesServiceTests
     }
 
     [Fact]
+    public async Task An_apply_the_read_back_confirms_says_so()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup(Rollheiser, Neymar));
+
+        var edit = (await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true)).Value;
+
+        Assert.True(edit.Confirmed);
+        Assert.True(edit.CaptainWritten);
+        Assert.True(edit.ViceCaptainWritten);
+    }
+
+    [Fact]
     public async Task A_vice_the_game_refuses_after_the_captain_went_through_reports_what_was_written()
     {
         _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup(Rollheiser, Gabriel));
@@ -174,6 +186,7 @@ public class SetPiecesServiceTests
         Assert.True(result.Value.Applied);
         Assert.True(result.Value.CaptainWritten);
         Assert.False(result.Value.ViceCaptainWritten);
+        Assert.False(result.Value.Confirmed);
         Assert.Contains(result.Value.Notes, note => note.Contains("vice-captain") && note.Contains("Make vice-captain"));
         Assert.Equal(Rollheiser.Id, result.Value.After!.Captain!.Id);
     }
@@ -191,8 +204,21 @@ public class SetPiecesServiceTests
         Assert.True(result.Value.Applied);
         Assert.True(result.Value.CaptainWritten);
         Assert.True(result.Value.ViceCaptainWritten);
+        Assert.False(result.Value.Confirmed);
         Assert.Null(result.Value.After);
         Assert.Contains(result.Value.Notes, note => note.Contains("read"));
+    }
+
+    [Fact]
+    public async Task A_read_back_that_shows_another_captain_is_not_confirmed()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup());
+
+        var edit = (await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: true)).Value;
+
+        Assert.True(edit.Applied);
+        Assert.False(edit.Confirmed);
+        Assert.Contains(edit.Notes, note => note.Contains("Agustín Rollheiser") && note.Contains("Neymar"));
     }
 
     private static string Messages<T>(Result<T> result)

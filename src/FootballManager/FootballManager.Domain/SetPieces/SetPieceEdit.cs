@@ -12,6 +12,9 @@ public class SetPieceEdit
     /// <summary>True once the game took the vice-captain change; false when none was written.</summary>
     public bool ViceCaptainWritten { get; set; }
 
+    /// <summary>True only when the read-back shows every role the call asked for; false for a dry run.</summary>
+    public bool Confirmed { get; set; }
+
     /// <summary>The setup as the game held it before the call.</summary>
     public required SetPieceSetup Before { get; set; }
 
