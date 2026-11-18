@@ -26,7 +26,8 @@ public static class SetPiecesTools
                  "By default a dry run that writes nothing: it checks the players and returns before (the setup now) " +
                  "and steps (what would change). A player who already holds the role is left as he is. With " +
                  "apply=true the API first checks and copies the save (see the README's Safety), writes, and returns " +
-                 "after, read back from the game. Refused when the two ids are the same player, when a player isn't in " +
+                 "after, read back from the game, with captainWritten and viceCaptainWritten (what the game took) and " +
+                 "confirmed (true only when after shows every role asked for; read the notes when false). Refused when the two ids are the same player, when a player isn't in " +
                  "the first team, and when the game's menu doesn't offer the change.")]
     public static async Task<string> SetCaptains(
         IHttpClientFactory httpFactory,
