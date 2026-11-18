@@ -84,6 +84,7 @@ public class ContractMenuClickTests
 
     [Theory]
     [InlineData("99")]
+    [InlineData("0")]
     [InlineData("null")]
     public async Task An_entry_with_an_event_the_client_doesnt_know_is_refused_and_nothing_is_sent(string eventId)
     {
@@ -111,7 +112,7 @@ public class ContractMenuClickTests
     {
         var plugin = new ContractPlugin(StatusMenu("Titular", "Rotação")) { WriteTimesOut = true };
 
-        await Assert.ThrowsAsync<GameWriteUnknownException>(() =>
+        await Assert.ThrowsAsync<GameAnswerLostException>(() =>
             Client(plugin).ClickMenuEntryAsync(Reserve, PlayerMenuAction.SetPlayingTime, [0, 1], Rotation));
     }
 

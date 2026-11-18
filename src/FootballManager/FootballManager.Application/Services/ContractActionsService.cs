@@ -152,7 +152,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             await editor.ClickMenuEntryAsync(change.PlayerId, change.Action, leaf.Path, leaf.Labels, cancellationToken);
             change.Menu = MenuWrite.Written;
         }
-        catch (GameWriteUnknownException exception)
+        catch (GameAnswerLostException exception)
         {
             change.Menu = MenuWrite.Unknown;
             change.Notes.Add($"The game didn't answer the pick ({exception.Message}): the read back decides whether it took.");

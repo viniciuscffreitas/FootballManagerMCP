@@ -144,7 +144,7 @@ public class ContractActionsServiceTests
     {
         Offered(PlayerMenuAction.SetPlayingTime);
         StatusMenu();
-        _editor.ClickMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameWriteUnknownException("timed out")));
+        _editor.ClickMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameAnswerLostException("timed out")));
         _contracts.GetContractsAsync(Arg.Any<CancellationToken>()).Returns(
             [Contract("Reserva")],
             [Contract("Rotação")]);
@@ -162,7 +162,7 @@ public class ContractActionsServiceTests
     {
         Offered(PlayerMenuAction.SetPlayingTime);
         StatusMenu();
-        _editor.ClickMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameWriteUnknownException("timed out")));
+        _editor.ClickMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameAnswerLostException("timed out")));
 
         var result = await _service.SetSquadStatusAsync(Reserve, "Rotação", apply: true);
 
