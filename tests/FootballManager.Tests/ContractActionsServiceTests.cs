@@ -465,6 +465,35 @@ public class ContractActionsServiceTests
         await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
     }
 
+    // The game takes the hand-over without showing the dialog its menu states, and drops the entry from his menu
+    // (Everton Cebolinha in the test save, 18/11/2026).
+    [Fact]
+    public async Task A_hand_over_his_menu_no_longer_offers_is_confirmed_without_a_dialog()
+    {
+        _editor.GetOfferedActionsAsync(Reserve, Arg.Any<CancellationToken>())
+            .Returns([PlayerMenuAction.DofContractRenewal], new HashSet<PlayerMenuAction>());
+        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { CanRun = true, Label = "Dir. de futebol negocia contrato", Confirmation = "Tem certeza?" });
+        Dialog(DialogState.NotShown, "");
+
+        var change = (await _service.HandRenewalToDofAsync(Reserve, apply: true)).Value;
+
+        Assert.True(change.Confirmed);
+        Assert.Equal(AppliedState.Yes, change.Applied);
+    }
+
+    [Fact]
+    public async Task A_hand_over_his_menu_still_offers_is_not_confirmed()
+    {
+        Offered(PlayerMenuAction.DofContractRenewal);
+        Menu(PlayerMenuAction.DofContractRenewal, new MenuEntry { CanRun = true, Label = "Dir. de futebol negocia contrato", Confirmation = "Tem certeza?" });
+        Dialog(DialogState.NotShown, "");
+
+        var change = (await _service.HandRenewalToDofAsync(Reserve, apply: true)).Value;
+
+        Assert.False(change.Confirmed);
+        Assert.Equal(AppliedState.Partial, change.Applied);
+    }
+
     private void FreeRelease()
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);

@@ -264,12 +264,48 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         }
     }
 
+    private async Task DofReadBackAsync(ContractChange change, CancellationToken cancellationToken)
+    {
+        try
+        {
+            for (var check = 0; check < StateChecks; check++)
+            {
+                if (check > 0)
+                {
+                    await Task.Delay(StatePoll, cancellationToken);
+                }
+
+                change.Confirmed = !(await editor.GetOfferedActionsAsync(change.PlayerId, cancellationToken)).Contains(change.Action);
+
+                if (change.Confirmed == true)
+                {
+                    return;
+                }
+            }
+
+            change.Notes.Add("His menu still offers handing his renewal to the director of football: check the game before sending it again.");
+        }
+        catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException)
+        {
+            change.Confirmed = null;
+            change.Notes.Add($"The hand-over was sent but reading his menu back failed ({exception.Message}): check the game before sending it again.");
+        }
+    }
+
     // What the squad's contracts show once the game has taken the change, compared with what was asked: the status
     // picked, or him gone from the first team. Only a change from the state before counts: a status he already had is
     // refused in the plan, and a release of one the first team didn't list can't be told. A read back that fails leaves
     // it unconfirmed, never an error.
     private async Task ReadBackAsync(ContractChange change, string picked, bool wasInSquad, CancellationToken cancellationToken)
     {
+        // The game takes the hand-over without showing the dialog its menu states, and drops the entry from his menu:
+        // the entry gone, which was there right before the pick, is the read back (test save, 18/11/2026).
+        if (change.Action == PlayerMenuAction.DofContractRenewal)
+        {
+            await DofReadBackAsync(change, cancellationToken);
+            return;
+        }
+
         if (change.Action is not (PlayerMenuAction.SetPlayingTime or PlayerMenuAction.ReleaseOnFreeTransfer))
         {
             change.Notes.Add(change.Action == PlayerMenuAction.MutualTermination
