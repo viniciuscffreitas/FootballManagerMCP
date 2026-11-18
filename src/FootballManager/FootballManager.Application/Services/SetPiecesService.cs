@@ -51,6 +51,13 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
                 return Result.Fail<SetPieceEdit>(new EntityDoesNotExistError());
             }
 
+            if (captain is null && vice is not null && vice.Id == before.Captain?.Id)
+            {
+                // His menu offers "Tornar Vice-capitão", but the game takes the armband off him for it: no captain left.
+                return Result.Fail<SetPieceEdit>(new ValidationError("viceCaptainId",
+                    [$"{vice.Name} is the captain: making him vice would leave the club without one. Name a new captain too."]));
+            }
+
             var writes = new List<(string Role, Func<Task> Write, Action Written)>();
 
             foreach (var (player, role, now, offered, write, written) in new (SetPiecePlayer?, string, SetPiecePlayer?, Func<CaptaincyOffer, bool>, Func<int, Task>, Action)[]
@@ -108,7 +115,7 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
                 }
             }
 
-            await ReadBackAsync(edit, captain, vice, cancellationToken);
+            await ReadBackAsync(edit, before, captain, vice, cancellationToken);
             return Result.Ok(edit);
         }
         catch (GameUnavailableException exception)
@@ -143,10 +150,11 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
         return Result.Ok(true);
     }
 
-    // Reads the setup after the writes and confirms only when it shows every role asked for. A read that fails leaves
-    // the writes reported: the game holds them whether or not the read went through.
+    // Reads the setup after the writes and confirms only when it shows every role asked for, and the role left out still
+    // held by the player who held it before. A read that fails leaves the writes reported: the game holds them whether
+    // or not the read went through.
     private async Task ReadBackAsync(
-        SetPieceEdit edit, SetPiecePlayer? captain, SetPiecePlayer? vice, CancellationToken cancellationToken)
+        SetPieceEdit edit, SetPieceSetup before, SetPiecePlayer? captain, SetPiecePlayer? vice, CancellationToken cancellationToken)
     {
         try
         {
@@ -161,14 +169,16 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
         var mismatches = new List<string>();
 
-        if (captain is not null && edit.After.Captain?.Id != captain.Id)
+        foreach (var (role, wanted, now) in new[]
+                 {
+                     ("captain", captain ?? before.Captain, edit.After.Captain),
+                     ("vice-captain", vice ?? before.ViceCaptain, edit.After.ViceCaptain)
+                 })
         {
-            mismatches.Add($"captain is {edit.After.Captain?.Name ?? "none"}, not {captain.Name}");
-        }
-
-        if (vice is not null && edit.After.ViceCaptain?.Id != vice.Id)
-        {
-            mismatches.Add($"vice-captain is {edit.After.ViceCaptain?.Name ?? "none"}, not {vice.Name}");
+            if (now?.Id != wanted?.Id)
+            {
+                mismatches.Add($"{role} is {now?.Name ?? "none"}, not {wanted?.Name ?? "none"}");
+            }
         }
 
         edit.Confirmed = mismatches.Count == 0;

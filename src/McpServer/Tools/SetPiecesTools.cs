@@ -27,8 +27,10 @@ public static class SetPiecesTools
                  "and steps (what would change). A player who already holds the role is left as he is. With " +
                  "apply=true the API first checks and copies the save (see the README's Safety), writes, and returns " +
                  "after, read back from the game, with captainWritten and viceCaptainWritten (what the game took) and " +
-                 "confirmed (true only when after shows every role asked for; read the notes when false). Refused when the two ids are the same player, when a player isn't in " +
-                 "the first team, and when the game's menu doesn't offer the change.")]
+                 "confirmed (true only when after shows every role asked for and the role left out unchanged; read the notes " +
+                 "when false). Refused when the two ids are the same player, when a player isn't in the first team, when " +
+                 "the vice named is the captain and no new captain is named (the game would leave the club without one), " +
+                 "and when the game's menu doesn't offer the change.")]
     public static async Task<string> SetCaptains(
         IHttpClientFactory httpFactory,
         [Description("The player to make captain (FM id); leave out to keep the captain.")]

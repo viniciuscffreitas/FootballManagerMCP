@@ -221,6 +221,30 @@ public class SetPiecesServiceTests
         Assert.Contains(edit.Notes, note => note.Contains("Agustín Rollheiser") && note.Contains("Neymar"));
     }
 
+    [Fact]
+    public async Task A_read_back_where_the_role_left_out_changed_is_not_confirmed()
+    {
+        // Making the vice captain: the game may leave the vice role empty, which the call promised to keep.
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), new SetPieceSetup { Captain = Gabriel, Squad = [Neymar, Gabriel, Rollheiser] });
+
+        var edit = (await _setPieces.SetCaptainsAsync(Gabriel.Id, null, apply: true)).Value;
+
+        Assert.False(edit.Confirmed);
+        Assert.Contains(edit.Notes, note => note.Contains("vice-captain") && note.Contains("Gabriel Brazão") && note.Contains("none"));
+    }
+
+    [Fact]
+    public async Task Making_the_captain_vice_without_a_new_captain_is_refused_before_the_save_is_touched()
+    {
+        // The game would take the armband off him to make him vice, leaving the club without a captain.
+        var result = await _setPieces.SetCaptainsAsync(null, Neymar.Id, apply: true);
+
+        Assert.True(result.HasError<ValidationError>());
+        Assert.Contains("captain", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().MakeViceCaptainAsync(default);
+    }
+
     private static string Messages<T>(Result<T> result)
     {
         return string.Join(" ", result.Errors.SelectMany(error =>
