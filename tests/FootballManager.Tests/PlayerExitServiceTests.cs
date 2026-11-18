@@ -36,7 +36,7 @@ public class PlayerExitServiceTests
         Assert.Equal("Recall him?", exit.Confirmation);
         Assert.True(exit.Status.OutOnLoan);
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -52,8 +52,9 @@ public class PlayerExitServiceTests
         Received.InOrder(() =>
         {
             _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
-            _editor.RunMenuEntryAsync(1, PlayerMenuAction.RemoveFromTransferList,
-                Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })), Arg.Any<CancellationToken>());
+            _editor.SendMenuEntryAsync(1, PlayerMenuAction.RemoveFromTransferList,
+                Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })),
+                Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Remove from transfer list" })), Arg.Any<CancellationToken>());
         });
         Assert.True(exit.Applied);
         Assert.False(exit.Status.TransferListed);
@@ -70,7 +71,7 @@ public class PlayerExitServiceTests
         var result = await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true);
 
         Assert.True(result.IsFailed);
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -84,7 +85,7 @@ public class PlayerExitServiceTests
         Assert.True(result.IsFailed);
         Assert.Contains("doesn't offer a recall from loan", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -107,7 +108,7 @@ public class PlayerExitServiceTests
 
         Assert.True(result.IsFailed);
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -117,8 +118,9 @@ public class PlayerExitServiceTests
 
         await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "transfer status > loan list", apply: true);
 
-        await _editor.Received(1).RunMenuEntryAsync(1, PlayerMenuAction.SetTransferStatus,
-            Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0, 1 })), Arg.Any<CancellationToken>());
+        await _editor.Received(1).SendMenuEntryAsync(1, PlayerMenuAction.SetTransferStatus,
+            Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0, 1 })),
+            Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Transfer status", "Loan list" })), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -131,7 +133,7 @@ public class PlayerExitServiceTests
         var result = await _exits.ChangeAsync(1, PlayerExitAction.OfferToClubs, choice: null, apply: true);
 
         Assert.True(result.IsFailed);
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -144,7 +146,25 @@ public class PlayerExitServiceTests
         var result = await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true);
 
         Assert.Contains("greys out", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
+    public async Task A_submenu_the_game_greys_out_offers_none_of_its_entries()
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.SetTransferStatus);
+        Menu(1, PlayerMenuAction.SetTransferStatus,
+            new MenuEntry { Label = "Transfer status", IsDisabled = true, Children = [new MenuEntry { Label = "Transfer list", CanRun = true }] },
+            new MenuEntry { Label = "Loan status", Children = [new MenuEntry { Label = "Loan list", CanRun = true }] });
+
+        var plan = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: null, apply: false)).Value;
+        var result = await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "Transfer status > Transfer list", apply: true);
+
+        Assert.Equal(["Loan status > Loan list"], plan.Choices);
+        Assert.True(result.IsFailed);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -166,7 +186,7 @@ public class PlayerExitServiceTests
 
         Assert.Contains("action", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
-        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
     private static HashSet<PlayerMenuAction> Set(params PlayerMenuAction[] actions)

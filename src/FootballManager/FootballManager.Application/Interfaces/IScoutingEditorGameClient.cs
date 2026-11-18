@@ -60,6 +60,16 @@ public interface IScoutingEditorGameClient
         int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Sends the menu entry at <paramref name="entry"/> (an index per level, from the top) only if the menu, read again
+    /// right before the send, still has it there with <paramref name="labels"/> at each level and greys out none of them;
+    /// otherwise it throws <see cref="Exceptions.GameRejectedException"/> and sends nothing. The player is looked for again
+    /// on the next read: the entry may move him to another list (a recalled player is no longer out on loan).
+    /// </summary>
+    Task SendMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Opens the panel the menu's first entry for <paramref name="action"/> opens (the game's NewsAction
     /// <paramref name="newsAction"/>, e.g. 6 for the transfer offer panel), as a click on it does.
     /// </summary>

@@ -104,7 +104,7 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             exit.Notes.Add(SaveNote(clearance.Value));
 
             var before = exit.Status;
-            await editor.RunMenuEntryAsync(playerId, menuAction, path, cancellationToken);
+            await editor.SendMenuEntryAsync(playerId, menuAction, path, PlayerMenus.Labels(menu, path), cancellationToken);
 
             exit.Applied = true;
 
@@ -155,12 +155,18 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
         return Result.Ok<List<int>?>(entries[index]);
     }
 
-    // The paths to every entry that does something when picked, from the top of the menu.
+    // The paths to every entry that does something when picked, from the top of the menu, under no submenu the game
+    // greys out (a greyed-out submenu can't be opened in the game).
     private static IEnumerable<List<int>> Runnable(List<MenuEntry> entries, List<int> above)
     {
         for (var i = 0; i < entries.Count; i++)
         {
             List<int> path = [.. above, i];
+
+            if (entries[i].IsDisabled)
+            {
+                continue;
+            }
 
             if (entries[i].Children.Count > 0)
             {

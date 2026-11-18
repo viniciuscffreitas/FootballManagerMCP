@@ -413,6 +413,78 @@ internal sealed class ScoutingEditorBridgeClient(
         return await ReadAtAsync(playerId, player, cancellationToken) ?? await FindPlayerAsync(playerId, cancellationToken);
     }
 
+    public async Task SendMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default)
+    {
+        if (entry.Count == 0 || labels.Count != entry.Count)
+        {
+            throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
+        }
+
+        var player = await PlaceAsync(playerId, cancellationToken);
+        var actionId = ScoutingConstants.ActionIdOf(action);
+
+        // Everything the send needs is built first, so the menu read below is the last thing before the send.
+        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
+                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
+                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
+        var send = OnAction(player, actionId).ToWrite("/native",
+            ("event", ScoutingConstants.DoActionEvent), ("field", $"Data:{payload}"), ("template", "none"));
+
+        if (!(await OfferedAsync(player, cancellationToken)).Contains(ActionKey(actionId)))
+        {
+            throw new GameRejectedException($"The game's menu no longer offers {action}. Nothing was sent; run the dry run again.");
+        }
+
+        var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
+
+        // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
+        // The entry must still be at that place with those labels, greyed out at no level, and send the event this
+        // client sends, or nothing is sent. A menu the game rebuilds in the few milliseconds before the send isn't caught.
+        if (MenuEntryAt(menu.Values.Items, entry, labels) is null)
+        {
+            throw new GameRejectedException(
+                $"The game's menu for {action} changed since the check: it no longer has '{string.Join(" > ", labels)}' " +
+                "to pick. Nothing was sent; run the dry run again.");
+        }
+
+        await bridge.WriteAsync<JsonElement>(send, cancellationToken);
+
+        // He's looked for again on the next read: the entry may have moved him (a recalled player leaves the loans list).
+        _players.Remove(playerId);
+    }
+
+    // The entry at that place when each level still has that label (case aside) and isn't greyed out, and the entry
+    // runs the menu's own event and has no sub-entries.
+    private static BridgeMenuItemDto? MenuEntryAt(List<BridgeMenuItemDto>? items, IReadOnlyList<int> entry, IReadOnlyList<string> labels)
+    {
+        BridgeMenuItemDto? item = null;
+        var level = items;
+
+        for (var i = 0; i < entry.Count; i++)
+        {
+            if (level is null || entry[i] < 0 || entry[i] >= level.Count)
+            {
+                return null;
+            }
+
+            item = level[entry[i]];
+            var fields = item.Text is null && item.RowData is not null ? item.RowData : item;
+            var label = (string.IsNullOrWhiteSpace(item.Text) ? item.RowData?.Text : item.Text) ?? string.Empty;
+
+            if (!string.Equals(label.Trim(), labels[i].Trim(), StringComparison.CurrentCultureIgnoreCase) || fields.Disabled == true)
+            {
+                return null;
+            }
+
+            level = item.ChildList;
+        }
+
+        var leaf = item!.Text is null && item.RowData is not null ? item.RowData : item;
+        return item.ChildList is { Count: > 0 } || leaf.Event != ScoutingConstants.DoActionEventId ? null : item;
+    }
+
     // An entry that opens a panel sends no event of its own (EventFmxDoAction opens nothing): the plugin's /newsaction
     // opens the panel with the references the entry carries, as the click does.
     public async Task OpenPanelAsync(int playerId, PlayerMenuAction action, int newsAction, CancellationToken cancellationToken = default)

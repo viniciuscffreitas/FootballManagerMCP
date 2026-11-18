@@ -1,0 +1,175 @@
+using System.Net;
+using System.Text;
+using FootballManager.Application.Exceptions;
+using FootballManager.Application.Interfaces;
+using FootballManager.Domain.Scouting;
+using FootballManager.Infrastructure.Clients;
+using FootballManager.Infrastructure.Constants;
+using FootballManager.Infrastructure.Mappings;
+using Mapster;
+using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
+
+namespace FootballManager.Tests;
+
+// The exit service picks an entry from the menu it read; the client reads the menu again to send it. The game can change
+// the menu in between (the save guard copies the save first), so the client checks the entry is still the one picked.
+public class ScoutingEditorBridgeClientTests
+{
+    private const int Player = 7;
+    private static readonly string[] TransferListed = ["Situação de transferência", "Na lista de transferências"];
+
+    // The client maps what the game sends with the global settings, as the API registers them.
+    static ScoutingEditorBridgeClientTests()
+    {
+        new MappingConfig().Register(TypeAdapterConfig.GlobalSettings);
+    }
+
+    [Fact]
+    public async Task The_entry_picked_is_sent_when_the_menu_still_has_it()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências"));
+
+        await (await plugin.FoundAsync()).SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed);
+
+        Assert.Single(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task An_entry_that_changed_since_the_check_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Indisponível"));
+
+        var refusal = await Assert.ThrowsAsync<GameRejectedException>(async () =>
+            await (await plugin.FoundAsync()).SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Contains("Na lista de transferências", refusal.Message);
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task An_entry_the_game_greyed_out_since_the_check_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências", leafDisabled: true));
+
+        await Assert.ThrowsAsync<GameRejectedException>(async () =>
+            await (await plugin.FoundAsync()).SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task An_entry_under_a_submenu_the_game_greyed_out_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências", topDisabled: true));
+
+        await Assert.ThrowsAsync<GameRejectedException>(async () =>
+            await (await plugin.FoundAsync()).SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task An_entry_the_menu_no_longer_reaches_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida"));
+
+        await Assert.ThrowsAsync<GameRejectedException>(async () =>
+            await (await plugin.FoundAsync()).SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task The_menu_is_checked_by_the_read_right_before_the_send()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências"));
+
+        await (await plugin.FoundAsync()).SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed);
+
+        var send = plugin.Requests.FindIndex(request => request.Method == HttpMethod.Post);
+        Assert.Contains($"props={ScoutingConstants.MenuItems}", Uri.UnescapeDataString(plugin.Requests[send - 1].RequestUri!.Query));
+    }
+
+    private static string StatusMenu(string first, string? second = null, bool leafDisabled = false, bool topDisabled = false)
+    {
+        var levels = new List<string> { Level(first, leafDisabled && second is null) };
+
+        if (second is not null)
+        {
+            levels.Add(Level(second, leafDisabled));
+        }
+
+        return $$"""[{"Text":"Situação de transferência","Event":0,"Disabled":{{(topDisabled ? "true" : "false")}},"ChildList":[{{string.Join(',', levels)}}]}]""";
+    }
+
+    private static string Level(string label, bool disabled)
+    {
+        return $$$"""{"RowData":{"Text":"{{{label}}}","Event":44,"Disabled":{{{(disabled ? "true" : "false")}}}}}""";
+    }
+
+    // The plugin as the client sees it: the player in the club's squad, his menu offering the transfer status entries.
+    private sealed class PlayerPlugin(string items) : HttpMessageHandler
+    {
+        public List<Uri> Writes { get; } = [];
+        public List<HttpRequestMessage> Requests { get; } = [];
+
+        // As the exit service does: the player is found first, in the club's squad, then his menu is used.
+        public async Task<ScoutingEditorBridgeClient> FoundAsync()
+        {
+            var client = Client();
+            Assert.Contains(Player, (await client.FindPlayersAsync([Player])).Keys);
+            return client;
+        }
+
+        public ScoutingEditorBridgeClient Client()
+        {
+            var factory = Substitute.For<IHttpClientFactory>();
+            factory.CreateClient(GameBridge.HttpClientName).Returns(_ => new HttpClient(this) { BaseAddress = new Uri("http://localhost:5121") });
+            var bridge = new GameBridge(factory, NullLogger<GameBridge>.Instance);
+            var scouting = Substitute.For<IScoutingGameClient>();
+            scouting.GetFocusesAsync(Arg.Any<CancellationToken>()).Returns([]);
+            var search = new DatabaseSearchBridgeClient(bridge, new SearchedRecords());
+
+            return new ScoutingEditorBridgeClient(
+                bridge, scouting, new RemovedFocusLog(), new SearchPositions(), search,
+                new TeamsBridgeClient(bridge, new GameVocabulary(bridge), search), new CompetitionPlaces());
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+
+            if (request.Method == HttpMethod.Post)
+            {
+                Writes.Add(request.RequestUri!);
+                return Answer("{}");
+            }
+
+            var url = Uri.UnescapeDataString(request.RequestUri!.Query);
+
+            if (url.Contains($"props={ScoutingConstants.MenuItems}"))
+            {
+                return Answer($$$"""{"values":{"Items":{{{items}}}}}""");
+            }
+
+            if (url.Contains($"props={ScoutingConstants.Actions}"))
+            {
+                return Answer($"{{\"values\":{{\"Actions\":{{\"#{ScoutingConstants.SetTransferStatusAction}\":{{}}}}}}}}");
+            }
+
+            // The club's squad holds him; every other list is empty.
+            return url.Contains($"list={TeamConstants.OwnTeam}.{TeamConstants.Players}")
+                ? Answer($$$"""{"count":1,"items":[{"values":{"{{{GameConstants.UniqueId}}}":{{{Player}}},"{{{GameConstants.Name}}}":"Walter"}}]}""")
+                : Answer("""{"count":0,"items":[]}""");
+        }
+
+        private static Task<HttpResponseMessage> Answer(string body)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+}
