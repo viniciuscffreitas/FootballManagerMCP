@@ -60,6 +60,36 @@ public class StaffEditorBridgeClientTests
         Assert.Empty(plugin.Writes);
     }
 
+    [Fact]
+    public async Task An_entry_under_a_submenu_the_game_greyed_out_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new MenuPlugin(Course("Licença B", "Licença A", topDisabled: true));
+
+        await Assert.ThrowsAsync<GameRejectedException>(() =>
+            Client(plugin).RunMenuEntryAsync(Coach, StaffMenuAction.CoachingCourse, [0, 1], LicenceA));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public async Task The_menu_is_checked_by_the_read_right_before_the_send()
+    {
+        var plugin = new MenuPlugin(Course("Licença B", "Licença A"));
+
+        await Client(plugin).RunMenuEntryAsync(Coach, StaffMenuAction.CoachingCourse, [0, 1], LicenceA);
+
+        var send = plugin.Requests.FindIndex(request => request.Method == HttpMethod.Post);
+        Assert.Contains($"props={ScoutingConstants.MenuItems}", Uri.UnescapeDataString(plugin.Requests[send - 1].RequestUri!.Query));
+    }
+
+    [Fact]
+    public async Task Actions_the_game_didnt_answer_are_unknown_not_none()
+    {
+        var plugin = new MenuPlugin(Course("Licença B", "Licença A"), actions: """{"values":{},"pending":["Actions"]}""");
+
+        await Assert.ThrowsAsync<GameUnavailableException>(() => Client(plugin).GetOfferedActionsAsync(Coach));
+    }
+
     private static StaffEditorBridgeClient Client(MenuPlugin plugin)
     {
         var factory = Substitute.For<IHttpClientFactory>();
@@ -67,7 +97,7 @@ public class StaffEditorBridgeClientTests
         return new StaffEditorBridgeClient(new GameBridge(factory, NullLogger<GameBridge>.Instance));
     }
 
-    private static string Course(string first, string? second = null, bool lastDisabled = false)
+    private static string Course(string first, string? second = null, bool lastDisabled = false, bool topDisabled = false)
     {
         var levels = new List<string> { Level(first, lastDisabled && second is null) };
 
@@ -76,7 +106,7 @@ public class StaffEditorBridgeClientTests
             levels.Add(Level(second, lastDisabled));
         }
 
-        return $$"""[{"Text":"Curso de treinador","Event":0,"ChildList":[{{string.Join(',', levels)}}]}]""";
+        return $$"""[{"Text":"Curso de treinador","Event":0,"Disabled":{{(topDisabled ? "true" : "false")}},"ChildList":[{{string.Join(',', levels)}}]}]""";
     }
 
     private static string Level(string label, bool disabled)
@@ -85,12 +115,15 @@ public class StaffEditorBridgeClientTests
     }
 
     // The plugin as the client sees it: the coaching course offered on the staff member, with the given entries.
-    private sealed class MenuPlugin(string items) : HttpMessageHandler
+    private sealed class MenuPlugin(string items, string? actions = null) : HttpMessageHandler
     {
         public List<Uri> Writes { get; } = [];
+        public List<HttpRequestMessage> Requests { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            Requests.Add(request);
+
             if (request.Method == HttpMethod.Post)
             {
                 Writes.Add(request.RequestUri!);
@@ -101,7 +134,7 @@ public class StaffEditorBridgeClientTests
 
             return url.Contains($"props={ScoutingConstants.MenuItems}")
                 ? Answer($$$"""{"values":{"Items":{{{items}}}}}""")
-                : Answer($"{{\"values\":{{\"Actions\":{{\"#{StaffConstants.CoachingCourseAction}\":{{}}}}}}}}");
+                : Answer(actions ?? $"{{\"values\":{{\"Actions\":{{\"#{StaffConstants.CoachingCourseAction}\":{{}}}}}}}}");
         }
 
         private static Task<HttpResponseMessage> Answer(string body)

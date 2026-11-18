@@ -56,27 +56,29 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
             throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
         }
 
+        // Everything the send needs is built first, so the menu read below is the last thing before the send.
+        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
+                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
+                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
+        var actionId = StaffConstants.ActionIdOf(action);
+
         if (await MenuAsync(staffId, action, cancellationToken) is not { } menu)
         {
             throw new GameRejectedException($"The game's menu no longer offers {action}.");
         }
 
         // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
-        // The entry must still be at that place with those labels, and not greyed out, or nothing is sent.
+        // The entry must still be at that place with those labels, and not greyed out at any level, or nothing is sent.
+        // The plugin still finds the entry by its place when it gets the send; a menu the game rebuilds in that gap
+        // (a few milliseconds) isn't caught here.
         var item = EntryAt(menu.Items, entry, labels)
                    ?? throw new GameRejectedException(
                        $"The game's menu for {action} changed since the check: it no longer has " +
                        $"'{string.Join(" > ", labels)}' to pick. Nothing was sent; run the dry run again.");
 
-        // The entry's fields and payload, where the game keeps them: on a top entry itself, on one below in its RowData.
-        var fields = Fields(item);
-        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
-                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
-                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
-        var actionId = StaffConstants.ActionIdOf(action);
+        // The entry's event, where the game keeps it: on a top entry itself, on one below in its RowData.
         var query = OnAction(menu.Record, actionId);
-
-        var write = fields.Event == ScoutingConstants.DoActionEventId
+        var write = Fields(item).Event == ScoutingConstants.DoActionEventId
             ? query.ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", $"Data:{payload}"), ("template", "none"))
             : query.ToWrite(ScoutingConstants.ContextActionEndpoint,
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)), ("field", $"Data:{payload}"));
@@ -84,8 +86,8 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
         await bridge.WriteAsync<JsonElement>(write, cancellationToken);
     }
 
-    // The entry at that place when each level still has that label (as the menu shows it, case aside) and the entry
-    // can be picked: no sub-entries, not greyed out.
+    // The entry at that place when each level still has that label (as the menu shows it, case aside) and isn't greyed
+    // out, and the entry can be picked: no sub-entries.
     private static BridgeMenuItemDto? EntryAt(List<BridgeMenuItemDto> items, IReadOnlyList<int> entry, IReadOnlyList<string> labels)
     {
         BridgeMenuItemDto? item = null;
@@ -100,7 +102,7 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
 
             item = level[entry[i]];
 
-            if (!string.Equals(Label(item), labels[i], StringComparison.CurrentCultureIgnoreCase))
+            if (!string.Equals(Label(item), labels[i], StringComparison.CurrentCultureIgnoreCase) || Fields(item).Disabled == true)
             {
                 return null;
             }
@@ -108,7 +110,7 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
             level = item.ChildList;
         }
 
-        return item is null || item.ChildList is { Count: > 0 } || Fields(item).Disabled == true ? null : item;
+        return item is null || item.ChildList is { Count: > 0 } ? null : item;
     }
 
     private static BridgeMenuItemDto Fields(BridgeMenuItemDto item)
@@ -155,6 +157,12 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
                 .WithHumanAndTeam()
                 .Props([ScoutingConstants.Actions]),
             cancellationToken);
+
+        // Actions the game didn't answer in time are unknown: read as none, a sent action would look taken away.
+        if (offered.Pending?.Contains(ScoutingConstants.Actions) == true)
+        {
+            throw new GameUnavailableException("The game didn't answer which staff actions it offers (it may be busy).");
+        }
 
         return offered.Values.Actions?.Keys.ToHashSet() ?? [];
     }
