@@ -44,7 +44,9 @@ function AssertTestSave {
 $failed = 0
 AssertTestSave
 $staff = Invoke-RestMethod -UseBasicParsing "$api/staff" -TimeoutSec 60
-$member = $staff.members | Where-Object { $_.job -notmatch 'Técnico|Manager' } | Select-Object -First 1
+# Skip the manager: his menu has none of the member actions. Windows PowerShell 5.1 reads this file as ANSI, so the
+# pattern avoids the accented letter of "Técnico".
+$member = $staff.members | Where-Object { $_.job -notmatch '^T\S{1,2}cnico$|^Manager$' } | Select-Object -First 1
 Write-Output "Staff member for the menu: $($member.name) ($($member.id), $($member.job)); vacancies $($staff.vacancies)"
 
 for ($i = 1; $i -le $Repeat; $i++) {
