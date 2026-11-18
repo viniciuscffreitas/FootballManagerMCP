@@ -2,7 +2,9 @@
 
 Run on the Windows PC, with the test save 'MCPFM investigation' loaded and no match being played:
     python smoke-68.py menus <playerId>...         # read only: every exit action's dry run for each player
-    python smoke-68.py list <playerId> <choice>    # x2: SetTransferStatus to <choice>, the status read back, then off the list
+    python smoke-68.py list <playerId> <choice>    # x2: SetTransferStatus to <choice> (e.g. "Situação de transferência > Na lista
+                                                   # de transferências"), get_squad unchanged by the dry run, the exact list
+                                                   # read back and confirmed, then off it again
     python smoke-68.py edges <playerId>            # actions the menu doesn't offer: refused, nothing sent (x2)
     python smoke-68.py recall                      # recall a player out on loan (apply), only if his menu offers it
 Every write first checks GET /session -> isInvestigationSave true, and stops otherwise.
@@ -60,24 +62,38 @@ def menus(players):
 def squad_keys(player):
     _, squad = call("GET", API + "/squad")
     players = squad.get("players", squad) if isinstance(squad, dict) else squad
-    found = next((p for p in players if p.get("id") == player), {})
+    found = next((p for p in players if p.get("id") == player), None)
+    check(found is not None, f"get_squad lists player {player}")
     return {s.get("key") for s in found.get("statuses") or []}
 
 
+def wanted_list(choice):
+    """The list the choice puts him on, and the get_squad status key that shows it."""
+    top = choice.split(">")[0].strip().lower()
+    if "empréstimo" in top or "loan" in top:
+        return "loanListed", "ListedForLoan", "RemoveFromLoanList"
+    return "transferListed", "TransferListed", "RemoveFromTransferList"
+
+
 def list_and_back(player, choice):
+    flag, key, back = wanted_list(choice)
+    keys_before = squad_keys(player)
+    check(key not in keys_before, f"he starts off that list: {keys_before}")
     status, plan = exit_(player, "SetTransferStatus", choice)
-    check(status == 200 and not plan["applied"], "dry run plans the status and sends nothing")
+    check(status == 200 and plan["applied"] == "NotWritten", "dry run plans the status and sends nothing")
+    check(plan["choice"] == choice, f"dry run picks exactly {choice}: {plan['choice']}")
+    check(squad_keys(player) == keys_before, "get_squad is the same after the dry run: nothing was written")
     status, after = exit_(player, "SetTransferStatus", choice, apply=True)
-    check(status == 200 and after["applied"], "apply sends the status")
-    listed = after["status"]["transferListed"] or after["status"]["loanListed"]
-    check(listed, f"the menu shows him listed: {after['status']}")
+    check(status == 200 and after["applied"] == "Written", f"apply sends the status: {after}")
+    check(after["confirmed"] is True, f"the read back confirms it: {after}")
+    check(after["status"][flag] is True, f"the menu shows him on that list ({flag}): {after['status']}")
     keys = squad_keys(player)
-    check(bool(keys & {"TransferListed", "ListedForLoan"}), f"get_squad shows the listing: {keys}")
-    back = "RemoveFromTransferList" if after["status"]["transferListed"] else "RemoveFromLoanList"
+    check(key in keys, f"get_squad shows {key}: {keys}")
     status, off = exit_(player, back, apply=True)
-    check(status == 200 and not (off["status"]["transferListed"] or off["status"]["loanListed"]), "off the list again")
+    check(status == 200 and off["applied"] == "Written" and off["confirmed"] is True, f"off the list again: {off}")
+    check(off["status"][flag] is False, f"the menu shows him off that list: {off['status']}")
     keys = squad_keys(player)
-    check(not (keys & {"TransferListed", "ListedForLoan"}), f"get_squad shows no listing: {keys}")
+    check(key not in keys, f"get_squad no longer shows {key}: {keys}")
 
 
 def backups():
@@ -94,6 +110,9 @@ def edges(player):
         check(status == 400, "recalling a player not out on loan is refused")
     status, _ = exit_(999999999, "Recall")
     check(status == 404, "an unknown player is not found")
+    guard()
+    status, _ = call("POST", f"{API}/transfers/exit?apply=true", {"playerId": player})
+    check(status == 400, "a request without an action is refused")
     check(backups() == before, "no save copy was made for a refused change")
 
 
@@ -106,7 +125,8 @@ def recall():
         if status == 200:
             print(f"menu offers a recall for {player}: {plan['choices']}")
             status, after = exit_(player, "Recall", apply=True)
-            check(status == 200 and not after["status"]["outOnLoan"], "recalled: no longer out on loan")
+            check(status == 200 and after["applied"] == "Written" and after["confirmed"] is True, f"the recall is confirmed: {after}")
+            check(after["status"]["outOnLoan"] is False, "recalled: no longer out on loan")
             return
     print("no player out on loan has a recall in his menu: not run")
 
