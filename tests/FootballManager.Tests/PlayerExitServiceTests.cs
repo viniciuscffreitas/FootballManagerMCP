@@ -293,6 +293,59 @@ public class PlayerExitServiceTests
         await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_status_he_already_has_is_refused_on_the_plan_and_nothing_is_sent(bool apply)
+    {
+        StatusMenu(1);
+        Offered(1, PlayerMenuAction.SetTransferStatus, PlayerMenuAction.RemoveFromTransferList);
+
+        var result = await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "Transfer status > Transfer list", apply: apply);
+
+        Assert.Contains("already", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
+        await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
+    public async Task A_lost_answer_the_read_back_doesnt_show_yet_is_unknown_not_unwritten()
+    {
+        StatusMenu(1);
+        LostAnswer();
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "Transfer status > Transfer list", apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Unknown, exit.Applied);
+        Assert.False(exit.Confirmed);
+        Assert.Contains(exit.Notes, note => note.StartsWith("Warning") && note.Contains("get_squad"));
+    }
+
+    [Theory]
+    [InlineData("Situação de empréstimo > Sem situação definida")]
+    [InlineData("Situação de empréstimo > Indisponível para empréstimo")]
+    public async Task A_loan_status_the_menu_cant_tell_apart_is_neither_confirmed_nor_denied(string choice)
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.SetTransferStatus);
+        Menu(1, PlayerMenuAction.SetTransferStatus, new MenuEntry
+        {
+            Label = "Situação de empréstimo",
+            Children =
+            [
+                new MenuEntry { Label = "Disponível para empréstimo", CanRun = true },
+                new MenuEntry { Label = "Sem situação definida", CanRun = true },
+                new MenuEntry { Label = "Indisponível para empréstimo", CanRun = true }
+            ]
+        });
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: choice, apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Written, exit.Applied);
+        Assert.Null(exit.Confirmed);
+        Assert.Contains(exit.Notes, note => note.StartsWith("Warning") && note.Contains("can't tell"));
+    }
+
     [Fact]
     public async Task An_action_outside_the_list_is_refused_before_any_read()
     {

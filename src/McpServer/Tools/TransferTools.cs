@@ -93,10 +93,10 @@ public static class TransferTools
                  "one entry, pass one of choices as choice. With apply=true the API first checks and copies the save " +
                  "(see the README's Safety), reads the menu again and runs the entry only if it is still there and not " +
                  "greyed out, then returns status as the game then shows him, applied (Written, NotWritten, or Unknown " +
-                 "when the game's answer was lost and the read back failed: check get_squad before sending it again) " +
+                 "when the game's answer was lost and the read back doesn't show the change: check get_squad before sending it again) " +
                  "and confirmed (true when the read back shows the change asked for, false with a warning in notes " +
                  "when it doesn't, null when the menu can't show it: an offer to clubs, a loan extension, the answers " +
-                 "to offers). An entry " +
+                 "to offers, a loan status off the loan list). A status he already has is refused, and nothing is sent. An entry " +
                  "that opens a screen of its own isn't run: the asking price dialog (\"Definir situação de " +
                  "transferência\") and OfferToClubs (\"Oferecer via TransferRoom\", the Transfer Room panel) are " +
                  "refused for now, so the asking price and the advert are set by the user in the game; an entry the " +

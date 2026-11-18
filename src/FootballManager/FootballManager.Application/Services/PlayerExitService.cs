@@ -95,6 +95,14 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             exit.Choice = PlayerMenus.Label(menu, path);
             var confirmation = PlayerMenus.ConfirmationOf(menu, path);
             exit.Confirmation = confirmation.Text;
+            var labels = PlayerMenus.Labels(menu, path);
+            var expected = Expected(action, labels);
+
+            // Sending what he already has would prove nothing: the read back would show it whether the game took it or not.
+            if (expected is { } target && target.Shows(exit.Status))
+            {
+                return Refuse("choice", $"{player.Name} is already {target.What}: there's nothing to change. Nothing was sent.");
+            }
 
             if (!apply)
             {
@@ -115,7 +123,6 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
 
             exit.Notes.Add(SaveNote(clearance.Value));
 
-            var labels = PlayerMenus.Labels(menu, path);
             var written = PlayerExitWrite.Written;
 
             try
@@ -128,8 +135,6 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
                 written = PlayerExitWrite.Unknown;
                 exit.Notes.Add($"Warning: {exception.Message}; the read back decides whether it was written.");
             }
-
-            var expected = Expected(action, labels);
 
             // The entry is sent by now: a read back that fails must not report it as failed, or it gets sent again.
             try
@@ -152,18 +157,25 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
                 exit.Notes.Add(action is PlayerExitAction.OfferToClubs or PlayerExitAction.ExtendLoan
                     ? $"His menu doesn't show whether {Describe(action)} went to the clubs: they answer in the inbox, " +
                       "usually within a few days of the game's calendar (get_inbox)."
-                    : $"His menu doesn't show the status '{exit.Choice}': check it with get_squad.");
+                    : CantTellApart(action, labels)
+                        ? $"Warning: his menu can't tell '{exit.Choice}' from the other loan statuses off the loan list, so it can't " +
+                          "confirm it: check it with get_squad."
+                        : $"His menu doesn't show the status '{exit.Choice}': check it with get_squad.");
                 return Result.Ok(exit);
             }
 
             var shown = wanted.Shows(exit.Status);
             exit.Confirmed = shown;
-            exit.Applied = written == PlayerExitWrite.Unknown && !shown ? PlayerExitWrite.NotWritten : PlayerExitWrite.Written;
+            // With the answer lost, only the change showing proves it was taken; not showing it yet doesn't prove it wasn't.
+            exit.Applied = written == PlayerExitWrite.Unknown && !shown ? PlayerExitWrite.Unknown : PlayerExitWrite.Written;
 
             if (!shown)
             {
                 exit.Notes.Add($"Warning: after the entry was sent, the game's menu doesn't show {player.Name} {wanted.What}: " +
-                               $"it shows him {Describe(exit.Status)}.");
+                               $"it shows him {Describe(exit.Status)}." +
+                               (written == PlayerExitWrite.Unknown
+                                   ? " The game's answer was lost too, so it may still take it: check with get_squad before sending it again."
+                                   : string.Empty));
             }
 
             return Result.Ok(exit);
@@ -275,9 +287,8 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
 
         if (StartsWithAny(top, LoanStatusMenus))
         {
-            return StartsWithAny(leaf, LoanListed) ? (status => status.LoanListed, "on the loan list")
-                : StartsWithAny(leaf, NotLoanListed) ? (status => !status.LoanListed, "off the loan list")
-                : null;
+            // Off the loan list are both "no status" and "unavailable": his menu shows them alike, so neither is expected.
+            return StartsWithAny(leaf, LoanListed) ? (status => status.LoanListed, "on the loan list") : null;
         }
 
         return null;
@@ -291,6 +302,13 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
     private static readonly string[] NotListed = ["Sem situação", "No status", "Not listed"];
     private static readonly string[] LoanListed = ["Disponível", "Loan list", "Available"];
     private static readonly string[] NotLoanListed = ["Sem situação", "Indisponível", "No status", "Unavailable", "Not listed"];
+
+    // A loan status off the loan list: "no status" and "unavailable for loan" look the same in his menu.
+    private static bool CantTellApart(PlayerExitAction action, List<string> labels)
+    {
+        return action == PlayerExitAction.SetTransferStatus && labels.Count == 2
+               && StartsWithAny(labels[0].Trim(), LoanStatusMenus) && StartsWithAny(labels[1].Trim(), NotLoanListed);
+    }
 
     private static bool StartsWithAny(string label, string[] prefixes)
     {
