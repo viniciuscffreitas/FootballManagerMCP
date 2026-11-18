@@ -1,4 +1,5 @@
 using FluentResults;
+using FootballManager.Application.Exceptions;
 using FootballManager.Application.Interfaces;
 using FootballManager.Application.ResultErrors;
 using FootballManager.Application.Services;
@@ -31,7 +32,8 @@ public class PlayerExitServiceTests
 
         var exit = (await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: false)).Value;
 
-        Assert.False(exit.Applied);
+        Assert.Equal(PlayerExitWrite.NotWritten, exit.Applied);
+        Assert.Null(exit.Confirmed);
         Assert.Equal("Recall from loan", exit.Choice);
         Assert.Equal("Recall him?", exit.Confirmation);
         Assert.True(exit.Status.OutOnLoan);
@@ -56,7 +58,8 @@ public class PlayerExitServiceTests
                 Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })),
                 Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Remove from transfer list" })), Arg.Any<CancellationToken>());
         });
-        Assert.True(exit.Applied);
+        Assert.Equal(PlayerExitWrite.Written, exit.Applied);
+        Assert.True(exit.Confirmed);
         Assert.False(exit.Status.TransferListed);
     }
 
@@ -168,6 +171,107 @@ public class PlayerExitServiceTests
     }
 
     [Fact]
+    public async Task A_listing_the_menu_doesnt_show_after_the_send_is_not_confirmed()
+    {
+        StatusMenu(1);
+        _editor.GetOfferedActionsAsync(1, Arg.Any<CancellationToken>())
+            .Returns(Set(PlayerMenuAction.SetTransferStatus), Set(PlayerMenuAction.SetTransferStatus, PlayerMenuAction.RemoveFromLoanList));
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "Transfer status > Transfer list", apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Written, exit.Applied);
+        Assert.False(exit.Confirmed);
+        Assert.True(exit.Status.LoanListed);
+        Assert.Contains(exit.Notes, note => note.StartsWith("Warning") && note.Contains("transfer list"));
+    }
+
+    [Fact]
+    public async Task A_listing_is_confirmed_once_the_menu_shows_it()
+    {
+        StatusMenu(1);
+        _editor.GetOfferedActionsAsync(1, Arg.Any<CancellationToken>())
+            .Returns(Set(PlayerMenuAction.SetTransferStatus), Set(PlayerMenuAction.SetTransferStatus, PlayerMenuAction.RemoveFromTransferList));
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.SetTransferStatus, choice: "Transfer status > Transfer list", apply: true)).Value;
+
+        Assert.True(exit.Confirmed);
+        Assert.True(exit.Status.TransferListed);
+    }
+
+    [Fact]
+    public async Task A_loan_extension_the_menu_cant_show_is_neither_confirmed_nor_denied()
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.RecallFromLoan, PlayerMenuAction.ExtendLoan);
+        Menu(1, PlayerMenuAction.ExtendLoan, new MenuEntry { Label = "Extend loan", CanRun = true });
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.ExtendLoan, choice: null, apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Written, exit.Applied);
+        Assert.Null(exit.Confirmed);
+        Assert.Contains(exit.Notes, note => note.Contains("doesn't show"));
+    }
+
+    [Fact]
+    public async Task A_lost_answer_is_decided_by_the_read_back()
+    {
+        Player(1);
+        _editor.GetOfferedActionsAsync(1, Arg.Any<CancellationToken>())
+            .Returns(Set(PlayerMenuAction.RemoveFromTransferList), Set(PlayerMenuAction.SetTransferStatus));
+        Menu(1, PlayerMenuAction.RemoveFromTransferList, new MenuEntry { Label = "Remove from transfer list", CanRun = true });
+        LostAnswer();
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.RemoveFromTransferList, choice: null, apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Written, exit.Applied);
+        Assert.True(exit.Confirmed);
+    }
+
+    [Fact]
+    public async Task A_lost_answer_with_a_failed_read_back_is_unknown()
+    {
+        Player(1);
+        _editor.GetOfferedActionsAsync(1, Arg.Any<CancellationToken>())
+            .Returns(_ => Set(PlayerMenuAction.RemoveFromTransferList), _ => throw new GameUnavailableException("timeout"));
+        Menu(1, PlayerMenuAction.RemoveFromTransferList, new MenuEntry { Label = "Remove from transfer list", CanRun = true });
+        LostAnswer();
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.RemoveFromTransferList, choice: null, apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Unknown, exit.Applied);
+        Assert.Null(exit.Confirmed);
+        Assert.Contains(exit.Notes, note => note.Contains("get_squad"));
+    }
+
+    [Fact]
+    public async Task A_sent_entry_whose_read_back_fails_is_still_reported_written()
+    {
+        Player(1);
+        _editor.GetOfferedActionsAsync(1, Arg.Any<CancellationToken>())
+            .Returns(_ => Set(PlayerMenuAction.RemoveFromTransferList), _ => throw new GameUnavailableException("timeout"));
+        Menu(1, PlayerMenuAction.RemoveFromTransferList, new MenuEntry { Label = "Remove from transfer list", CanRun = true });
+
+        var result = await _exits.ChangeAsync(1, PlayerExitAction.RemoveFromTransferList, choice: null, apply: true);
+
+        Assert.Equal(PlayerExitWrite.Written, result.Value.Applied);
+        Assert.Null(result.Value.Confirmed);
+        Assert.Contains(result.Value.Notes, note => note.Contains("get_squad"));
+    }
+
+    [Fact]
+    public async Task A_game_that_fails_before_the_send_is_unavailable_and_nothing_was_written()
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.RemoveFromTransferList);
+        Menu(1, PlayerMenuAction.RemoveFromTransferList, new MenuEntry { Label = "Remove from transfer list", CanRun = true });
+        _editor.SendMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameUnavailableException("down")));
+
+        var result = await _exits.ChangeAsync(1, PlayerExitAction.RemoveFromTransferList, choice: null, apply: true);
+
+        Assert.True(result.HasError<GameUnavailableError>());
+    }
+
+    [Fact]
     public async Task A_player_no_list_holds_is_not_found()
     {
         _editor.FindPlayersAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new Dictionary<int, ScoutedPlayer>());
@@ -187,6 +291,12 @@ public class PlayerExitServiceTests
         Assert.Contains("action", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
         await _editor.DidNotReceiveWithAnyArgs().SendMenuEntryAsync(default, default, default!, default!);
+    }
+
+    private void LostAnswer()
+    {
+        _editor.SendMenuEntryAsync(default, default, default!, default!)
+            .ReturnsForAnyArgs(Task.FromException(new GameAnswerLostException("The game didn't answer in time.")));
     }
 
     private static HashSet<PlayerMenuAction> Set(params PlayerMenuAction[] actions)

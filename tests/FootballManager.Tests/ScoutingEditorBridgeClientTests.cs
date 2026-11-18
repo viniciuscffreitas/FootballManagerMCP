@@ -104,6 +104,18 @@ public class ScoutingEditorBridgeClientTests
         Assert.Contains(PlayerMenuAction.SetTransferStatus, offered);
     }
 
+    [Fact]
+    public async Task A_send_the_game_doesnt_answer_is_a_lost_answer_not_a_refusal()
+    {
+        var plugin = new PlayerPlugin(StatusMenu("Sem situação definida", "Na lista de transferências"), sendTimesOut: true);
+        var client = await plugin.FoundAsync();
+
+        await Assert.ThrowsAsync<GameAnswerLostException>(() =>
+            client.SendMenuEntryAsync(Player, PlayerMenuAction.SetTransferStatus, [0, 1], TransferListed));
+
+        Assert.Single(plugin.Writes);
+    }
+
     private static string StatusMenu(string first, string? second = null, bool leafDisabled = false, bool topDisabled = false)
     {
         var levels = new List<string> { Level(first, leafDisabled && second is null) };
@@ -123,7 +135,7 @@ public class ScoutingEditorBridgeClientTests
 
     // The plugin as the client sees it: the player in the club's squad, his menu offering the transfer status entries;
     // or out on loan, his menu offering the recall, and back in the squad once the recall is sent.
-    private sealed class PlayerPlugin(string items, bool outOnLoan = false) : HttpMessageHandler
+    private sealed class PlayerPlugin(string items, bool outOnLoan = false, bool sendTimesOut = false) : HttpMessageHandler
     {
         private bool _outOnLoan = outOnLoan;
 
@@ -160,7 +172,9 @@ public class ScoutingEditorBridgeClientTests
             {
                 Writes.Add(request.RequestUri!);
                 _outOnLoan = false;
-                return Answer("{}");
+
+                // The request went out; its answer never comes back.
+                return sendTimesOut ? Task.FromException<HttpResponseMessage>(new TaskCanceledException("timeout")) : Answer("{}");
             }
 
             var url = Uri.UnescapeDataString(request.RequestUri!.Query);

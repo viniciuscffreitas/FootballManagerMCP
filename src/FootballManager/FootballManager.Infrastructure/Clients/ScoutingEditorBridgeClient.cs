@@ -452,7 +452,16 @@ internal sealed class ScoutingEditorBridgeClient(
                 "to pick. Nothing was sent; run the dry run again.");
         }
 
-        await bridge.WriteAsync<JsonElement>(send, cancellationToken);
+        try
+        {
+            await bridge.WriteAsync<JsonElement>(send, cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            // The send went out: a timeout or an error now doesn't say the game didn't take it.
+            _players.Remove(playerId);
+            throw new GameAnswerLostException($"The game's answer to {action} was lost: {exception.Message}", exception);
+        }
 
         // He's looked for again on the next read: the entry may have moved him (a recalled player leaves the loans list).
         _players.Remove(playerId);

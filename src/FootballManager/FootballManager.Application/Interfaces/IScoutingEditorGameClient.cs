@@ -62,7 +62,8 @@ public interface IScoutingEditorGameClient
     /// <summary>
     /// Sends the menu entry at <paramref name="entry"/> (an index per level, from the top) only if the menu, read again
     /// right before the send, still has it there with <paramref name="labels"/> at each level and greys out none of them;
-    /// otherwise it throws <see cref="Exceptions.GameRejectedException"/> and sends nothing. The player is looked for again
+    /// otherwise it throws <see cref="Exceptions.GameRejectedException"/> and sends nothing. A send whose answer is lost
+    /// throws <see cref="Exceptions.GameAnswerLostException"/>: the game may have taken it. The player is looked for again
     /// on the next read: the entry may move him to another list (a recalled player is no longer out on loan).
     /// </summary>
     Task SendMenuEntryAsync(

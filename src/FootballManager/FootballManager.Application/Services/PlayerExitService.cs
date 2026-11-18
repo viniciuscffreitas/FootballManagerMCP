@@ -103,25 +103,55 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
 
             exit.Notes.Add(SaveNote(clearance.Value));
 
-            var before = exit.Status;
-            await editor.SendMenuEntryAsync(playerId, menuAction, path, PlayerMenus.Labels(menu, path), cancellationToken);
+            var labels = PlayerMenus.Labels(menu, path);
+            var written = PlayerExitWrite.Written;
 
-            exit.Applied = true;
-
-            // An offer to clubs or a loan extension goes to other clubs, who answer in the inbox later: where he
-            // stands doesn't change, so it's read once.
-            if (action is PlayerExitAction.OfferToClubs or PlayerExitAction.ExtendLoan)
+            try
             {
-                exit.Status = StatusOf(await editor.GetOfferedActionsAsync(playerId, cancellationToken));
-                exit.Notes.Add("The clubs answer in the inbox, usually within a few days of the game's calendar: get_inbox.");
+                await editor.SendMenuEntryAsync(playerId, menuAction, path, labels, cancellationToken);
+            }
+            catch (GameAnswerLostException exception)
+            {
+                // The entry went out: a lost answer doesn't say the game didn't take it, the read back decides.
+                written = PlayerExitWrite.Unknown;
+                exit.Notes.Add($"Warning: {exception.Message}; the read back decides whether it was written.");
+            }
+
+            var expected = Expected(action, labels);
+
+            // The entry is sent by now: a read back that fails must not report it as failed, or it gets sent again.
+            try
+            {
+                exit.Status = await StatusAfterAsync(playerId, expected?.Shows, cancellationToken);
+            }
+            catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException)
+            {
+                exit.Applied = written;
+                exit.Notes.Add(written == PlayerExitWrite.Unknown
+                    ? $"Warning: the game may or may not have taken it, and his menu couldn't be read back ({exception.Message}): " +
+                      "check with get_squad before sending it again."
+                    : $"Sent, but his menu couldn't be read back ({exception.Message}): check with get_squad before sending it again.");
                 return Result.Ok(exit);
             }
 
-            exit.Status = await StatusAfterAsync(playerId, before, cancellationToken);
-
-            if (SameAs(exit.Status, before))
+            if (expected is not { } wanted)
             {
-                exit.Notes.Add($"The game's menu still shows {player.Name} as before ({Describe(exit.Status)}) after the entry was sent.");
+                exit.Applied = written;
+                exit.Notes.Add(action is PlayerExitAction.OfferToClubs or PlayerExitAction.ExtendLoan
+                    ? $"His menu doesn't show whether {Describe(action)} went to the clubs: they answer in the inbox, " +
+                      "usually within a few days of the game's calendar (get_inbox)."
+                    : $"His menu doesn't show the status '{exit.Choice}': check it with get_squad.");
+                return Result.Ok(exit);
+            }
+
+            var shown = wanted.Shows(exit.Status);
+            exit.Confirmed = shown;
+            exit.Applied = written == PlayerExitWrite.Unknown && !shown ? PlayerExitWrite.NotWritten : PlayerExitWrite.Written;
+
+            if (!shown)
+            {
+                exit.Notes.Add($"Warning: after the entry was sent, the game's menu doesn't show {player.Name} {wanted.What}: " +
+                               $"it shows him {Describe(exit.Status)}.");
             }
 
             return Result.Ok(exit);
@@ -182,23 +212,77 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
         }
     }
 
-    // Where he stands once the menu shows the change, or as it last showed him.
-    private async Task<PlayerExitStatus> StatusAfterAsync(int playerId, PlayerExitStatus before, CancellationToken cancellationToken)
+    // Where he stands once the menu shows him as the entry puts him, or as it last showed him. An entry whose effect
+    // the menu doesn't show is read once.
+    private async Task<PlayerExitStatus> StatusAfterAsync(
+        int playerId, Func<PlayerExitStatus, bool>? shows, CancellationToken cancellationToken)
     {
-        var status = before;
+        PlayerExitStatus status = new();
 
-        for (var check = 0; check < StateChecks; check++)
+        for (var check = 0; check < (shows is null ? 1 : StateChecks); check++)
         {
             await Task.Delay(StatePoll, cancellationToken);
             status = StatusOf(await editor.GetOfferedActionsAsync(playerId, cancellationToken));
 
-            if (!SameAs(status, before))
+            if (shows?.Invoke(status) == true)
             {
                 return status;
             }
         }
 
         return status;
+    }
+
+    // Where the entry puts him, as his menu shows it; null when the menu doesn't show it: an offer to clubs or a loan
+    // extension (the clubs answer later), or a status other than listed or not listed (the answers to offers, say).
+    // A status entry is read by its labels, in the game's display language (Portuguese, or English).
+    private static (Func<PlayerExitStatus, bool> Shows, string What)? Expected(PlayerExitAction action, List<string> labels)
+    {
+        switch (action)
+        {
+            case PlayerExitAction.RemoveFromTransferList:
+                return (status => !status.TransferListed, "off the transfer list");
+            case PlayerExitAction.RemoveFromLoanList:
+                return (status => !status.LoanListed, "off the loan list");
+            case PlayerExitAction.Recall:
+                return (status => !status.OutOnLoan, "back from loan");
+            case PlayerExitAction.SetTransferStatus when labels.Count == 2:
+                break;
+            default:
+                return null;
+        }
+
+        var (top, leaf) = (labels[0].Trim(), labels[1].Trim());
+
+        if (StartsWithAny(top, TransferStatusMenus))
+        {
+            return StartsWithAny(leaf, Listed) ? (status => status.TransferListed, "on the transfer list")
+                : StartsWithAny(leaf, NotListed) ? (status => !status.TransferListed, "off the transfer list")
+                : null;
+        }
+
+        if (StartsWithAny(top, LoanStatusMenus))
+        {
+            return StartsWithAny(leaf, LoanListed) ? (status => status.LoanListed, "on the loan list")
+                : StartsWithAny(leaf, NotLoanListed) ? (status => !status.LoanListed, "off the loan list")
+                : null;
+        }
+
+        return null;
+    }
+
+    // The transfer status menu's labels: "Situação de transferência" > "Na lista de transferências" / "Sem situação
+    // definida"; "Situação de empréstimo" > "Disponível para empréstimo" / "Sem situação definida" / "Indisponível".
+    private static readonly string[] TransferStatusMenus = ["Situação de transferência", "Transfer status"];
+    private static readonly string[] LoanStatusMenus = ["Situação de empréstimo", "Loan status"];
+    private static readonly string[] Listed = ["Na lista", "Transfer list"];
+    private static readonly string[] NotListed = ["Sem situação", "No status", "Not listed"];
+    private static readonly string[] LoanListed = ["Disponível", "Loan list", "Available"];
+    private static readonly string[] NotLoanListed = ["Sem situação", "Indisponível", "No status", "Unavailable", "Not listed"];
+
+    private static bool StartsWithAny(string label, string[] prefixes)
+    {
+        return prefixes.Any(prefix => label.StartsWith(prefix, StringComparison.CurrentCultureIgnoreCase));
     }
 
     private static PlayerExitStatus StatusOf(HashSet<PlayerMenuAction> offered)
@@ -209,11 +293,6 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             LoanListed = offered.Contains(PlayerMenuAction.RemoveFromLoanList),
             OutOnLoan = offered.Contains(PlayerMenuAction.RecallFromLoan)
         };
-    }
-
-    private static bool SameAs(PlayerExitStatus a, PlayerExitStatus b)
-    {
-        return a.TransferListed == b.TransferListed && a.LoanListed == b.LoanListed && a.OutOnLoan == b.OutOnLoan;
     }
 
     private static PlayerMenuAction MenuActionOf(PlayerExitAction action)

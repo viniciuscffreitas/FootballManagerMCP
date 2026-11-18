@@ -3,7 +3,14 @@ namespace FootballManager.Domain.Transfers;
 /// <summary>A change to a player's way out of the club, planned from his menu in the game, and sent when applied.</summary>
 public class PlayerExit
 {
-    public bool Applied { get; set; }
+    /// <summary>NotWritten for a dry run; Unknown when the game's answer was lost and the read back can't tell.</summary>
+    public PlayerExitWrite Applied { get; set; }
+
+    /// <summary>
+    /// Whether the read back after the send shows him where the entry puts him; null for a dry run, an entry whose
+    /// effect his menu doesn't show (an offer, a loan extension), or a read back that failed.
+    /// </summary>
+    public bool? Confirmed { get; set; }
     public int PlayerId { get; set; }
     public required string PlayerName { get; set; }
     public PlayerExitAction Action { get; set; }

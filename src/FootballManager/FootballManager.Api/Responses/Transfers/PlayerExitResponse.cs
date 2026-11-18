@@ -1,10 +1,16 @@
+using System.Text.Json.Serialization;
 using FootballManager.Domain.Transfers;
 
 namespace FootballManager.Api.Responses.Transfers;
 
 public class PlayerExitResponse
 {
-    public bool Applied { get; set; }
+    /// <summary>Written, NotWritten (also a dry run) or Unknown: then check with get_squad before sending it again.</summary>
+    public PlayerExitWrite Applied { get; set; }
+
+    /// <summary>Whether the read back shows the change; null when it can't tell (see notes). Always sent, null included.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public bool? Confirmed { get; set; }
     public int PlayerId { get; set; }
     public required string PlayerName { get; set; }
     public PlayerExitAction Action { get; set; }
