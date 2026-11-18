@@ -452,6 +452,7 @@ public class MappingConfig
         config.NewConfig<BridgeMenuItemDto, MenuEntry>()
             .Map(dest => dest.Label, src => MenuLabel(src))
             .Map(dest => dest.CanRun, src => MenuRuns(src))
+            .Map(dest => dest.Disabled, src => MenuFields(src).Disabled == true)
             .Map(dest => dest.Confirmation, src => MenuConfirmation(src))
             .Map(dest => dest.ConfirmationIsWarning, src => MenuWarns(src))
             .Map(dest => dest.Children, src => src.ChildList ?? new List<BridgeMenuItemDto>());
@@ -801,6 +802,16 @@ public class MappingConfig
     // The club vision screen. An objective the game leaves unnamed isn't shown; the culture texts hold one item a line.
     private static void RegisterBoard(TypeAdapterConfig config)
     {
+        // The budget adjustment panel: a flag the game leaves out reads as not allowed.
+        config.NewConfig<BridgeBudgetPanelDto, BudgetPanel>()
+            .Map(dest => dest.SliderValue, src => src.SliderValue ?? 0)
+            .Map(dest => dest.TransferBudget, src => Text(src.TransferBudget))
+            .Map(dest => dest.WageBudget, src => Text(src.WageBudget))
+            .Map(dest => dest.CanEdit, src => src.CanEdit == true)
+            .Map(dest => dest.CanEditUp, src => src.CanEditUp == true)
+            .Map(dest => dest.CanEditDown, src => src.CanEditDown == true)
+            .Map(dest => dest.Board, src => Text(src.Board));
+
         config.NewConfig<BridgeTeamConfidenceDto, BoardConfidence>()
             .Map(dest => dest.Grade, src => src.BoardGrade)
             .Map(dest => dest.Summary, src => Text(src.BoardSummary))
@@ -1244,10 +1255,12 @@ public class MappingConfig
         return MenuFields(item).ActionData?.ConfirmationDialogData?.IsErrorDialog == true;
     }
 
-    // The dialog's text on one line, as the game words it ("Ask the scouts to watch X? ... travel costs ...").
+    // The dialog's text on one line, as the game words it ("Ask the scouts to watch X? ... travel costs ..."). An entry
+    // that asks nothing may still tell the user something once it ran (the board's "it will get back to you").
     private static string? MenuConfirmation(BridgeMenuItemDto item)
     {
-        var description = Text(MenuFields(item).ActionData?.ConfirmationDialogData?.Description);
+        var data = MenuFields(item).ActionData;
+        var description = Text(data?.ConfirmationDialogData?.Description) ?? Text(data?.OKDialogData?.Description);
 
         return description is null
             ? null

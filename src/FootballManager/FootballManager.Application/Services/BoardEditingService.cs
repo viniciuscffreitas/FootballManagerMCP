@@ -25,10 +25,11 @@ public interface IBoardEditingService
     Task<Result<BoardAnswer>> AnswerAsync(string? line, bool apply, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Moves money between the transfer and the wage budget with the game's budget adjustment slider. A dry run unless
-    /// <paramref name="apply"/>; applying with no <paramref name="sliderValue"/> only opens the panel and reads it.
+    /// Moves money between the transfer and the wage budget with the game's budget adjustment panel. A dry run unless
+    /// <paramref name="apply"/>; applying with no <paramref name="steps"/> only opens the panel and reads it.
     /// </summary>
-    Task<Result<BudgetAdjustment>> AdjustBudgetAsync(float? sliderValue, bool apply, CancellationToken cancellationToken = default);
+    /// <param name="steps">Steps of the game's own increment; positive moves money from the transfer to the wage budget.</param>
+    Task<Result<BudgetAdjustment>> AdjustBudgetAsync(int? steps, bool apply, CancellationToken cancellationToken = default);
 }
 
 // Requests to the board go through the club's menu, as the board screen's do: the game offers only what the board will
@@ -154,7 +155,7 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
         }
     }
 
-    public async Task<Result<BudgetAdjustment>> AdjustBudgetAsync(float? sliderValue, bool apply, CancellationToken cancellationToken = default)
+    public async Task<Result<BudgetAdjustment>> AdjustBudgetAsync(int? steps, bool apply, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -164,7 +165,7 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
                 return Fail<BudgetAdjustment>("budget", "The club's menu doesn't offer a budget adjustment now.");
             }
 
-            var plan = new BudgetAdjustment { Budgets = budgets, SliderValue = sliderValue };
+            var plan = new BudgetAdjustment { Budgets = budgets, Steps = steps };
 
             if (!apply)
             {
@@ -187,7 +188,7 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
 
             plan.Before = panel;
 
-            if (sliderValue is not { } value)
+            if (steps is not ({ } value and not 0))
             {
                 plan.Applied = true;
                 return Result.Ok(plan);
@@ -195,10 +196,10 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
 
             if (!panel.CanEdit)
             {
-                return Fail<BudgetAdjustment>("sliderValue", $"The board doesn't let the user move the budgets now: {panel.Board}");
+                return Fail<BudgetAdjustment>("steps", $"The board doesn't let the user move the budgets now: {panel.Board}");
             }
 
-            plan.After = await game.SetBudgetSliderAsync(value, cancellationToken);
+            plan.After = await game.MoveBudgetAsync(value, cancellationToken);
             plan.Applied = true;
             return Result.Ok(plan);
         }

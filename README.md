@@ -98,6 +98,9 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
 | | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
 | Board | `get_board` | The board's and the supporters' confidence (grade and texts, the board's praise and criticism), the club vision's objectives, each side's culture, requests to the board and promises made to it |
+| Board | `request_from_board` | Asks the board through the club's menu: the board talk (facilities, youth, staff...), a bigger wage or transfer budget, a new contract for the user, an affiliate. Dry run by default |
+| Board | `answer_board` | Says a line in the talk with the board on screen: a request's, or the club vision and season expectations meeting's. Dry run by default |
+| Board | `adjust_budget` | Moves money between the transfer and the wage budget with the game's budget panel, in the game's own steps. Dry run by default |
 | News | `get_news` | The newest stories about your club and your league from the news portal (date, title, club, source), their text on request |
 | Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
 | | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |

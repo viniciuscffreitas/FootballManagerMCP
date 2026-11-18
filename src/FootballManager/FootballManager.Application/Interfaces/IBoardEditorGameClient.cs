@@ -31,6 +31,9 @@ public interface IBoardEditorGameClient
     /// <summary>Opens the budget adjustment panel (if it isn't open) and reads it; null when it didn't open.</summary>
     Task<BudgetPanel?> OpenBudgetPanelAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Moves the panel's slider, confirms the split and reads the panel back.</summary>
-    Task<BudgetPanel?> SetBudgetSliderAsync(float value, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Moves the panel's split by <paramref name="steps"/> of the game's own increment (positive: from the transfer to the
+    /// wage budget), confirms it and reads the panel back.
+    /// </summary>
+    Task<BudgetPanel?> MoveBudgetAsync(int steps, CancellationToken cancellationToken = default);
 }
