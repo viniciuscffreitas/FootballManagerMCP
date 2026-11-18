@@ -16,6 +16,8 @@ namespace FootballManager.Application.Services;
 public class ContractActionsService(IScoutingEditorGameClient editor, IContractsGameClient contracts, ISaveGuard saveGuard)
     : IContractActionsService
 {
+    private readonly record struct MenuLeaf(List<int> Path, List<string> Labels, MenuEntry Entry, bool IsDisabled);
+
     // The game shows a contract change in the squad's contracts a moment after it's taken.
     private const int StateChecks = 5;
     private static readonly TimeSpan StatePoll = TimeSpan.FromMilliseconds(400);
@@ -81,41 +83,41 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
                                     "he may not be one of the club's own players, or his contract doesn't allow it).");
             }
 
-            var leaves = Leaves(menu, []).ToList();
+            var leaves = Leaves(menu, [], [], false).ToList();
             var picked = wanted is null
-                ? leaves.Where(leaf => !leaf.Entry.IsDisabled).Select(leaf => ((List<int> Path, MenuEntry Entry)?)leaf).FirstOrDefault()
+                ? leaves.Where(leaf => !leaf.IsDisabled).Select(leaf => (MenuLeaf?)leaf).FirstOrDefault()
                 : Find(leaves, wanted);
 
-            if (picked is null || picked.Value.Entry.IsDisabled)
+            if (picked is not { IsDisabled: false } leaf)
             {
-                var labels = string.Join(", ", leaves.Select(leaf => leaf.Entry.Label + (leaf.Entry.IsDisabled ? " (greyed out)" : "")));
+                var labels = string.Join(", ", leaves.Select(each => each.Entry.Label + (each.IsDisabled ? " (greyed out)" : "")));
                 return Fail(wanted is null ? "game" : "status", wanted is null
                     ? $"The game's menu for {player.Name} has no entry it lets be picked now: {labels}."
                     : $"The game's menu offers {player.Name} none of '{wanted}' it lets be picked now. Its entries: {labels}.");
             }
 
-            var (path, entry) = picked.Value;
+            var entry = leaf.Entry;
             var current = await ContractOfAsync(playerId, cancellationToken);
             var change = new ContractChange
             {
                 PlayerId = player.Id,
                 PlayerName = player.Name,
                 Action = action,
-                Choice = PlayerMenus.Label(menu, path),
+                Choice = string.Join(" > ", leaf.Labels),
                 Confirmation = entry.Confirmation,
                 ConfirmationIsWarning = entry.ConfirmationIsWarning,
                 AgreedPlayingTime = current?.AgreedPlayingTime,
-                Choices = action == PlayerMenuAction.SetPlayingTime ? leaves.Select(leaf => leaf.Entry.Label).ToList() : []
+                Choices = action == PlayerMenuAction.SetPlayingTime ? leaves.Select(each => each.Entry.Label).ToList() : []
             };
 
             if (!apply)
             {
                 change.Notes.Add(entry.Confirmation is not null
-                    ? "Show the user the game's confirmation first: applying answers \"Yes\" to it."
+                    ? "Show the user the game's confirmation first: applying answers \"Yes\" to the game's dialog only when it names him and holds that confirmation."
                     : IsRelease(action)
                         ? "The game's menu doesn't state what letting him go costs: tell the user the cost isn't known before applying " +
-                          "(get_contracts shows his wage and time left). Applying answers \"Yes\" to the game's dialog and returns its text."
-                        : "The game's menu states no confirmation for it: applying answers \"Yes\" to whatever dialog the game shows, and returns its text.");
+                          "(get_contracts shows his wage and time left). Applying answers \"Yes\" to the game's dialog only when it names him, and returns its text."
+                        : "The game's menu states no confirmation for it: applying answers \"Yes\" to the game's dialog only when it names him, and returns its text.");
                 return Result.Ok(change);
             }
 
@@ -127,10 +129,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             }
 
             change.Notes.Add(SaveNote(clearance.Value));
-            change.DialogAnswered = await editor.ClickMenuEntryAsync(playerId, action, path, cancellationToken);
-            change.Applied = true;
-
-            await ReadBackAsync(change, cancellationToken);
+            await ApplyAsync(change, leaf, cancellationToken);
             return Result.Ok(change);
         }
         catch (GameUnavailableException exception)
@@ -143,44 +142,112 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         }
     }
 
-    // What the squad's contracts show once the game has taken the change: the new status, or whether he's still listed.
-    private async Task ReadBackAsync(ContractChange change, CancellationToken cancellationToken)
+    // Picks the entry, answers its dialog, and reads the change back. From the pick on, nothing fails the call: each step
+    // says what it did, so that the caller doesn't send again what the game may have taken. A refusal before the pick
+    // (the menu changed, a dialog already open) throws: nothing was sent.
+    private async Task ApplyAsync(ContractChange change, MenuLeaf leaf, CancellationToken cancellationToken)
     {
-        for (var check = 0; check < StateChecks; check++)
+        try
         {
-            if (check > 0)
-            {
-                await Task.Delay(StatePoll, cancellationToken);
-            }
-
-            var contract = await ContractOfAsync(change.PlayerId, cancellationToken);
-            change.StillInSquad = contract is not null;
-            change.AgreedPlayingTimeAfter = contract?.AgreedPlayingTime;
-
-            if (Reached(change))
-            {
-                return;
-            }
+            await editor.ClickMenuEntryAsync(change.PlayerId, change.Action, leaf.Path, leaf.Labels, cancellationToken);
+            change.Menu = MenuWrite.Written;
+        }
+        catch (GameWriteUnknownException exception)
+        {
+            change.Menu = MenuWrite.Unknown;
+            change.Notes.Add($"The game didn't answer the pick ({exception.Message}): the read back decides whether it took.");
         }
 
-        change.Notes.Add(change.Action switch
+        if (change.Menu == MenuWrite.Written)
         {
-            PlayerMenuAction.SetPlayingTime => "The game doesn't show the new status in his contract yet: check get_contracts before sending it again.",
-            PlayerMenuAction.ReleaseOnFreeTransfer => "The first team still lists him: the game may let him go at its next day's processing. Check get_squad after continuing.",
-            _ => "The change was sent: check his menu or get_contracts before sending it again."
-        });
+            // Only the dialog of this action is answered: it names him and, when the menu stated one, holds the
+            // confirmation the dry run showed (for a release, its cost).
+            List<string> expected = [change.PlayerName, .. leaf.Entry.Confirmation is { } confirmation ? [confirmation] : Array.Empty<string>()];
+            var dialog = await editor.AnswerDialogAsync(expected, cancellationToken);
+            change.Dialog = dialog.State;
+            change.DialogText = dialog.Text;
+        }
+
+        await ReadBackAsync(change, leaf.Entry.Label, cancellationToken);
+
+        if (change.Menu == MenuWrite.Unknown && change.Confirmed == true)
+        {
+            change.Menu = MenuWrite.Written;
+        }
+
+        change.Applied = change.Confirmed == true || (change.Menu == MenuWrite.Written && change.Dialog switch
+        {
+            DialogState.Answered => true,
+            DialogState.NotShown => leaf.Entry.Confirmation is null,
+            _ => false
+        })
+            ? AppliedState.Yes
+            : AppliedState.Partial;
+
+        if (change.Applied == AppliedState.Partial)
+        {
+            change.Notes.Add(change.Dialog switch
+            {
+                DialogState.NotAnswered when change.DialogText is not null =>
+                    $"The game showed a dialog that isn't this action's (it doesn't name {change.PlayerName} or hold the dry run's " +
+                    $"confirmation), so it wasn't answered: \"{change.DialogText}\". Ask the user to resolve it in the game.",
+                DialogState.NotAnswered =>
+                    "The game's dialog couldn't be read, so it wasn't answered. Ask the user to check the game for an open dialog.",
+                DialogState.Unknown =>
+                    "\"Yes\" was sent to the game's dialog but it didn't close, or the game didn't answer. Ask the user to check the game.",
+                DialogState.NotShown =>
+                    "The game showed no confirmation dialog though the menu stated one. Ask the user to check the game.",
+                _ => "The game didn't answer the pick and the read back doesn't show the change. Check the game before sending it again."
+            });
+        }
     }
 
-    private static bool Reached(ContractChange change)
+    // What the squad's contracts show once the game has taken the change, compared with what was asked: the status
+    // picked, or him gone from the first team. A read back that fails leaves it unconfirmed, never an error.
+    private async Task ReadBackAsync(ContractChange change, string picked, CancellationToken cancellationToken)
     {
-        return change.Action switch
+        if (change.Action is not (PlayerMenuAction.SetPlayingTime or PlayerMenuAction.ReleaseOnFreeTransfer))
         {
-            PlayerMenuAction.SetPlayingTime => change.AgreedPlayingTimeAfter != change.AgreedPlayingTime,
-            PlayerMenuAction.ReleaseOnFreeTransfer => change.StillInSquad == false,
+            change.Notes.Add(change.Action == PlayerMenuAction.MutualTermination
+                ? "He answers the offer later: confirmed stays null. Check get_contracts or his inbox after continuing."
+                : "The game doesn't show this change in his contract: confirmed stays null. Check his menu before sending it again.");
+            return;
+        }
 
-            // A mutual termination waits for his answer; the other changes don't show in the contract's fields.
-            _ => true
-        };
+        try
+        {
+            for (var check = 0; check < StateChecks; check++)
+            {
+                if (check > 0)
+                {
+                    await Task.Delay(StatePoll, cancellationToken);
+                }
+
+                var contract = await ContractOfAsync(change.PlayerId, cancellationToken);
+                change.StillInSquad = contract is not null;
+                change.AgreedPlayingTimeAfter = contract?.AgreedPlayingTime;
+                change.Confirmed = change.Action == PlayerMenuAction.SetPlayingTime
+                    ? change.AgreedPlayingTimeAfter is { } after ? Plain(after) == Plain(picked) : null
+                    : !change.StillInSquad;
+
+                if (change.Confirmed == true)
+                {
+                    return;
+                }
+            }
+        }
+        catch (GameUnavailableException exception)
+        {
+            change.Confirmed = null;
+            change.Notes.Add($"The change was sent but reading it back failed ({exception.Message}): check get_contracts before sending it again.");
+            return;
+        }
+
+        change.Notes.Add(change.Action == PlayerMenuAction.SetPlayingTime
+            ? change.Confirmed == false
+                ? $"His contract shows '{change.AgreedPlayingTimeAfter}', not '{picked}': check get_contracts before sending it again."
+                : "The game didn't read back his status: check get_contracts before sending it again."
+            : "The first team still lists him: the game may let him go at its next day's processing. Check get_squad after continuing.");
     }
 
     private async Task<SquadPlayerContract?> ContractOfAsync(int playerId, CancellationToken cancellationToken)
@@ -188,20 +255,23 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         return (await contracts.GetContractsAsync(cancellationToken)).FirstOrDefault(contract => contract.PlayerId == playerId);
     }
 
-    // Every entry that does something rather than open a sub-menu, with its path (an index per level, from the top).
-    private static IEnumerable<(List<int> Path, MenuEntry Entry)> Leaves(List<MenuEntry> entries, List<int> above)
+    // Every entry that does something rather than open a sub-menu, with its path (an index per level, from the top), its
+    // label at each level, and whether it or a level above it is greyed out.
+    private static IEnumerable<MenuLeaf> Leaves(List<MenuEntry> entries, List<int> above, List<string> labelsAbove, bool disabledAbove)
     {
         for (var i = 0; i < entries.Count; i++)
         {
             List<int> path = [.. above, i];
+            List<string> labels = [.. labelsAbove, entries[i].Label];
+            var disabled = disabledAbove || entries[i].IsDisabled;
 
             if (entries[i].Children.Count == 0)
             {
-                yield return (path, entries[i]);
+                yield return new MenuLeaf(path, labels, entries[i], disabled);
                 continue;
             }
 
-            foreach (var leaf in Leaves(entries[i].Children, path))
+            foreach (var leaf in Leaves(entries[i].Children, path, labels, disabled))
             {
                 yield return leaf;
             }
@@ -209,7 +279,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     }
 
     // The entry labelled so, ignoring case and accents; else the only one whose label holds it.
-    private static (List<int> Path, MenuEntry Entry)? Find(List<(List<int> Path, MenuEntry Entry)> leaves, string wanted)
+    private static MenuLeaf? Find(List<MenuLeaf> leaves, string wanted)
     {
         var key = Plain(wanted);
         var exact = leaves.Where(leaf => Plain(leaf.Entry.Label) == key).ToList();

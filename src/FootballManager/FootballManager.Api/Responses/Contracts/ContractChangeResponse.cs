@@ -1,10 +1,12 @@
+using System.Text.Json.Serialization;
+using FootballManager.Domain.Contracts;
 using FootballManager.Domain.Scouting;
 
 namespace FootballManager.Api.Responses.Contracts;
 
 public class ContractChangeResponse
 {
-    public bool Applied { get; set; }
+    public AppliedState Applied { get; set; }
     public int PlayerId { get; set; }
     public required string PlayerName { get; set; }
     public PlayerMenuAction Action { get; set; }
@@ -14,7 +16,13 @@ public class ContractChangeResponse
     public string? AgreedPlayingTime { get; set; }
     public string? AgreedPlayingTimeAfter { get; set; }
     public List<string> Choices { get; set; } = [];
-    public string? DialogAnswered { get; set; }
+    public MenuWrite Menu { get; set; }
+    public DialogState? Dialog { get; set; }
+    public string? DialogText { get; set; }
     public bool? StillInSquad { get; set; }
+
+    /// <summary>Null when the read back can't tell: serialized as null rather than left out.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public bool? Confirmed { get; set; }
     public List<string> Notes { get; set; } = [];
 }

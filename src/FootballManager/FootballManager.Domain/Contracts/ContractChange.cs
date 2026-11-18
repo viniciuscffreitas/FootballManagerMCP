@@ -8,7 +8,8 @@ namespace FootballManager.Domain.Contracts;
 /// </summary>
 public class ContractChange
 {
-    public bool Applied { get; set; }
+    /// <summary>No for a dry run; Partial when the game may be waiting on the user (see Menu, Dialog and Notes).</summary>
+    public AppliedState Applied { get; set; }
     public int PlayerId { get; set; }
     public required string PlayerName { get; set; }
 
@@ -33,11 +34,23 @@ public class ContractChange
     /// <summary>For a squad status: every status the menu offers him.</summary>
     public List<string> Choices { get; set; } = [];
 
-    /// <summary>Once applied: the text of the confirmation dialog the game showed and the tool answered "Yes" to.</summary>
-    public string? DialogAnswered { get; set; }
+    /// <summary>Once applied: whether the pick of the menu entry reached the game.</summary>
+    public MenuWrite Menu { get; set; }
 
-    /// <summary>Once applied: whether the first team still lists him (a release).</summary>
+    /// <summary>Once applied: what became of the game's confirmation dialog; null for a dry run.</summary>
+    public DialogState? Dialog { get; set; }
+
+    /// <summary>Once applied: the text of the confirmation dialog the game showed, answered or not.</summary>
+    public string? DialogText { get; set; }
+
+    /// <summary>Once applied: whether the first team still lists him (a release on a free transfer).</summary>
     public bool? StillInSquad { get; set; }
+
+    /// <summary>
+    /// Once applied: whether the game's read back shows exactly the change asked for (the status picked, him gone from
+    /// the squad); null when the game doesn't show it in his contract or the read back failed.
+    /// </summary>
+    public bool? Confirmed { get; set; }
 
     public List<string> Notes { get; set; } = [];
 }

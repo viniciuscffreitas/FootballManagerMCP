@@ -1,5 +1,8 @@
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using FootballManager.Application.Exceptions;
+using FootballManager.Domain.Scouting;
 using FootballManager.Infrastructure.Constants;
 
 namespace FootballManager.Infrastructure.Clients;
@@ -21,44 +24,81 @@ internal sealed class GameDialogs(GameBridge bridge)
     }
 
     /// <summary>
-    /// Waits for a dialog to show and answers "Yes" to it; its text, or null when none showed. Throws
-    /// <see cref="GameRejectedException"/> when it stays open after the answer.
+    /// Waits for a dialog to show and answers "Yes" to it only when its text holds every one of
+    /// <paramref name="expected"/> (case, accents and line breaks aside), so that a dialog other than the action's is
+    /// never answered. Never throws for the game: what it could tell is in the answer's state.
     /// </summary>
-    public async Task<string?> AnswerYesAsync(CancellationToken cancellationToken)
+    public async Task<DialogAnswer> AnswerYesAsync(IReadOnlyList<string> expected, CancellationToken cancellationToken)
     {
         (string Text, string? Yes)? dialog = null;
 
-        for (var check = 0; check < ShowChecks && dialog is null; check++)
+        try
         {
-            await Task.Delay(Poll, cancellationToken);
-            dialog = await ReadAsync(cancellationToken);
+            for (var check = 0; check < ShowChecks && dialog is null; check++)
+            {
+                await Task.Delay(Poll, cancellationToken);
+                dialog = await ReadAsync(cancellationToken);
+            }
+        }
+        catch (GameUnavailableException)
+        {
+            // Nothing was clicked; whether a dialog showed isn't known.
+            return new DialogAnswer { State = DialogState.NotAnswered };
         }
 
         if (dialog is not { } shown)
         {
-            return null;
+            return new DialogAnswer { State = DialogState.NotShown };
         }
 
-        if (shown.Yes is null)
+        var text = Plain(shown.Text);
+
+        if (shown.Yes is null || !expected.All(part => text.Contains(Plain(part), StringComparison.Ordinal)))
         {
-            throw new GameRejectedException($"The game's dialog has no \"Yes\" button: {shown.Text}");
+            return new DialogAnswer { State = DialogState.NotAnswered, Text = shown.Text };
         }
 
-        await bridge.WriteAsync<JsonElement>(
-            BridgeQuery.Write(DialogConstants.ClickEndpoint, [("path", shown.Yes), ("how", DialogConstants.ClickHow)]),
-            cancellationToken);
-
-        for (var check = 0; check < CloseChecks; check++)
+        try
         {
-            await Task.Delay(Poll, cancellationToken);
+            await bridge.WriteAsync<JsonElement>(
+                BridgeQuery.Write(DialogConstants.ClickEndpoint, [("path", shown.Yes), ("how", DialogConstants.ClickHow)]),
+                cancellationToken);
+        }
+        catch (GameRejectedException)
+        {
+            return new DialogAnswer { State = DialogState.NotAnswered, Text = shown.Text };
+        }
+        catch (GameUnavailableException)
+        {
+            return new DialogAnswer { State = DialogState.Unknown, Text = shown.Text };
+        }
 
-            if (await ReadAsync(cancellationToken) is null)
+        try
+        {
+            for (var check = 0; check < CloseChecks; check++)
             {
-                return shown.Text;
+                await Task.Delay(Poll, cancellationToken);
+
+                if (await ReadAsync(cancellationToken) is null)
+                {
+                    return new DialogAnswer { State = DialogState.Answered, Text = shown.Text };
+                }
             }
         }
+        catch (GameUnavailableException)
+        {
+            // Clicked, but whether it closed isn't known.
+        }
 
-        throw new GameRejectedException($"The game's dialog stayed open after \"Yes\": {shown.Text}");
+        return new DialogAnswer { State = DialogState.Unknown, Text = shown.Text };
+    }
+
+    // Lower case, without accents, every run of white space as one space.
+    private static string Plain(string text)
+    {
+        var letters = text.ToLowerInvariant().Normalize(NormalizationForm.FormD)
+            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark);
+        return string.Join(' ', new string(letters.ToArray()).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 
     // The shown dialog's texts ("Confirme, por favor: Enviar a numeração atual do elenco?") and its Yes button's path.

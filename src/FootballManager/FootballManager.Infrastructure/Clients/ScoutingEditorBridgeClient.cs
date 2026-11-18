@@ -375,6 +375,19 @@ internal sealed class ScoutingEditorBridgeClient(
                 .Props([ScoutingConstants.Actions]),
             cancellationToken);
 
+        // Actions the game didn't answer in time are unknown: read as none, a sent action would look taken away.
+        if (offered.Pending?.Contains(ScoutingConstants.Actions) == true)
+        {
+            throw new GameUnavailableException("The game didn't answer which actions his menu offers (it may be busy).");
+        }
+
+        // A read the game failed is unknown too, not an empty menu.
+        if (offered.Errors?.ContainsKey(ScoutingConstants.Actions) == true)
+        {
+            throw new GameUnavailableException(
+                $"The game failed to read which actions his menu offers: {offered.Errors[ScoutingConstants.Actions]}");
+        }
+
         return offered.Values.Actions?.Keys.ToHashSet() ?? [];
     }
 
@@ -433,51 +446,109 @@ internal sealed class ScoutingEditorBridgeClient(
     }
 
     // As the menu's click does: /contextaction runs the entry through PluginContextMenuContributor with the event and the
-    // payload the game built for it. Unlike EventFmxDoAction, a click shows the entry's confirmation dialog, which is
-    // answered here as the user would.
-    public async Task<string?> ClickMenuEntryAsync(
-        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default)
+    // payload the game built for it. Unlike EventFmxDoAction, a click shows the entry's confirmation dialog, which
+    // AnswerDialogAsync answers once it's checked to be this entry's.
+    public async Task ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default)
     {
-        if (entry.Count == 0)
+        if (entry.Count == 0 || labels.Count != entry.Count)
         {
-            throw new ArgumentException("Name the menu entry to pick.", nameof(entry));
+            throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
         }
 
         if (await dialogs.OpenDialogAsync(cancellationToken) is { } open)
         {
-            throw new GameRejectedException($"A dialog is open in the game ({open}): ask the user to answer it first.");
+            throw new GameRejectedException($"A dialog is open in the game ({open}): ask the user to answer it first. Nothing was sent.");
         }
 
         var player = await PlaceAsync(playerId, cancellationToken);
         var actionId = ScoutingConstants.ActionIdOf(action);
-        var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
-        var picked = ItemAt(menu.Values.Items, entry)
-                     ?? throw new GameRejectedException("The game's menu no longer has that entry: run the dry run again.");
+        var payload = PayloadOf(entry);
 
-        // The entry's own event, as a click passes it: EventFmxDoAction (44) for one that does something, 0 for one that
-        // opens a panel or card.
-        await bridge.WriteAsync<JsonElement>(
-            OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
-                ("action", actionId.ToString(CultureInfo.InvariantCulture)),
-                ("eventId", ((picked.RowData ?? picked).Event ?? 0).ToString(CultureInfo.InvariantCulture)),
-                ("field", $"Data:{PayloadOf(entry)}")),
-            cancellationToken);
-
-        return await dialogs.AnswerYesAsync(cancellationToken);
-    }
-
-    // The entry at the path (an index per level), or null when the menu has none there.
-    private static BridgeMenuItemDto? ItemAt(List<BridgeMenuItemDto> items, IReadOnlyList<int> entry)
-    {
-        var item = entry[0] < items.Count ? items[entry[0]] : null;
-
-        foreach (var index in entry.Skip(1))
+        if (!(await OfferedAsync(player, cancellationToken)).Contains(ActionKey(actionId)))
         {
-            var children = item?.ChildList;
-            item = children is not null && index < children.Count ? children[index] : null;
+            throw new GameRejectedException($"The game's menu no longer offers {action} for him. Nothing was sent; run the dry run again.");
         }
 
-        return item;
+        // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
+        // The entry must still be at that place with those labels, and not greyed out at any level, or nothing is sent.
+        // The plugin still finds the entry by its place when it gets the send; a menu the game rebuilds in that gap
+        // (a few milliseconds) isn't caught here.
+        var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
+        var item = EntryAt(menu.Values.Items, entry, labels)
+                   ?? throw new GameRejectedException(
+                       $"The game's menu for {action} changed since the check: it no longer has " +
+                       $"'{string.Join(" > ", labels)}' to pick. Nothing was sent; run the dry run again.");
+
+        // The entry's event, as a click passes it: EventFmxDoAction (44) for one that does something, 0 for one that
+        // opens a panel or card. Only the two the client knows are sent: the plugin reads a missing event as 0, so any
+        // other would run as a context action.
+        var eventId = Fields(item).Event;
+
+        if (eventId is not (ScoutingConstants.DoActionEventId or 0))
+        {
+            throw new GameRejectedException(
+                $"The game's entry '{string.Join(" > ", labels)}' sends event {eventId?.ToString(CultureInfo.InvariantCulture) ?? "none"}, " +
+                "which this tool doesn't know how to send. Nothing was sent.");
+        }
+
+        try
+        {
+            await bridge.WriteAsync<JsonElement>(
+                OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
+                    ("action", actionId.ToString(CultureInfo.InvariantCulture)),
+                    ("eventId", eventId.Value.ToString(CultureInfo.InvariantCulture)),
+                    ("field", $"Data:{payload}")),
+                cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            // Sent, but not answered: the game may have taken it.
+            throw new GameWriteUnknownException($"The game didn't answer the pick of '{string.Join(" > ", labels)}': {exception.Message}", exception);
+        }
+    }
+
+    public Task<DialogAnswer> AnswerDialogAsync(IReadOnlyList<string> expected, CancellationToken cancellationToken = default)
+    {
+        return dialogs.AnswerYesAsync(expected, cancellationToken);
+    }
+
+    // The entry at that place when each level still has that label (as the menu shows it, case aside) and isn't greyed
+    // out, and the entry can be picked: no sub-entries.
+    private static BridgeMenuItemDto? EntryAt(List<BridgeMenuItemDto> items, IReadOnlyList<int> entry, IReadOnlyList<string> labels)
+    {
+        BridgeMenuItemDto? item = null;
+        var level = items;
+
+        for (var i = 0; i < entry.Count; i++)
+        {
+            if (level is null || entry[i] < 0 || entry[i] >= level.Count)
+            {
+                return null;
+            }
+
+            item = level[entry[i]];
+
+            if (!string.Equals(Label(item), labels[i], StringComparison.CurrentCultureIgnoreCase) || Fields(item).Disabled == true)
+            {
+                return null;
+            }
+
+            level = item.ChildList;
+        }
+
+        return item is null || item.ChildList is { Count: > 0 } ? null : item;
+    }
+
+    private static BridgeMenuItemDto Fields(BridgeMenuItemDto item)
+    {
+        return item.Text is null && item.RowData is not null ? item.RowData : item;
+    }
+
+    private static string Label(BridgeMenuItemDto item)
+    {
+        return (string.IsNullOrWhiteSpace(item.Text) ? item.RowData?.Text : item.Text) ?? string.Empty;
     }
 
     // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.

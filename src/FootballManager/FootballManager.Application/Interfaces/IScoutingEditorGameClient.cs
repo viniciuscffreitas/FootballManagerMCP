@@ -72,11 +72,19 @@ public interface IScoutingEditorGameClient
     Task RunMenuClickAsync(int playerId, PlayerMenuAction action, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Picks the menu entry at <paramref name="entry"/> (an index per level, from the top) as a click on the menu does,
-    /// then answers "Yes" to the confirmation dialog the game shows for it. Refused while a dialog is already open in
-    /// the game, so that none of the user's is answered. Returns the text of the dialog answered, or null when the game
-    /// showed none.
+    /// Picks the menu entry at <paramref name="entry"/> (an index per level, from the top) as a click on the menu does.
+    /// The player's menu is read again first: the action must still be offered, and the entry at that place must have
+    /// <paramref name="labels"/> at every level, be greyed out at none, and send an event the client knows. Otherwise,
+    /// or while a dialog is already open in the game, it throws <see cref="Exceptions.GameRejectedException"/> and sends
+    /// nothing. A send the game didn't answer throws <see cref="Exceptions.GameWriteUnknownException"/>.
     /// </summary>
-    Task<string?> ClickMenuEntryAsync(
-        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default);
+    Task ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits for the game's confirmation dialog and answers "Yes" to it only when its text holds every one of
+    /// <paramref name="expected"/> (case and accents aside): the dialog of the action asked for, not another one.
+    /// </summary>
+    Task<DialogAnswer> AnswerDialogAsync(IReadOnlyList<string> expected, CancellationToken cancellationToken = default);
 }
