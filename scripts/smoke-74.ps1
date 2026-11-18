@@ -81,12 +81,16 @@ for ($i = 1; $i -le $Repeat; $i++) {
         Write-Output "Advert entry picked: $leaf"
         $r = Post '/staff/actions?apply=true' @{ action = 'AdvertiseCoachingJob'; entry = @($leaf -split ' > ') }
         Start-Sleep -Seconds 2
-        $now = Invoke-RestMethod -UseBasicParsing "$api/staff" -TimeoutSec 60
         $applied = $r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).applied
-        # The advert placed must show in the read: exactly one more open staff job than before the apply.
-        # Limit: get_staff exposes only the club's total of open jobs, not which job each one is. The +1 proves an
-        # advert was placed, not that it is the coaching one; check the job in the game's staff screen.
-        Check "advert apply #$i" ($applied -and $now.vacancies -eq ($after + 1)) "$($r.Status) vacancies $after -> $($now.vacancies) :: $($r.Body)"
+        # The advert placed shows in the menu: the game greys its job out ("A vaga já foi anunciada."). StaffVacancies
+        # counts the club's unfilled posts and doesn't move with an advert (test save, 18/11/2026).
+        $again = Post '/staff/actions' @{ action = 'AdvertiseCoachingJob' }
+        $greyed = $again.Status -eq 200 -and -not (@(Leaves ($again.Body | ConvertFrom-Json).menu '') -contains $leaf)
+        Check "advert apply #$i" ($applied -and $greyed) "$($r.Status) greyed out after: $greyed :: $($r.Body)"
+        # Edge: the job just advertised is greyed out, so asking for it again is refused before any write.
+        AssertTestSave
+        $twice = Post '/staff/actions?apply=true' @{ action = 'AdvertiseCoachingJob'; entry = @($leaf -split ' > ') }
+        Check "advert again refused #$i" ($twice.Status -ge 400 -and $twice.Status -lt 500) "$($twice.Status) $($twice.Body)"
     }
 }
 

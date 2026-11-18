@@ -1,9 +1,14 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using FootballManager.Application.Exceptions;
+using FootballManager.Domain.Scouting;
 using FootballManager.Domain.Staff;
 using FootballManager.Infrastructure.Clients;
 using FootballManager.Infrastructure.Constants;
+using FootballManager.Infrastructure.Dtos.Scouting;
+using FootballManager.Infrastructure.Mappings;
+using Mapster;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -109,6 +114,31 @@ public class StaffEditorBridgeClientTests
         Assert.Empty(plugin.Writes);
     }
 
+    // The game greys out an advert already placed beside its RowData, not in it: {"RowData":{..., "Disabled":false},
+    // "Disabled":true, "Hint":"A vaga já foi anunciada."} (test save, 18/11/2026).
+    [Fact]
+    public async Task An_entry_the_game_greys_out_beside_its_row_data_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new MenuPlugin(GreyedBesideRowData());
+
+        await Assert.ThrowsAsync<GameRejectedException>(() =>
+            Client(plugin).RunMenuEntryAsync(Coach, StaffMenuAction.CoachingCourse, [0, 1], LicenceA));
+
+        Assert.Empty(plugin.Writes);
+    }
+
+    [Fact]
+    public void An_entry_the_game_greys_out_beside_its_row_data_reads_as_disabled()
+    {
+        var config = new TypeAdapterConfig();
+        new MappingConfig().Register(config);
+        var items = JsonSerializer.Deserialize<List<BridgeMenuItemDto>>(GreyedBesideRowData())!;
+
+        var entry = items.Adapt<List<MenuEntry>>(config)[0].Children[1];
+        Assert.True(entry.Disabled);
+        Assert.False(entry.CanRun);
+    }
+
     private static StaffEditorBridgeClient Client(MenuPlugin plugin)
     {
         var factory = Substitute.For<IHttpClientFactory>();
@@ -126,6 +156,12 @@ public class StaffEditorBridgeClientTests
         }
 
         return $$"""[{"Text":"Curso de treinador","Event":0,"Disabled":{{(topDisabled ? "true" : "false")}},"ChildList":[{{string.Join(',', levels)}}]}]""";
+    }
+
+    private static string GreyedBesideRowData()
+    {
+        const string greyed = """{"RowData":{"Text":"Licença A","Event":44,"Disabled":false},"Disabled":true,"Hint":"A vaga já foi anunciada."}""";
+        return $$"""[{"Text":"Curso de treinador","Event":0,"Disabled":false,"ChildList":[{{Level("Licença B", false)}},{{greyed}}]}]""";
     }
 
     private static string Level(string label, bool disabled, int eventId = 44)

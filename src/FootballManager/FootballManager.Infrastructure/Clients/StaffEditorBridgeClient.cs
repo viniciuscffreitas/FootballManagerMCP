@@ -112,7 +112,9 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
 
             item = level[entry[i]];
 
-            if (!string.Equals(Label(item), labels[i], StringComparison.CurrentCultureIgnoreCase) || Fields(item).Disabled == true)
+            // The game greys an entry out in its RowData or beside it (an advert already placed: "A vaga já foi anunciada.").
+            if (!string.Equals(Label(item), labels[i], StringComparison.CurrentCultureIgnoreCase)
+                || item.Disabled == true || item.RowData?.Disabled == true)
             {
                 return null;
             }
