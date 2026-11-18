@@ -40,14 +40,17 @@ internal static class StaffConstants
     public const string Club = "Club";
     public const string Vacancies = "StaffVacancies";
 
-    // A staff member as the record a menu action applies to: his item in the first team's staff list.
+    // A staff member as the record a menu action applies to: his item in the first team's staff list (seen 17/11/2026:
+    // "Rescisão amigável", an EventFmxDoAction entry with the game's confirmation).
     public static string MemberRecord(int staffId)
     {
         return $"{Members}[{GameConstants.UniqueId}={staffId.ToString(CultureInfo.InvariantCulture)}]";
     }
 
-    // Job adverts are the club's; the game may hang them on the club or on its first team, so both are tried.
-    public static readonly string[] ClubRecords = [Club, TeamConstants.OwnTeam];
+    // Job adverts: the game hangs them on the first team (seen 17/11/2026: "Publicar Anúncio > Treino > Treinador", each
+    // job an EventFmxDoAction entry); the club is tried after it. The club's own menu holds "Responsabilidades"
+    // (TeamContainerEditResponsibilities), an entry that opens the responsibilities panel.
+    public static readonly string[] ClubRecords = [TeamConstants.OwnTeam, Club];
 
     // FM.GamePlugin.ActionID values of the staff screen's menus.
     public const uint DismissAction = 1701671793;
