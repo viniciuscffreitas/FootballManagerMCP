@@ -117,14 +117,18 @@ for ($i = 1; $i -le $Repeat; $i++) {
     Check "taken number #$i" ($r.Status -eq 400 -and $r.Body -match 'taken') $r.Body
 
     if ($Apply) {
-        $used = @($cup.registered + $cup.unregistered | ForEach-Object { $_.squadNumber }) | Where-Object { $_ }
-        $free = (90..99 | Where-Object { $used -notcontains $_ } | Select-Object -First 1)
+        # The first number from 90 the game offers him free (a dry run that passes).
+        $free = 90..99 | Where-Object { (Post '/squad/numbers' @{ playerId = $reserve.id; number = $_ }).Status -eq 200 } | Select-Object -First 1
         $old = ($cup.registered + $cup.unregistered | Where-Object { $_.id -eq $reserve.id } | Select-Object -First 1).squadNumber
         AssertTestSave
         $r = Post '/squad/numbers?apply=true' @{ playerId = $reserve.id; number = $free }
         $body = $r.Body | ConvertFrom-Json
-        $read = (Cup (Registration)).registered + (Cup (Registration)).unregistered | Where-Object { $_.id -eq $reserve.id } | Select-Object -First 1
-        Check "number apply #$i" ($r.Status -eq 200 -and $body.confirmed -and $read.squadNumber -eq $free) "$($reserve.name): $old -> $free, read $($read.squadNumber) :: $($r.Body)"
+        # Read back through the API: the same number again is refused because the game shows he wears it now.
+        $again = Post '/squad/numbers' @{ playerId = $reserve.id; number = $free }
+        Check "number apply #$i" ($r.Status -eq 200 -and $body.confirmed -and $again.Status -eq 400 -and $again.Body -match 'already wears') "$($reserve.name): $old -> $free :: $($r.Body) :: read $($again.Body)"
+        # The number given must not have been taken from anyone: no other first-team player wears it.
+        $others = @($candidates | Where-Object { $_.id -ne $reserve.id } | Where-Object { (Post '/squad/numbers' @{ playerId = $_.id; number = $free }).Body -match 'taken' })
+        Check "number free for the others #$i" ($others.Count -eq ($candidates.Count - 1)) "$($others.Count) of $($candidates.Count - 1) see $free taken"
         if ($old) {
             AssertTestSave
             $r = Post '/squad/numbers?apply=true' @{ playerId = $reserve.id; number = $old }

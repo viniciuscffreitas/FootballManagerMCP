@@ -125,6 +125,24 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
 
         Answered(numbers, [RegistrationConstants.CanChangeNumber, RegistrationConstants.NumberDropdown]);
 
+        // The dropdown can lag a number given a moment before (seen 18/11/2026: 90 showed free after Patrick got it, and
+        // giving it to Hayner took it from him). What each first-team player wears now counts too.
+        var team = await bridge.GetListAsync<BridgeRegistrationPlayerDto>(
+            BridgeQuery.FromHuman().List(RegistrationConstants.FirstTeamPlayers).WithHumanAndTeam()
+                .Props([GameConstants.UniqueId, GameConstants.Name, RegistrationConstants.SquadNumber]),
+            cancellationToken);
+        var worn = new Dictionary<int, string>();
+
+        foreach (var item in team.Items)
+        {
+            Answered(item, [GameConstants.UniqueId, RegistrationConstants.SquadNumber]);
+
+            if (item.Values.Id != playerId && Number(item.Values.SquadNumber) is { } wornNumber)
+            {
+                worn[wornNumber] = $"{wornNumber}. {item.Values.Name}";
+            }
+        }
+
         return new PlayerSquadNumber
         {
             Id = playerId,
@@ -134,11 +152,16 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
             Suggested = Number(numbers.Values.Suggested),
             Options = (numbers.Values.Options ?? [])
                 .Where(option => option.RowData?.PropertyValue is > 0)
-                .Select(option => new SquadNumberOption
+                .Select(option =>
                 {
-                    Number = (int)option.RowData!.PropertyValue!.Value,
-                    Label = option.RowData.DisplayValue,
-                    Taken = option.Disabled == true
+                    var number = (int)option.RowData!.PropertyValue!.Value;
+                    var holder = worn.GetValueOrDefault(number);
+                    return new SquadNumberOption
+                    {
+                        Number = number,
+                        Label = option.Disabled == true || holder is null ? option.RowData.DisplayValue : holder,
+                        Taken = option.Disabled == true || holder is not null
+                    };
                 })
                 .ToList()
         };
