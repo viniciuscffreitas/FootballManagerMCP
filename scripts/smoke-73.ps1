@@ -59,7 +59,20 @@ for ($i = 1; $i -le $Repeat; $i++) {
     $after = Cup (Registration)
     Check "unregister dry run #$i" ($dry.Status -eq 200 -and $after.registered.Count -eq $cup.registered.Count) "$($dry.Status) $($dry.Body)"
 
-    # Edge case 1: a change that breaks the goalkeeper minimum warns in the dry run and is refused on apply.
+    # Edge case 1: unregistering down past the minimum squad size warns in the dry run and writes nothing.
+    $minSize = $cup.rules | Where-Object { $_.type -eq 165 } | Select-Object -First 1
+    if ($minSize) {
+        $limit = [int]($minSize.display -replace '^\d+/(\d+).*$', '$1')
+        $ids = @($cup.registered | Where-Object { -not $_.isGoalkeeper } | Select-Object -First ($cup.registered.Count - $limit + 1) | ForEach-Object { $_.id })
+        $r = Post '/squad/registration' @{ competition = $Competition; unregister = $ids }
+        $still = (Cup (Registration)).registered.Count
+        Check "size rule break warns #$i" ($r.Status -eq 200 -and ($r.Body | ConvertFrom-Json).warnings.Count -gt 0 -and $still -eq $cup.registered.Count) "unregister $($ids.Count): warnings $((($r.Body | ConvertFrom-Json).warnings) -join ' | '); registered still $still"
+        $r = Post '/squad/registration?apply=true' @{ competition = $Competition; unregister = $ids }
+        $still = (Cup (Registration)).registered.Count
+        Check "size rule break refused on apply #$i" ($r.Status -eq 400 -and $still -eq $cup.registered.Count) "$($r.Status) registered still $still"
+    }
+
+    # Edge case 1b: a change that breaks the goalkeeper minimum warns in the dry run.
     $keepers = @($cup.registered | Where-Object { $_.isGoalkeeper })
     $minKeepers = $cup.rules | Where-Object { $_.type -eq 87 } | Select-Object -First 1
     if ($minKeepers) {
@@ -90,14 +103,18 @@ for ($i = 1; $i -le $Repeat; $i++) {
 
     # Use case 3 and edge cases 2-3: squad numbers.
     $squad = (Invoke-RestMethod -UseBasicParsing "$api/squad" -TimeoutSec 120).players
-    $reserve = $squad | Select-Object -Last 1
+    # A reserve whose number the game lets change: in the test save (18/11/2026) only players without a number. Each
+    # repetition takes the next one, since a player given a number is locked from then on.
+    $candidates = @($squad | Where-Object { (Post '/squad/numbers' @{ playerId = $_.id; number = 97 }).Status -eq 200 })
+    $reserve = $candidates[$i - 1]
+    Write-Output "Number player #${i}: $($reserve.name) ($($reserve.id))"
     $r = Post '/squad/numbers' @{}
     Check "number without a request #$i" ($r.Status -eq 400) $r.Body
     $r = Post '/squad/numbers' @{ askAssistant = $true }
     Check "assistant dry run #$i" ($r.Status -eq 200 -and -not ($r.Body | ConvertFrom-Json).applied) $r.Body
     $taken = ($cup.registered | Where-Object { $_.squadNumber -and $_.id -ne $reserve.id } | Select-Object -First 1).squadNumber
     $r = Post '/squad/numbers' @{ playerId = $reserve.id; number = $taken }
-    Check "taken number #$i" ($r.Status -eq 400) $r.Body
+    Check "taken number #$i" ($r.Status -eq 400 -and $r.Body -match 'taken') $r.Body
 
     if ($Apply) {
         $used = @($cup.registered + $cup.unregistered | ForEach-Object { $_.squadNumber }) | Where-Object { $_ }
