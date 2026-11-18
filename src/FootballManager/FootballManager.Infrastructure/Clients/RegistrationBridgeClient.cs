@@ -86,11 +86,24 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
                 .ToWrite("/set", ("path", RegistrationConstants.Selected), ("value", registered ? "true" : "false")),
             cancellationToken);
 
-        // The plugin reads the tick back: one the game didn't take is not written.
-        if (result.After is not { } after || after.ValueKind != (registered ? JsonValueKind.True : JsonValueKind.False))
+        // The plugin reads the tick back. No read back leaves it unknown; the other value means the game didn't take it.
+        if (result.After is not { ValueKind: JsonValueKind.True or JsonValueKind.False } after)
+        {
+            throw new GameUnavailableException($"The tick for {playerId} in {competitionName} was sent but not read back.");
+        }
+
+        if (after.ValueKind != (registered ? JsonValueKind.True : JsonValueKind.False))
         {
             throw new GameRejectedException($"The game didn't take the tick for {playerId} in {competitionName}.");
         }
+    }
+
+    public async Task<bool> HasPendingChangesAsync(int competitionIndex, string competitionName, CancellationToken cancellationToken = default)
+    {
+        var session = await SessionAsync(competitionIndex, competitionName, cancellationToken);
+        var record = await bridge.GetRecordAsync<BridgeRegistrationDto>(session.Props([RegistrationConstants.HasChanges]), cancellationToken);
+        Answered(record, [RegistrationConstants.HasChanges]);
+        return record.Values.HasChanges ?? throw new GameUnavailableException($"The game didn't say whether {competitionName} has changes not confirmed.");
     }
 
     public async Task ConfirmRegistrationAsync(int competitionIndex, string competitionName, CancellationToken cancellationToken = default)
@@ -189,7 +202,12 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
                 .ToWrite("/set", ("path", RegistrationConstants.NumberSelected), ("value", number.ToString(CultureInfo.InvariantCulture))),
             cancellationToken);
 
-        if (result.Changed != true)
+        if (result.Changed is null)
+        {
+            throw new GameUnavailableException($"Number {number} for {playerId} was sent but not read back. Nothing was confirmed.");
+        }
+
+        if (result.Changed == false)
         {
             throw new GameRejectedException($"The game didn't take number {number} for {playerId}. Nothing was confirmed.");
         }

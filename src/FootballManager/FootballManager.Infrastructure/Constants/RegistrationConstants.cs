@@ -26,6 +26,9 @@ internal static class RegistrationConstants
     public const string CanChange = "CanChangeSelection";
     public const string Selected = "Selected";
 
+    // True between a tick and the screen's confirm (false again after it, seen 18/11/2026).
+    public const string HasChanges = "HasMadeChanges";
+
     // Both screens commit their edit session with it, no data.
     public const string ConfirmEvent = "EventFmxConfirmChanges";
     public const string Person = "Person";

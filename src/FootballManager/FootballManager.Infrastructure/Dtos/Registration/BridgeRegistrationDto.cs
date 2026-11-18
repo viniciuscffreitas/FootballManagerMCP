@@ -41,6 +41,9 @@ internal sealed class BridgeRegistrationDto
     [JsonPropertyName(RegistrationConstants.Rules)]
     public List<BridgeRegistrationRuleDto>? Rules { get; set; }
 
+    [JsonPropertyName(RegistrationConstants.HasChanges)]
+    public bool? HasChanges { get; set; }
+
     // A player's tick, read with him passed as Person.
     [JsonPropertyName(RegistrationConstants.CanChange)]
     public bool? CanChange { get; set; }

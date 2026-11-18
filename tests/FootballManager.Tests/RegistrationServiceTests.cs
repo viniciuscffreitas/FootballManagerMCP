@@ -203,6 +203,18 @@ public class RegistrationServiceTests
     }
 
     [Fact]
+    public async Task Ticks_left_on_the_screen_get_nothing_written()
+    {
+        _game.HasPendingChangesAsync(1, Cup, Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await _registration.ChangeRegistrationAsync(Cup, [Youngster], null, apply: true);
+
+        Assert.Contains("not confirmed", Assert.IsType<ValidationError>(Assert.Single(result.Errors)).ErrorMessages.Single());
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetRegisteredAsync(default, default!, default, default);
+    }
+
+    [Fact]
     public async Task A_name_several_registrations_hold_is_refused()
     {
         var result = await _registration.ChangeRegistrationAsync("Bra", [Youngster], null, apply: false);

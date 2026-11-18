@@ -131,6 +131,13 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
                 return Fail("players", $"Nothing was written: {string.Join(" ", change.Warnings)}");
             }
 
+            // Ticks left on the screen (by the user, or a change stopped midway) would go in with this confirm.
+            if (await game.HasPendingChangesAsync(target.Index, target.Name, cancellationToken))
+            {
+                return Fail("competition", $"The game's registration screen for {target.Name} holds changes not confirmed: " +
+                                           "confirm or undo them in the game first. Nothing was written.");
+            }
+
             var clearance = await saveGuard.PrepareWriteAsync(cancellationToken);
 
             if (clearance.IsFailed)
@@ -172,7 +179,7 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
 
             if (state.Error is { } error)
             {
-                change.Warnings.Add($"Stopped at {player.Name} ({player.Id}): {error}. The other players weren't sent; the screen's change isn't confirmed.");
+                change.Warnings.Add($"Stopped at {player.Name} ({player.Id}): {error}. The other players weren't sent and nothing was confirmed: the ticks sent stay on the game's registration screen until confirmed or undone there.");
                 return change.Writes.Values.Any(write => write != RegistrationWrite.NotWritten);
             }
         }
@@ -240,14 +247,15 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
         }
     }
 
-    // The registrations named so, by their name or their competition's, case aside; else those whose name holds the text.
+    // The registrations with that name, case aside; else with that competition; else those whose name holds the text.
     private static List<CompetitionRegistration> Find(SquadRegistration registration, string competition)
     {
         var wanted = competition.Trim();
-        var exact = registration.Competitions.Where(c => Same(c.Name, wanted) || Same(c.Competition, wanted)).ToList();
+        var byName = registration.Competitions.Where(c => Same(c.Name, wanted)).ToList();
+        var byCompetition = registration.Competitions.Where(c => Same(c.Competition, wanted)).ToList();
 
-        return exact.Count > 0
-            ? exact
+        return byName.Count > 0 ? byName
+            : byCompetition.Count > 0 ? byCompetition
             : registration.Competitions.Where(c => c.Name.Contains(wanted, StringComparison.CurrentCultureIgnoreCase)).ToList();
     }
 

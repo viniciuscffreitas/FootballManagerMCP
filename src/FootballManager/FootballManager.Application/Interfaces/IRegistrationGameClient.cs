@@ -27,6 +27,11 @@ public interface IRegistrationGameClient
     /// </summary>
     Task SetRegisteredAsync(int competitionIndex, string competitionName, int playerId, bool registered, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Whether the registration's screen holds ticks not yet confirmed: the next confirm would send them too.
+    /// </summary>
+    Task<bool> HasPendingChangesAsync(int competitionIndex, string competitionName, CancellationToken cancellationToken = default);
+
     /// <summary>Confirms the registration's changes, as its screen's Confirm button does.</summary>
     Task ConfirmRegistrationAsync(int competitionIndex, string competitionName, CancellationToken cancellationToken = default);
 
