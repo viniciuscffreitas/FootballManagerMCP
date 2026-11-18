@@ -5,6 +5,7 @@ using FootballManager.Application.ResultErrors;
 using FootballManager.Domain.Saves;
 using FootballManager.Domain.Scouting;
 using FootballManager.Domain.Staff;
+using Choice = (string Label, System.Collections.Generic.List<int> Path, System.Collections.Generic.List<string> Labels, FootballManager.Domain.Scouting.MenuEntry Entry);
 
 namespace FootballManager.Application.Services;
 
@@ -99,7 +100,7 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
             }
 
             plan.Notes.Add(SaveNote(clearance.Value));
-            await game.RunMenuEntryAsync(staffId, action, picked.Value.Path, cancellationToken);
+            await game.RunMenuEntryAsync(staffId, action, picked.Value.Path, picked.Value.Labels, cancellationToken);
             plan.Applied = true;
 
             await Task.Delay(SettlePause, cancellationToken);
@@ -127,7 +128,7 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
     }
 
     // Every entry that does something when picked: one without sub-entries the game doesn't grey out.
-    private static IEnumerable<(string Label, List<int> Path, MenuEntry Entry)> Leaves(List<MenuEntry> entries, List<string> above)
+    private static IEnumerable<Choice> Leaves(List<MenuEntry> entries, List<string> above)
     {
         for (var i = 0; i < entries.Count; i++)
         {
@@ -136,20 +137,19 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
 
             if (entry.Children.Count > 0)
             {
-                foreach (var (label, path, leaf) in Leaves(entry.Children, labels))
+                foreach (var (label, path, levels, leaf) in Leaves(entry.Children, labels))
                 {
-                    yield return (label, path.Prepend(i).ToList(), leaf);
+                    yield return (label, path.Prepend(i).ToList(), levels, leaf);
                 }
             }
             else if (!entry.Disabled)
             {
-                yield return (string.Join(Separator, labels), [i], entry);
+                yield return (string.Join(Separator, labels), [i], labels, entry);
             }
         }
     }
 
-    private static (string Label, List<int> Path, MenuEntry Entry)? Find(
-        List<(string Label, List<int> Path, MenuEntry Entry)> choices, IReadOnlyList<string> entry)
+    private static Choice? Find(List<Choice> choices, IReadOnlyList<string> entry)
     {
         var wanted = string.Join(Separator, entry.Select(label => label.Trim()));
 
@@ -164,7 +164,7 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
         return null;
     }
 
-    private static string Labels(IEnumerable<(string Label, List<int> Path, MenuEntry Entry)> choices)
+    private static string Labels(IEnumerable<Choice> choices)
     {
         return string.Join("; ", choices.Select(choice => $"'{choice.Label}'"));
     }

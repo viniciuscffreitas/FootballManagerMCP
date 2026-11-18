@@ -48,11 +48,12 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
     }
 
     public async Task RunMenuEntryAsync(
-        int? staffId, StaffMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default)
+        int? staffId, StaffMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default)
     {
-        if (entry.Count == 0)
+        if (entry.Count == 0 || labels.Count != entry.Count)
         {
-            throw new ArgumentException("Name the menu entry to pick.", nameof(entry));
+            throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
         }
 
         if (await MenuAsync(staffId, action, cancellationToken) is not { } menu)
@@ -60,15 +61,15 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
             throw new GameRejectedException($"The game's menu no longer offers {action}.");
         }
 
+        // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
+        // The entry must still be at that place with those labels, and not greyed out, or nothing is sent.
+        var item = EntryAt(menu.Items, entry, labels)
+                   ?? throw new GameRejectedException(
+                       $"The game's menu for {action} changed since the check: it no longer has " +
+                       $"'{string.Join(" > ", labels)}' to pick. Nothing was sent; run the dry run again.");
+
         // The entry's fields and payload, where the game keeps them: on a top entry itself, on one below in its RowData.
-        var item = menu.Items[entry[0]];
-
-        foreach (var index in entry.Skip(1))
-        {
-            item = item.ChildList![index];
-        }
-
-        var fields = item.Text is null && item.RowData is not null ? item.RowData : item;
+        var fields = Fields(item);
         var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
                       + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
                       + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
@@ -81,6 +82,43 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)), ("field", $"Data:{payload}"));
 
         await bridge.WriteAsync<JsonElement>(write, cancellationToken);
+    }
+
+    // The entry at that place when each level still has that label (as the menu shows it, case aside) and the entry
+    // can be picked: no sub-entries, not greyed out.
+    private static BridgeMenuItemDto? EntryAt(List<BridgeMenuItemDto> items, IReadOnlyList<int> entry, IReadOnlyList<string> labels)
+    {
+        BridgeMenuItemDto? item = null;
+        var level = items;
+
+        for (var i = 0; i < entry.Count; i++)
+        {
+            if (level is null || entry[i] < 0 || entry[i] >= level.Count)
+            {
+                return null;
+            }
+
+            item = level[entry[i]];
+
+            if (!string.Equals(Label(item), labels[i], StringComparison.CurrentCultureIgnoreCase))
+            {
+                return null;
+            }
+
+            level = item.ChildList;
+        }
+
+        return item is null || item.ChildList is { Count: > 0 } || Fields(item).Disabled == true ? null : item;
+    }
+
+    private static BridgeMenuItemDto Fields(BridgeMenuItemDto item)
+    {
+        return item.Text is null && item.RowData is not null ? item.RowData : item;
+    }
+
+    private static string Label(BridgeMenuItemDto item)
+    {
+        return (string.IsNullOrWhiteSpace(item.Text) ? item.RowData?.Text : item.Text) ?? string.Empty;
     }
 
     // The action's entries, from the first record that offers it.

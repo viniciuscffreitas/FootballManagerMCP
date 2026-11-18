@@ -19,6 +19,12 @@ public interface IStaffEditorGameClient
     /// <summary>The action's entries; null when the menu doesn't offer it now.</summary>
     Task<List<MenuEntry>?> GetMenuAsync(int? staffId, StaffMenuAction action, CancellationToken cancellationToken = default);
 
-    /// <summary>Picks the entry at <paramref name="entry"/> (an index per level, from the top), as the menu's click does.</summary>
-    Task RunMenuEntryAsync(int? staffId, StaffMenuAction action, IReadOnlyList<int> entry, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Picks the entry at <paramref name="entry"/> (an index per level, from the top), as the menu's click does. Throws
+    /// <see cref="Exceptions.GameRejectedException"/>, sending nothing, when the menu read now no longer has
+    /// <paramref name="labels"/> (the label at each level) there, or greys the entry out.
+    /// </summary>
+    Task RunMenuEntryAsync(
+        int? staffId, StaffMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default);
 }

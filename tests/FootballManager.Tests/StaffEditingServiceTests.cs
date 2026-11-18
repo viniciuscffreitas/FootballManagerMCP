@@ -46,7 +46,7 @@ public class StaffEditingServiceTests
         Assert.Equal("Demitir", plan.Choice);
         Assert.Equal("Pagar R$500 mil de indenização?", plan.Confirmation);
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
-        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -61,7 +61,8 @@ public class StaffEditingServiceTests
         {
             _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
             _game.RunMenuEntryAsync(Coach, StaffMenuAction.Dismiss,
-                Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })), Arg.Any<CancellationToken>());
+                Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })), Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<CancellationToken>());
         });
         Assert.True(plan.Applied);
         Assert.False(plan.StillOffered);
@@ -75,7 +76,9 @@ public class StaffEditingServiceTests
 
         Assert.Equal("Curso de treinador > Licença A", plan.Choice);
         await _game.Received(1).RunMenuEntryAsync(Coach, StaffMenuAction.CoachingCourse,
-            Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0, 1 })), Arg.Any<CancellationToken>());
+            Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0, 1 })),
+            Arg.Is<IReadOnlyList<string>>(labels => labels.SequenceEqual(new[] { "Curso de treinador", "Licença A" })),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -87,7 +90,7 @@ public class StaffEditingServiceTests
         Assert.Null(dryRun.Choice);
         Assert.Equal(2, dryRun.Menu[0].Children.Count);
         Assert.Contains("Curso de treinador > Licença B", Messages(result));
-        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -98,7 +101,7 @@ public class StaffEditingServiceTests
         Assert.Contains("doesn't offer LeadershipCourse", Messages(result));
         Assert.Contains("Dismiss", Messages(result));
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
-        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -108,7 +111,7 @@ public class StaffEditingServiceTests
 
         Assert.Contains("Licença Pro", Messages(result));
         Assert.Contains("Curso de treinador > Licença A", Messages(result));
-        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -135,7 +138,7 @@ public class StaffEditingServiceTests
         var result = await _staff.RunActionAsync(Coach, StaffMenuAction.Dismiss, null, apply: true);
 
         Assert.Contains("Another save is loaded.", Messages(result));
-        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
@@ -150,7 +153,8 @@ public class StaffEditingServiceTests
         Assert.True(plan.Applied);
         await _game.DidNotReceiveWithAnyArgs().FindMemberAsync(default);
         await _game.Received(1).RunMenuEntryAsync(null, StaffMenuAction.AdvertiseCoachingJob,
-            Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })), Arg.Any<CancellationToken>());
+            Arg.Is<IReadOnlyList<int>>(entry => entry.SequenceEqual(new[] { 0 })), Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -160,7 +164,7 @@ public class StaffEditingServiceTests
 
         Assert.Contains("action", Messages(result));
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
-        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
     }
 
     [Fact]
