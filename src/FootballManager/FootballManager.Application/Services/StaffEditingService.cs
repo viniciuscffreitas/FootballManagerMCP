@@ -8,21 +8,6 @@ using FootballManager.Domain.Staff;
 
 namespace FootballManager.Application.Services;
 
-public interface IStaffEditingService
-{
-    /// <summary>
-    /// Runs a staff menu action as the user would pick it in the game: on a first-team staff member (sack, mutual
-    /// termination, a course, a new contract) or, with <paramref name="staffId"/> null, on the club (job adverts). A
-    /// dry run unless <paramref name="apply"/>.
-    /// </summary>
-    /// <param name="entry">
-    /// The menu entry to pick, by its label at each level (case doesn't matter). Needed to apply when the menu has more
-    /// than one entry it can pick.
-    /// </param>
-    Task<Result<StaffAction>> RunActionAsync(
-        int? staffId, StaffMenuAction? action, IReadOnlyList<string>? entry, bool apply, CancellationToken cancellationToken = default);
-}
-
 // Staff changes go through the menus the game builds for them, as the staff screen's do: the game offers only what fits
 // the person now (no course for someone on one, no sacking for the user's own manager), each entry with the
 // confirmation it would show. A dry run reads the menu and says what would be picked; nothing is written without apply.
