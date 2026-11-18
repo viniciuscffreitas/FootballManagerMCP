@@ -364,6 +364,38 @@ public class PlayerExitServiceTests
         await _editor.DidNotReceiveWithAnyArgs().FindPlayersAsync(default!);
     }
 
+    // The game takes a recall and greys the entry out, but he stays out on loan for a few days: its OK dialog says
+    // "Miguel Terceros vai voltar em breve ao seu clube." (test save, 18/11/2026).
+    [Fact]
+    public async Task A_recall_the_game_greys_out_once_sent_is_confirmed_though_he_is_still_out_on_loan()
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.RecallFromLoan);
+        _editor.GetMenuAsync(1, PlayerMenuAction.RecallFromLoan, Arg.Any<CancellationToken>()).Returns(
+            [new MenuEntry { Label = "Trazer do empréstimo", CanRun = true }],
+            [new MenuEntry { Label = "Trazer do empréstimo", IsDisabled = true }]);
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true)).Value;
+
+        Assert.Equal(PlayerExitWrite.Written, exit.Applied);
+        Assert.True(exit.Confirmed);
+        Assert.True(exit.Status.OutOnLoan);
+        Assert.Contains(exit.Notes, note => note.Contains("soon"));
+    }
+
+    [Fact]
+    public async Task A_recall_the_menu_still_offers_once_sent_is_not_confirmed()
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.RecallFromLoan);
+        Menu(1, PlayerMenuAction.RecallFromLoan, new MenuEntry { Label = "Trazer do empréstimo", CanRun = true });
+
+        var exit = (await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true)).Value;
+
+        Assert.False(exit.Confirmed);
+        Assert.Contains(exit.Notes, note => note.StartsWith("Warning"));
+    }
+
     private void LostAnswer()
     {
         _editor.SendMenuEntryAsync(default, default, default!, default!)

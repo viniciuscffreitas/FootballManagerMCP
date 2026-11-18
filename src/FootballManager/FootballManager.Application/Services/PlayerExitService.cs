@@ -165,6 +165,17 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             }
 
             var shown = wanted.Shows(exit.Status);
+
+            // The game takes a recall without bringing him back at once: it greys "Trazer do empréstimo" out and says
+            // "<player> vai voltar em breve ao seu clube.", while he stays out on loan for a few days. The entry was
+            // runnable before the send, so the entry greyed out now is the game taking the recall.
+            if (!shown && action == PlayerExitAction.Recall && await RecallGreyedOutAsync(playerId, menuAction, cancellationToken))
+            {
+                shown = true;
+                exit.Notes.Add($"The game took the recall: it greys the entry out now and {player.Name} comes back to the club soon " +
+                               "(a few days of the game's calendar). Until then his menu still shows him out on loan.");
+            }
+
             exit.Confirmed = shown;
             // With the answer lost, only the change showing proves it was taken; not showing it yet doesn't prove it wasn't.
             exit.Applied = written == PlayerExitWrite.Unknown && !shown ? PlayerExitWrite.Unknown : PlayerExitWrite.Written;
@@ -233,6 +244,20 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
             {
                 yield return path;
             }
+        }
+    }
+
+    // True when the menu still lists the recall but greys out every entry of it. A read that fails proves nothing.
+    private async Task<bool> RecallGreyedOutAsync(int playerId, PlayerMenuAction menuAction, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var menu = await editor.GetMenuAsync(playerId, menuAction, cancellationToken);
+            return menu is { Count: > 0 } && menu.All(entry => entry.IsDisabled);
+        }
+        catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException)
+        {
+            return false;
         }
     }
 

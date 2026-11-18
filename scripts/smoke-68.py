@@ -126,7 +126,10 @@ def recall():
             print(f"menu offers a recall for {player}: {plan['choices']}")
             status, after = exit_(player, "Recall", apply=True)
             check(status == 200 and after["applied"] == "Written" and after["confirmed"] is True, f"the recall is confirmed: {after}")
-            check(after["status"]["outOnLoan"] is False, "recalled: no longer out on loan")
+            # The game greys the recall out and brings him back a few days later ("vai voltar em breve ao seu clube").
+            status, again = exit_(player, "Recall")
+            check(after["status"]["outOnLoan"] is False or (status == 400 and "greys out" in again),
+                  "recalled: back from loan, or the game greys the recall out until he's back")
             return
     print("no player out on loan has a recall in his menu: not run")
 
