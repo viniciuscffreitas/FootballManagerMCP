@@ -39,7 +39,7 @@ for ($i = 1; $i -le $Repeat; $i++) {
     # Use case 4: a staff member's menu, dry run only.
     foreach ($action in 'Dismiss', 'MutualTermination', 'CoachingCourse', 'LeadershipCourse') {
         $r = Post '/staff/actions' @{ staffId = $member.id; action = $action }
-        Check "member $action dry run #$i" ($r.Status -eq 200 -or $r.Status -eq 400) "$($r.Status) $($r.Body.Substring(0, [Math]::Min(300, $r.Body.Length)))"
+        Check "member $action dry run #$i" ($r.Status -eq 200 -or ($r.Status -eq 400 -and $r.Body -match "doesn't offer")) "$($r.Status) $($r.Body.Substring(0, [Math]::Min(300, $r.Body.Length)))"
     }
 
     # Edge case 2: someone not on the staff, and an action that runs on the club given a member.

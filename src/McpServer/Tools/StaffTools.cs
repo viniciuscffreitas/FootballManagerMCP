@@ -36,8 +36,8 @@ public static class StaffTools
                  "sacking costs). When the menu has several entries (a course's levels, an advert's jobs), name one by " +
                  "its label at each level in entry, e.g. [\"Curso de treinador\", \"Licença A\"]. Show the user the " +
                  "plan and ask. To apply, call again with apply=true: the save is checked (and the real one copied) " +
-                 "first; stillOffered then says whether the menu still offers the action. Refused while a match is " +
-                 "being played.")]
+                 "first; stillOffered then says whether the menu still offers the action. Don't run it while a match " +
+                 "is being played.")]
     public static async Task<string> ManageStaff(
         IHttpClientFactory httpFactory,
         [Description("Dismiss, MutualTermination, CoachingCourse, LeadershipCourse, OfferContract, AdvertiseJob, " +

@@ -54,6 +54,7 @@ internal static class StaffConstants
     public const uint MutualTerminationAction = 1632134254;
     public const uint CoachingCourseAction = 1900504944;
     public const uint LeadershipCourseAction = 1297173097;
+    // The same id as the player's "Iniciar negociação de contrato" (PersonOfferContract); not yet seen on a staff member.
     public const uint OfferContractAction = 2000111204;
     public const uint AdvertiseJobAction = 880036918;
     public const uint AdvertiseCoachingJobAction = 1951295084;
@@ -72,7 +73,8 @@ internal static class StaffConstants
             StaffMenuAction.AdvertiseJob => AdvertiseJobAction,
             StaffMenuAction.AdvertiseCoachingJob => AdvertiseCoachingJobAction,
             StaffMenuAction.AdvertiseScoutingJob => AdvertiseScoutingJobAction,
-            _ => AdvertiseMedicalJobAction
+            StaffMenuAction.AdvertiseMedicalJob => AdvertiseMedicalJobAction,
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "No menu action for it.")
         };
     }
 }

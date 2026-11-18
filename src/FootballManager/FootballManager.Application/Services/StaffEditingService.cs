@@ -108,7 +108,7 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
             }
 
             plan.Notes.Add(SaveNote(clearance.Value));
-            await game.RunMenuEntryAsync(staffId, action, picked!.Value.Path, cancellationToken);
+            await game.RunMenuEntryAsync(staffId, action, picked.Value.Path, cancellationToken);
             plan.Applied = true;
 
             await Task.Delay(SettlePause, cancellationToken);
