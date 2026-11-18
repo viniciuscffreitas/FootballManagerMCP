@@ -21,5 +21,11 @@ public enum PlayerMenuAction
     MakeOffer,
 
     /// <summary>Start a contract negotiation with one of the club's own players: opens the contract negotiation panel.</summary>
-    NegotiateContract
+    NegotiateContract,
+
+    /// <summary>Mark a player of another club as a transfer target of the director of football.</summary>
+    MarkDofTarget,
+
+    /// <summary>Take a player off the director of football's transfer targets.</summary>
+    UnmarkDofTarget
 }

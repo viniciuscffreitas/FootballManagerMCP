@@ -197,6 +197,11 @@ internal static class ScoutingConstants
     public const uint NegotiateContractAction = 2000111204;
     public const string ContextActionEndpoint = "/contextaction";
 
+    // The director of football's transfer targets (PersonAddPlayersAsTransferTargets, listed on a player of another club
+    // on 16/11/2026, and PersonRemovePlayersAsTransferTargets once he is one).
+    public const uint MarkDofTargetAction = 1230532153;
+    public const uint UnmarkDofTargetAction = 1313370439;
+
     public static uint ActionIdOf(PlayerMenuAction action)
     {
         return action switch
@@ -208,6 +213,8 @@ internal static class ScoutingConstants
             PlayerMenuAction.EndTrial => EndTrialAction,
             PlayerMenuAction.MakeOffer => MakeOfferAction,
             PlayerMenuAction.NegotiateContract => NegotiateContractAction,
+            PlayerMenuAction.MarkDofTarget => MarkDofTargetAction,
+            PlayerMenuAction.UnmarkDofTarget => UnmarkDofTargetAction,
             _ => AssignScoutAction
         };
     }
