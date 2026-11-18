@@ -189,6 +189,34 @@ public class ContractActionsServiceTests
     }
 
     [Fact]
+    public async Task A_status_he_already_has_is_refused_and_nothing_is_sent()
+    {
+        Offered(PlayerMenuAction.SetPlayingTime);
+        StatusMenu();
+        _contracts.GetContractsAsync(Arg.Any<CancellationToken>()).Returns([Contract("Rotação")]);
+
+        var result = await _service.SetSquadStatusAsync(Reserve, "Rotação", apply: true);
+
+        Assert.Contains("already", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _editor.DidNotReceiveWithAnyArgs().ClickMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
+    public async Task A_lost_pick_of_a_release_of_one_the_first_team_didnt_list_stays_unknown()
+    {
+        FreeRelease();
+        _editor.ClickMenuEntryAsync(default, default, default!, default!).ReturnsForAnyArgs(Task.FromException(new GameAnswerLostException("timed out")));
+        _contracts.GetContractsAsync(Arg.Any<CancellationToken>()).Returns(new List<SquadPlayerContract>());
+
+        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true)).Value;
+
+        Assert.Equal(MenuWrite.Unknown, change.Menu);
+        Assert.Equal(AppliedState.Partial, change.Applied);
+        Assert.Null(change.Confirmed);
+    }
+
+    [Fact]
     public async Task A_read_back_that_fails_after_the_send_is_unconfirmed_not_an_error()
     {
         Offered(PlayerMenuAction.SetPlayingTime);

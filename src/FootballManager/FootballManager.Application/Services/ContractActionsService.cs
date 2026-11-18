@@ -113,6 +113,12 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
             var entry = leaf.Entry;
             var current = await ContractOfAsync(playerId, cancellationToken);
+
+            // A status he has already would make the read back look like the change took, even if the game never got it.
+            if (action == PlayerMenuAction.SetPlayingTime && current?.AgreedPlayingTime is { } now && Plain(now) == Plain(entry.Label))
+            {
+                return Fail("status", $"{player.Name}'s contract already promises '{now}': there is nothing to change.");
+            }
             var change = new ContractChange
             {
                 PlayerId = player.Id,
@@ -144,7 +150,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             }
 
             change.Notes.Add(SaveNote(clearance.Value));
-            await ApplyAsync(change, leaf, cancellationToken);
+            await ApplyAsync(change, leaf, current is not null, cancellationToken);
             return Result.Ok(change);
         }
         catch (GameUnavailableException exception)
@@ -160,7 +166,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     // Picks the entry, answers its dialog, and reads the change back. From the pick on, nothing fails the call: each step
     // says what it did, so that the caller doesn't send again what the game may have taken. A refusal before the pick
     // (the menu changed, a dialog already open) throws: nothing was sent.
-    private async Task ApplyAsync(ContractChange change, MenuLeaf leaf, CancellationToken cancellationToken)
+    private async Task ApplyAsync(ContractChange change, MenuLeaf leaf, bool wasInSquad, CancellationToken cancellationToken)
     {
         try
         {
@@ -183,7 +189,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
             change.DialogText = dialog.Text;
         }
 
-        await ReadBackAsync(change, leaf.Entry.Label, cancellationToken);
+        await ReadBackAsync(change, leaf.Entry.Label, wasInSquad, cancellationToken);
 
         if (change.Menu == MenuWrite.Unknown && change.Confirmed == true)
         {
@@ -218,14 +224,23 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
     }
 
     // What the squad's contracts show once the game has taken the change, compared with what was asked: the status
-    // picked, or him gone from the first team. A read back that fails leaves it unconfirmed, never an error.
-    private async Task ReadBackAsync(ContractChange change, string picked, CancellationToken cancellationToken)
+    // picked, or him gone from the first team. Only a change from the state before counts: a status he already had is
+    // refused in the plan, and a release of one the first team didn't list can't be told. A read back that fails leaves
+    // it unconfirmed, never an error.
+    private async Task ReadBackAsync(ContractChange change, string picked, bool wasInSquad, CancellationToken cancellationToken)
     {
         if (change.Action is not (PlayerMenuAction.SetPlayingTime or PlayerMenuAction.ReleaseOnFreeTransfer))
         {
             change.Notes.Add(change.Action == PlayerMenuAction.MutualTermination
                 ? "He answers the offer later: confirmed stays null. Check get_contracts or his inbox after continuing."
                 : "The game doesn't show this change in his contract: confirmed stays null. Check his menu before sending it again.");
+            return;
+        }
+
+        if (change.Action == PlayerMenuAction.ReleaseOnFreeTransfer && !wasInSquad)
+        {
+            change.Notes.Add("The first team's contracts didn't list him before the release, so the read back can't show it: " +
+                             "confirmed stays null. Check his club in the game before sending it again.");
             return;
         }
 
