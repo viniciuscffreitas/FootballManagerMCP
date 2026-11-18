@@ -55,4 +55,20 @@ public class GameBridgeTests
 
         Assert.IsType<JsonException>(exception.InnerException, exactMatch: false);
     }
+
+    // A read answered with something that isn't JSON is the game being unavailable, not a crash: after a write, the read
+    // back would otherwise turn into a 500 that hides the write.
+    [Fact]
+    public async Task A_read_answered_with_something_unreadable_is_unavailable_not_a_crash()
+    {
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(GameBridge.HttpClientName)
+            .Returns(_ => new HttpClient(new RecordingHandler("<html>busy</html>")) { BaseAddress = new Uri("http://localhost:5121") });
+        var bridge = new GameBridge(factory, NullLogger<GameBridge>.Instance);
+
+        var exception = await Assert.ThrowsAsync<GameUnavailableException>(() =>
+            bridge.GetRecordAsync<Dictionary<string, JsonElement>>(FootballManager.Infrastructure.Clients.BridgeQuery.FromGame().Props(["X"]), CancellationToken.None));
+
+        Assert.IsType<JsonException>(exception.InnerException, exactMatch: false);
+    }
 }
