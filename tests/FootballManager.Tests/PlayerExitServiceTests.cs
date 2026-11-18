@@ -157,6 +157,18 @@ public class PlayerExitServiceTests
         Assert.True(result.HasError<EntityDoesNotExistError>());
     }
 
+    [Fact]
+    public async Task An_apply_without_an_action_is_refused_and_sends_nothing()
+    {
+        StatusMenu(1);
+
+        var result = await _exits.ChangeAsync(1, null, choice: "Transfer status > Transfer list", apply: true);
+
+        Assert.Contains("action", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync();
+        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+    }
+
     private static HashSet<PlayerMenuAction> Set(params PlayerMenuAction[] actions)
     {
         return actions.ToHashSet();
