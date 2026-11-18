@@ -57,6 +57,13 @@ def menus(players):
             exit_(player, action)
 
 
+def squad_keys(player):
+    _, squad = call("GET", API + "/squad")
+    players = squad.get("players", squad) if isinstance(squad, dict) else squad
+    found = next((p for p in players if p.get("id") == player), {})
+    return {s.get("key") for s in found.get("statuses") or []}
+
+
 def list_and_back(player, choice):
     status, plan = exit_(player, "SetTransferStatus", choice)
     check(status == 200 and not plan["applied"], "dry run plans the status and sends nothing")
@@ -64,9 +71,13 @@ def list_and_back(player, choice):
     check(status == 200 and after["applied"], "apply sends the status")
     listed = after["status"]["transferListed"] or after["status"]["loanListed"]
     check(listed, f"the menu shows him listed: {after['status']}")
+    keys = squad_keys(player)
+    check(bool(keys & {"TransferListed", "ListedForLoan"}), f"get_squad shows the listing: {keys}")
     back = "RemoveFromTransferList" if after["status"]["transferListed"] else "RemoveFromLoanList"
     status, off = exit_(player, back, apply=True)
     check(status == 200 and not (off["status"]["transferListed"] or off["status"]["loanListed"]), "off the list again")
+    keys = squad_keys(player)
+    check(not (keys & {"TransferListed", "ListedForLoan"}), f"get_squad shows no listing: {keys}")
 
 
 def backups():

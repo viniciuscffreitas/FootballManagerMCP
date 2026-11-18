@@ -81,8 +81,9 @@ public static class TransferTools
 
     [McpServerTool(Name = "manage_player_exit")]
     [Description("Change how one of the club's own players may leave, without the mouse, through his own menu in the " +
-                 "running game (the right click on him): action SetTransferStatus (the menu's transfer statuses, e.g. " +
-                 "transfer list or loan list), RemoveFromTransferList, RemoveFromLoanList, OfferToClubs, Recall (a " +
+                 "running game (the right click on him): action SetTransferStatus (the menu's statuses, e.g. \"Situação de " +
+                 "transferência > Na lista de transferências\", \"Situação de empréstimo > Disponível para " +
+                 "empréstimo\", and the answers to offers under \"Opções de Ofertas de Transferência\"), RemoveFromTransferList, RemoveFromLoanList, OfferToClubs, Recall (a " +
                  "player the club has out on loan comes back) or ExtendLoan. The game offers only what fits where he " +
                  "stands: an action its menu doesn't offer now is refused with where he stands, and nothing is sent. " +
                  "By default a dry run that sends nothing: it returns choices (every entry the menu offers for the " +
@@ -91,8 +92,11 @@ public static class TransferTools
                  "status (transferListed, loanListed, outOnLoan, read from the same menu). When the menu has more than " +
                  "one entry, pass one of choices as choice. With apply=true the API first checks and copies the save " +
                  "(see the README's Safety), runs the entry and returns status as the game then shows him. An entry " +
-                 "that opens a screen of its own (an asking price dialog, the Transfer Room) isn't run: the call is " +
-                 "refused and names it. Use the fm27-guide skill's market rules before listing a player. Refused while " +
+                 "that opens a screen of its own isn't run: the asking price dialog (\"Definir situação de " +
+                 "transferência\") and OfferToClubs (\"Oferecer via TransferRoom\", the Transfer Room panel) are " +
+                 "refused for now, so the asking price and the advert are set by the user in the game; an entry the " +
+                 "game greys out (e.g. a recall it doesn't allow yet) is refused too. get_squad shows the listing " +
+                 "among a player's statuses (TransferListed, ListedForLoan). Use the fm27-guide skill's market rules before listing a player. Refused while " +
                  "a match is being played.")]
     public static async Task<string> ManagePlayerExit(
         IHttpClientFactory httpFactory,

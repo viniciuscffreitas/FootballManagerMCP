@@ -54,6 +54,13 @@ public class PlayerExitService(IScoutingEditorGameClient editor, ISaveGuard save
 
             var entries = Runnable(menu, []).ToList();
 
+            if (entries.Count == 0 && menu.All(entry => entry.IsDisabled))
+            {
+                return Refuse("action",
+                    $"The game greys out {Describe(action)} for {player.Name} now ({string.Join(", ", menu.Select(entry => entry.Label))}): " +
+                    "it can't be done yet. Nothing was sent.");
+            }
+
             if (entries.Count == 0)
             {
                 return Refuse("action",

@@ -135,6 +135,19 @@ public class PlayerExitServiceTests
     }
 
     [Fact]
+    public async Task An_entry_the_game_greys_out_is_refused_as_not_possible_now()
+    {
+        Player(1);
+        Offered(1, PlayerMenuAction.RecallFromLoan);
+        Menu(1, PlayerMenuAction.RecallFromLoan, new MenuEntry { Label = "Trazer do empréstimo", IsDisabled = true });
+
+        var result = await _exits.ChangeAsync(1, PlayerExitAction.Recall, choice: null, apply: true);
+
+        Assert.Contains("greys out", Assert.IsType<ValidationError>(result.Errors.Single()).ErrorMessages.Single());
+        await _editor.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!);
+    }
+
+    [Fact]
     public async Task A_player_no_list_holds_is_not_found()
     {
         _editor.FindPlayersAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<CancellationToken>()).Returns(new Dictionary<int, ScoutedPlayer>());
