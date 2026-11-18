@@ -28,6 +28,22 @@ public class ContractsBridgeClientTests
         await Assert.ThrowsAsync<GameUnavailableException>(() => client.GetContractsAsync());
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("""{"values":null}""")]
+    public async Task A_row_the_game_sent_empty_makes_the_read_unavailable(string row)
+    {
+        var client = Client("""{"count":2,"items":[{"values":{"UniqueId":7,"Name":"Reserva"}},""" + row + "]}");
+
+        await Assert.ThrowsAsync<GameUnavailableException>(() => client.GetContractsAsync());
+    }
+
+    [Fact]
+    public async Task A_list_the_game_sent_as_null_makes_the_read_unavailable()
+    {
+        await Assert.ThrowsAsync<GameUnavailableException>(() => Client("""{"count":0,"items":null}""").GetContractsAsync());
+    }
+
     [Fact]
     public async Task Rows_with_their_ids_are_read()
     {

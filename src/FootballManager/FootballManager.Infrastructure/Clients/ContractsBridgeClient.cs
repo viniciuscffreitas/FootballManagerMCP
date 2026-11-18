@@ -15,6 +15,12 @@ internal sealed class ContractsBridgeClient(GameBridge bridge) : IContractsGameC
     {
         var squad = await bridge.GetSquadAsync<BridgeSquadContractDto>(ContractConstants.Properties, cancellationToken);
 
+        // A list or a row the game sent as null is a read that failed, not an empty squad or a player gone.
+        if (squad.Items is null || squad.Items.Any(item => item?.Values is null))
+        {
+            throw new GameUnavailableException("The game sent an empty row in the squad's contracts: read them again.");
+        }
+
         // A row whose id the game didn't give (not answered, failed, or missing) makes the read unknown: read as 0, the
         // player would look gone from the squad.
         if (squad.Items.FirstOrDefault(item => item.Values.Id is null) is { } unread)
