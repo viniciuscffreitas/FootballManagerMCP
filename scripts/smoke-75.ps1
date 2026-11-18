@@ -1,8 +1,8 @@
 # Smoke for ticket #75 (board: requests, budget split, talks). Runs on the Windows PC, with the API (5120) built from
 # agent/t75 and the test save "MCPFM investigation" loaded, outside a live match. Without -Apply it only reads and runs
-# dry runs; -Apply also moves the budget split there and back (x$Repeat) and sends one cheap request (youth).
-#   powershell -File scripts\smoke-75.ps1 [-Apply] [-Repeat 2] [-Steps 1] [-Request "base"]
-param([switch]$Apply, [int]$Repeat = 2, [int]$Steps = 1, [string]$Request = 'base')
+# dry runs; -Apply also moves the budget split there and back (x$Repeat) and sends one cheap request (an affiliate).
+#   powershell -File scripts\smoke-75.ps1 [-Apply] [-Repeat 2] [-Steps 1] [-Request AffiliateLink]
+param([switch]$Apply, [int]$Repeat = 2, [int]$Steps = 1, [string]$Request = 'AffiliateLink')
 $ErrorActionPreference = 'Stop'
 $api = 'http://localhost:5120/api/v1'
 
@@ -81,18 +81,19 @@ if ($Apply) {
         Check "UC2 move back #$i" ($back.Status -eq 200 -and $back.Json.after.transferBudget -eq $start.transferBudget -and $back.Json.after.wageBudget -eq $start.wageBudget) ($back.Json.after | ConvertTo-Json -Compress)
     }
 
-    # UC3: one cheap request (the board hears one at a time), answered line by line.
+    # UC3: one cheap request (the board hears one at a time): an affiliate, pitched in the board meeting line by line,
+    # then out of the meeting.
     AssertTestSave
-    $r = Post '/board/requests?apply=true' @{ action = 'Request' }
-    Check "UC3 open the board talk" ($r.Status -eq 200 -and $r.Json.applied) "card $(($r.Json.card.lines) -join ' | ')"
-    $line = $Request
-    for ($round = 1; $round -le 6 -and $r.Status -eq 200; $round++) {
+    $r = Post '/board/requests?apply=true' @{ action = $Request }
+    Check "UC3 open the board meeting" ($r.Status -eq 200 -and $r.Json.applied -and $r.Json.card.lines.Count -gt 0) "card $(($r.Json.card.lines) -join ' | ')"
+    for ($round = 1; $round -le 8 -and $r.Status -eq 200; $round++) {
         AssertTestSave
-        $r = Post '/board/conversation?apply=true' @{ line = $line }
-        if ($r.Status -ne 200) { break }
+        $talk = Post '/board/conversation?apply=false' @{}
+        if ($talk.Status -ne 200) { break }
+        # The first line pitches the request; once the talk is over only "Sair da reunião" is left, and it leaves.
+        $r = Post '/board/conversation?apply=true' @{ line = '0' }
         Write-Output "   said '$($r.Json.line)'; next: $(($r.Json.after.lines) -join ' | ')"
         if (-not $r.Json.after) { break }
-        $line = '0'
     }
     Start-Sleep 2
     $final = Board

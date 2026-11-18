@@ -4,14 +4,15 @@ namespace FootballManager.Infrastructure.Constants;
 
 // Dealings with the board, as the club's menu offers them. Every board action hangs on the club's menu (seen
 // 17/11/2026 on Records:Human/Club): the budget and new-contract requests send EventFmxDoAction with the game's notice
-// "A diretoria entrará em contato com você em breve"; "Pedido à Diretoria" and the affiliate requests send no event
-// and open a talk with the board; the budget adjustment opens its panel (NewsAction 18).
+// "A diretoria entrará em contato com você em breve"; the affiliate requests open the board meeting card (NewsAction
+// 19, card 26), where the user pitches the request line by line; the budget adjustment opens its panel (NewsAction 18).
+// "Pedido à Diretoria" (MakeBoardRequest, 1297567845) isn't offered: through /contextaction the game only logs the
+// click (EventFmxAuditActionsMenuObjectSelected) and opens nothing, and its entry carries no references for /newsaction.
 internal static class BoardEditingConstants
 {
     public const string Club = "Club";
 
     // FM.GamePlugin.ActionID values on the club's menu.
-    public const uint RequestAction = 1297567845;
     public const uint IncreaseBudgetsAction = 1497974126;
     public const uint ManagerNewContractAction = 896087905;
     public const uint AffiliateLinkAction = 1229607543;
@@ -22,7 +23,6 @@ internal static class BoardEditingConstants
     {
         return action switch
         {
-            BoardMenuAction.Request => RequestAction,
             BoardMenuAction.IncreaseBudgets => IncreaseBudgetsAction,
             BoardMenuAction.ManagerNewContract => ManagerNewContractAction,
             BoardMenuAction.AffiliateLink => AffiliateLinkAction,
@@ -59,4 +59,7 @@ internal static class BoardEditingConstants
     public const string UiPath = "/ui?maxDepth=160";
     public const string MeetingAnswer = "#SpeakToMeetingAnswerActionButton";
     public const string SuggestionClass = "suggestion-button";
+
+    // The meeting card's button out, once the talk is over or to leave it unanswered.
+    public const string LeaveMeeting = "Sair da reunião";
 }

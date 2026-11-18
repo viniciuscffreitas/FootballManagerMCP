@@ -29,8 +29,8 @@ public class BoardController(IBoardService boardService, IBoardEditingService bo
     }
 
     /// <summary>
-    /// Asks the board for something through the club's menu: the board talk (facilities, youth, staff and the other
-    /// requests), a bigger wage or transfer budget, a new contract for the user, an affiliate. A dry run that lists what
+    /// Asks the board for something through the club's menu: a bigger wage or transfer budget, a new contract for the
+    /// user, an affiliate (pitched in the board meeting). A dry run that lists what
     /// the menu offers now and the entry it would pick unless apply=true.
     /// </summary>
     [HttpPost("requests")]

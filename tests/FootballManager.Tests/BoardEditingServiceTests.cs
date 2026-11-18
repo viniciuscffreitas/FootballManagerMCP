@@ -20,14 +20,14 @@ public class BoardEditingServiceTests
     public BoardEditingServiceTests()
     {
         _game.GetOfferedActionsAsync(Arg.Any<CancellationToken>())
-            .Returns([BoardMenuAction.Request, BoardMenuAction.IncreaseBudgets, BoardMenuAction.ManagerNewContract]);
+            .Returns([BoardMenuAction.AffiliateLink, BoardMenuAction.IncreaseBudgets, BoardMenuAction.ManagerNewContract]);
         _game.GetMenuAsync(BoardMenuAction.IncreaseBudgets, Arg.Any<CancellationToken>())
             .Returns(_ => [
                 new MenuEntry { Label = "Aumentar Orçamento de Salários", Confirmation = Notice },
                 new MenuEntry { Label = "Aumentar orçamento de transferências", Confirmation = Notice }
             ]);
-        _game.GetMenuAsync(BoardMenuAction.Request, Arg.Any<CancellationToken>())
-            .Returns(_ => [new MenuEntry { Label = "Pedido à Diretoria" }]);
+        _game.GetMenuAsync(BoardMenuAction.AffiliateLink, Arg.Any<CancellationToken>())
+            .Returns(_ => [new MenuEntry { Label = "Pedir Novo Clube Parceiro", Confirmation = Notice }]);
         _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())
             .Returns(Result.Ok(new SaveClearance { SaveName = "MCPFM investigation", IsTestSave = true }));
         _board = new BoardEditingService(_game, _saveGuard);
@@ -51,24 +51,24 @@ public class BoardEditingServiceTests
     public async Task Applying_clears_the_save_then_picks_the_entry_and_reads_the_talk_it_opens()
     {
         _game.ReadCardAsync(Arg.Any<CancellationToken>())
-            .Returns(new BoardCard { Lines = ["Melhorar as instalações de base", "Contratar mais olheiros"] });
+            .Returns(new BoardCard { Lines = ["Podemos começar a procurar um novo clube afiliado?", "Sair da reunião"] });
 
-        var plan = (await _board.RequestAsync(BoardMenuAction.Request, null, apply: true)).Value;
+        var plan = (await _board.RequestAsync(BoardMenuAction.AffiliateLink, null, apply: true)).Value;
 
         Received.InOrder(() =>
         {
             _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
-            _game.RunMenuEntryAsync(BoardMenuAction.Request, 0, Arg.Any<CancellationToken>());
+            _game.RunMenuEntryAsync(BoardMenuAction.AffiliateLink, 0, Arg.Any<CancellationToken>());
         });
         Assert.True(plan.Applied);
-        Assert.Equal("Melhorar as instalações de base", plan.Card!.Lines[0]);
+        Assert.Equal("Podemos começar a procurar um novo clube afiliado?", plan.Card!.Lines[0]);
         Assert.Contains(plan.Notes, note => note.Contains("MCPFM investigation"));
     }
 
     [Fact]
     public async Task A_request_the_menu_does_not_offer_fails_with_the_ones_it_does()
     {
-        var result = await _board.RequestAsync(BoardMenuAction.AffiliateLink, null, apply: true);
+        var result = await _board.RequestAsync(BoardMenuAction.SeniorAffiliateLink, null, apply: true);
 
         var error = Assert.IsType<ValidationError>(Assert.Single(result.Errors));
         Assert.Contains("IncreaseBudgets", Assert.Single(error.ErrorMessages));

@@ -28,10 +28,10 @@ public static class BoardTools
 
     [McpServerTool(Name = "request_from_board")]
     [Description("Asks the board for something in the user's running Football Manager 27 save, through the club's " +
-                 "menu as the board screen does. action: Request (\"Pedido à Diretoria\": opens the talk with the " +
-                 "board, whose lines are the requests: facilities, youth set-up, staff and the rest), IncreaseBudgets " +
+                 "menu as the board screen does. action: IncreaseBudgets " +
                  "(entries \"Aumentar Orçamento de Salários\" and \"Aumentar orçamento de transferências\"), " +
-                 "ManagerNewContract (a new contract for the user), AffiliateLink or SeniorAffiliateLink. The game " +
+                 "ManagerNewContract (a new contract for the user), AffiliateLink or SeniorAffiliateLink (these two open " +
+                 "the board meeting, where the user pitches the request line by line with answer_board). The game " +
                  "offers only what the board will hear now: an action it doesn't offer fails with the ones it does " +
                  "(offered lists them; one missing usually means a request is open or was refused recently). By " +
                  "default a dry run that returns the menu's entries in the game's language, the entry it would pick " +
@@ -42,7 +42,7 @@ public static class BoardTools
                  "requests. Don't run it while a match is being played.")]
     public static async Task<string> RequestFromBoard(
         IHttpClientFactory httpFactory,
-        [Description("Request, IncreaseBudgets, ManagerNewContract, AffiliateLink or SeniorAffiliateLink.")]
+        [Description("IncreaseBudgets, ManagerNewContract, AffiliateLink or SeniorAffiliateLink.")]
         string action,
         [Description("The menu entry to pick, by its label as the dry run lists it.")]
         string? entry = null,
@@ -62,7 +62,8 @@ public static class BoardTools
                  "Name the line by its number from 0 or a piece of its text. Show the user the lines and ask: a " +
                  "promise or an expectation agreed here binds the season. To say it, call again with apply=true: the " +
                  "save is checked (and the real one copied) first; after holds the next lines, null once the talk " +
-                 "closed. Don't run it while a match is being played.")]
+                 "closed. The last line of a meeting is \"Sair da reunião\", which leaves it. Don't run it while a match is " +
+                 "being played.")]
     public static async Task<string> AnswerBoard(
         IHttpClientFactory httpFactory,
         [Description("The line to say: its number from 0 or a piece of its text.")]

@@ -12,8 +12,8 @@ namespace FootballManager.Infrastructure.Clients;
 
 // The board through the MCPFM plugin, as the club's menu offers it: game.Actions lists the actions the club (the menu's
 // "Records") offers; game.Action is one of them, its Items the entries. An entry sending EventFmxDoAction runs through
-// /native, as the scouting menus do; one sending no event (a talk with the board) runs through /contextaction, as the
-// menu's click does. The talk it opens is read from the /ui tree and its lines pressed with /click.
+// /native, as the scouting menus do; one opening a panel (the board meeting card) runs through /newsaction with the
+// references it carries. The talk it opens is read from the /ui tree and its lines pressed with /click.
 internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorGameClient
 {
     private static readonly TimeSpan Poll = TimeSpan.FromMilliseconds(500);
@@ -46,10 +46,23 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
             throw new GameRejectedException($"The club's menu no longer offers {action}.");
         }
 
-        var payload = $"Data:@{ScoutingConstants.MenuItems}[{Format(entry)}].ActionData";
-        var write = items[entry].Event == ScoutingConstants.DoActionEventId
-            ? OnAction(actionId).ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", payload), ("template", "none"))
-            : OnAction(actionId).ToWrite(ScoutingConstants.ContextActionEndpoint, ("action", Format(actionId)), ("field", payload));
+        var item = items[entry];
+        var data = $"@{ScoutingConstants.MenuItems}[{Format(entry)}].ActionData";
+        string write;
+
+        if (item.Event == ScoutingConstants.DoActionEventId)
+        {
+            write = OnAction(actionId).ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", $"Data:{data}"), ("template", "none"));
+        }
+        else if (item.ActionData?.NewsAction is { } panel and >= 0)
+        {
+            write = OnAction(actionId).ToWrite("/newsaction", ("action", Format(panel)),
+                ("card", Format(item.ActionData.DynamicCardId ?? -1)), ("field", $"References:{data}.ActionDataReferences"));
+        }
+        else
+        {
+            write = OnAction(actionId).ToWrite(ScoutingConstants.ContextActionEndpoint, ("action", Format(actionId)), ("field", $"Data:{data}"));
+        }
 
         await bridge.WriteAsync<JsonElement>(write, cancellationToken);
     }
@@ -234,6 +247,11 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
 
         var lines = new List<(string Text, string Click)>();
 
+        // The meeting card's own way out, after the lines.
+        var exit = elements.FirstOrDefault(element => element.Text == BoardEditingConstants.LeaveMeeting) is { } label
+            ? elements.Where(element => element.IsButton && label.IsWithin(element.Path)).MaxBy(element => element.Path.Length)
+            : null;
+
         foreach (var answer in elements.Where(IsLine))
         {
             // A line inside another (the meeting's inner button) is the same line.
@@ -252,6 +270,11 @@ internal sealed class BoardEditorBridgeClient(GameBridge bridge) : IBoardEditorG
             {
                 lines.Add((text, click.Path));
             }
+        }
+
+        if (exit is not null && lines.All(line => line.Click != exit.Path))
+        {
+            lines.Add((BoardEditingConstants.LeaveMeeting, exit.Path));
         }
 
         return lines;
