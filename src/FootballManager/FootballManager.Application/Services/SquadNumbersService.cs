@@ -104,44 +104,19 @@ public class SquadNumbersService(IRegistrationGameClient game, ISaveGuard saveGu
         return Result.Ok(change);
     }
 
+    // The assistant's numbering is planned only: the screen's events for it (EventFmxAutoSelect and
+    // EventFmxNumberAllPlayers, then its confirm) changed nothing in the test save (18/11/2026), so an apply is refused
+    // before the save check.
     private async Task<Result<SquadNumberChange>> AssistantAsync(bool apply, CancellationToken cancellationToken)
     {
+        if (apply)
+        {
+            return Fail("askAssistant", "This tool can't ask the assistant to number the squad yet: the game didn't take it in the test save. " +
+                                        "Nothing was written; give each player a number instead.");
+        }
+
         var change = new SquadNumberChange { AskAssistant = true, NeedingNumbersBefore = await game.CountPlayersNeedingNumbersAsync(cancellationToken) };
-        change.Notes.Add("The assistant numbers the players without a number; the game may also renumber others.");
-
-        if (!apply)
-        {
-            return Result.Ok(change);
-        }
-
-        if (await ClearAsync(change, cancellationToken) is { } refused)
-        {
-            return refused;
-        }
-
-        change.Write = await SendAsync(change, () => game.AskAssistantToNumberAsync(cancellationToken));
-        change.Applied = change.Write != RegistrationWrite.NotWritten;
-
-        if (change.Applied)
-        {
-            await Task.Delay(SettlePause, cancellationToken);
-
-            try
-            {
-                change.NeedingNumbersAfter = await game.CountPlayersNeedingNumbersAsync(cancellationToken);
-                change.Confirmed = change.NeedingNumbersAfter == 0;
-
-                if (change.Confirmed == false)
-                {
-                    change.Warnings.Add($"Read back, {change.NeedingNumbersAfter} players still have no number.");
-                }
-            }
-            catch (GameUnavailableException exception)
-            {
-                change.Warnings.Add($"Sent, but the numbers couldn't be read back ({exception.Message}): check get_squad before sending it again.");
-            }
-        }
-
+        change.Notes.Add("The assistant numbers the players without a number; the game may also renumber others. This tool can only plan it.");
         return Result.Ok(change);
     }
 

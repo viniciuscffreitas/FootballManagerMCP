@@ -12,13 +12,9 @@ namespace FootballManager.Infrastructure.Clients;
 
 // Registrations and squad numbers through the MCPFM plugin, on the edit sessions the game's screens bind (proven
 // 18/11/2026 in the test save): a tick is a /set of the session's "Selected" with the player passed as Person, a number a
-// /set of "NumSelected"; each screen's EventFmxConfirmChanges then commits it. The assistant's numbering (the screen's
-// EventFmxAutoSelect) changed nothing when sent this way, so it refuses before sending.
+// /set of "NumSelected"; each screen's EventFmxConfirmChanges then commits it.
 internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistrationGameClient
 {
-    private const string AssistantNotProven =
-        "This tool can't ask the assistant yet: the event the screen sends changed nothing in the test save (ticket #73). " +
-        "Nothing was sent; give each player a number instead.";
 
     public async Task<SquadRegistration> GetRegistrationAsync(CancellationToken cancellationToken = default)
     {
@@ -57,7 +53,8 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
             cancellationToken);
 
         Answered(tick, [RegistrationConstants.CanChange]);
-        return tick.Values.CanChange == true;
+        return tick.Values.CanChange
+               ?? throw new GameUnavailableException($"The game didn't say whether {playerId} can be changed in {competitionName}.");
     }
 
     public async Task<RegistrationPlayer?> FindClubPlayerAsync(int playerId, CancellationToken cancellationToken = default)
@@ -138,6 +135,15 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
 
         Answered(numbers, [RegistrationConstants.CanChangeNumber, RegistrationConstants.NumberDropdown]);
 
+        // Right after the save loads, the squad numbers edit session isn't up: it answers null for whether a number can
+        // change and offers only "-" (seen 18/11/2026), until the squad numbers screen is opened. That's unknown, not locked.
+        if (numbers.Values.CanChange is null)
+        {
+            throw new GameUnavailableException(
+                "The game's squad numbers screen isn't set up (it answers nothing until it's opened after loading the save): " +
+                "open Squad Numbers in the game, then try again.");
+        }
+
         // The dropdown can lag a number given a moment before (seen 18/11/2026: 90 showed free after Patrick got it, and
         // giving it to Hayner took it from him). What each first-team player wears now counts too.
         var team = await bridge.GetListAsync<BridgeRegistrationPlayerDto>(
@@ -213,11 +219,6 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
         }
 
         await bridge.WriteAsync<JsonElement>(Confirm(NumbersSession()), cancellationToken);
-    }
-
-    public Task AskAssistantToNumberAsync(CancellationToken cancellationToken = default)
-    {
-        throw new GameRejectedException(AssistantNotProven);
     }
 
     // The screen's Confirm: EventFmxConfirmChanges on its edit session, with no data. It commits without the dialog the

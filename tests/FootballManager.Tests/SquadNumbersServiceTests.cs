@@ -103,21 +103,15 @@ public class SquadNumbersServiceTests
     }
 
     [Fact]
-    public async Task The_assistant_numbers_everyone_after_the_save_check()
+    public async Task The_assistant_plans_in_a_dry_run_and_an_apply_is_refused_before_the_save_check()
     {
-        var dryRun = (await new SquadNumbersService(_game, _saveGuard).ChangeNumberAsync(null, null, askAssistant: true, apply: false)).Value;
-        await _game.DidNotReceiveWithAnyArgs().AskAssistantToNumberAsync(default);
-
-        _game.CountPlayersNeedingNumbersAsync(Arg.Any<CancellationToken>()).Returns(13, 0);
-        var plan = (await _numbers.ChangeNumberAsync(null, null, askAssistant: true, apply: true)).Value;
+        // The screen's assistant events (EventFmxAutoSelect, EventFmxNumberAllPlayers) changed nothing in the test save.
+        var dryRun = (await _numbers.ChangeNumberAsync(null, null, askAssistant: true, apply: false)).Value;
+        var applied = await _numbers.ChangeNumberAsync(null, null, askAssistant: true, apply: true);
 
         Assert.Equal(13, dryRun.NeedingNumbersBefore);
-        Received.InOrder(() =>
-        {
-            _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
-            _game.AskAssistantToNumberAsync(Arg.Any<CancellationToken>());
-        });
-        Assert.Equal((13, 0, true), (plan.NeedingNumbersBefore, plan.NeedingNumbersAfter, plan.Confirmed));
+        Assert.Equal("askAssistant", Assert.IsType<ValidationError>(Assert.Single(applied.Errors)).PropertyName);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
     }
 
     [Theory]

@@ -56,7 +56,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 |---|---|---|
 | Squad | `get_squad` | Your first team: positions, condition, morale, season numbers; attributes on request |
 | | `get_availability` | Who can play the next match: the injured and their time out, the suspended (scope, matches left, reason), the match's registration and squad size rules, and every player's condition and sharpness |
-| | `get_squad_registration` | Each competition's registration: window and deadline, rules with the squad's value against each, who is registered and who could be
+| | `get_squad_registration` | Each competition's registration: window and deadline, rules with the squad's value against each, who is registered and who could be |
 | | `register_players` | Registers or unregisters players in one competition while its window is open; the dry run warns of each rule the change breaks (squad size, goalkeepers) |
 | | `set_squad_number` | Gives a player a free squad number; asking the assistant to number everyone is a dry run only for now |
 | | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |

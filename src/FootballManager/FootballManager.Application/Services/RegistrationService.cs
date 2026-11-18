@@ -148,7 +148,7 @@ public class RegistrationService(IRegistrationGameClient game, ISaveGuard saveGu
             change.Notes.Add(SaveNote(clearance.Value));
             change.Applied = await WriteAsync(target, change, cancellationToken);
 
-            // Nothing reached the game: there's nothing to read back.
+            // Read back only what reached the game (or may have).
             if (change.Applied)
             {
                 await ReadBackAsync(target, change, cancellationToken);

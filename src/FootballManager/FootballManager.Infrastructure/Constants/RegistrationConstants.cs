@@ -41,9 +41,6 @@ internal static class RegistrationConstants
     public const string IsGoalkeeper = "IsGoalkeeper";
     public static readonly string[] PlayerProperties = [GameConstants.UniqueId, GameConstants.Name, SquadNumber, IsGoalkeeper];
 
-    // The game's squad number for a player who has none.
-    public const int NoNumber = -1;
-
     // The squad numbers screen's edit session, on the first team, for its first-team view (the filter its screen passes).
     public const string NumbersSession = TeamConstants.OwnTeam + ".SquadNumbersEditSession";
     public const string NumbersFilter = "SquadNumbersFilter";

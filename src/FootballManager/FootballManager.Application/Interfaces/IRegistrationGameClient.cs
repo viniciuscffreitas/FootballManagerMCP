@@ -43,7 +43,4 @@ public interface IRegistrationGameClient
 
     /// <summary>Gives the player the number, as the squad numbers screen's dropdown does, and confirms it.</summary>
     Task SetSquadNumberAsync(int playerId, int number, CancellationToken cancellationToken = default);
-
-    /// <summary>"Pedir ao auxiliar para atribuir" on the squad numbers screen, then its confirmation.</summary>
-    Task AskAssistantToNumberAsync(CancellationToken cancellationToken = default);
 }

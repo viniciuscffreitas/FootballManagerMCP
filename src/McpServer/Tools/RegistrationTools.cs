@@ -54,7 +54,9 @@ public static class RegistrationTools
     [Description("Give a first-team player a squad number, or ask the assistant to number everyone without one, as the " +
                  "game's squad numbers screen does. By default a dry run: it checks the player, that the game lets his " +
                  "number change and that the number is free (a taken one fails with who wears it). For the assistant, " +
-                 "it says how many players have no number; applying it is refused for now (the screen's event changed nothing when sent, so give each player a number). Show the user the plan and ask. To apply, call again with " +
+                 "it says how many players have no number; applying it is refused before any write (the screen's events changed nothing when sent, so give each player a number). " +
+                 "Right after the save loads the game answers nothing about numbers until its squad numbers screen is opened: then this " +
+                 "fails as unavailable and asks for that. Show the user the plan and ask. To apply, call again with " +
                  "apply=true: the save is checked (and the real one copied) first; write says Written, NotWritten or " +
                  "Unknown and confirmed whether the number read back is the one asked. Don't run it while a match is " +
                  "being played.")]
