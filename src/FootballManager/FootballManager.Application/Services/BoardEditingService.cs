@@ -37,6 +37,9 @@ public interface IBoardEditingService
 // the game's notice that the board will answer later; others open a talk with the board, read back after the click.
 public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGuard) : IBoardEditingService
 {
+    // Each step is one write; the panel's increments are small, but a split is a few of them, never hundreds.
+    public const int MaxBudgetSteps = 20;
+
     // The game shows a talk, or takes a request, a frame or more after the click.
     private static readonly TimeSpan SettlePause = TimeSpan.FromMilliseconds(800);
 
@@ -118,7 +121,7 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
 
             if (!string.IsNullOrWhiteSpace(line) && index is null)
             {
-                return Fail<BoardAnswer>("line", $"The talk has no line '{line}'; it has: {string.Join("; ", card.Lines.Select((text, i) => $"{i} '{text}'"))}.");
+                return Fail<BoardAnswer>("line", $"No single line of the talk matches '{line}'; it has: {string.Join("; ", card.Lines.Select((text, i) => $"{i} '{text}'"))}.");
             }
 
             if (index is null && apply)
@@ -165,6 +168,11 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
                 return Fail<BudgetAdjustment>("budget", "The club's menu doesn't offer a budget adjustment now.");
             }
 
+            if (steps is { } asked && (asked == 0 || Math.Abs(asked) > MaxBudgetSteps))
+            {
+                return Fail<BudgetAdjustment>("steps", $"Give between 1 and {MaxBudgetSteps} steps, positive or negative; leave them out to only read the panel.");
+            }
+
             var plan = new BudgetAdjustment { Budgets = budgets, Steps = steps };
 
             if (!apply)
@@ -188,9 +196,10 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
 
             plan.Before = panel;
 
-            if (steps is not ({ } value and not 0))
+            // Opening the panel changes the screen, not the budgets.
+            if (steps is not { } value)
             {
-                plan.Applied = true;
+                plan.Notes.Add("Opened the budget panel; the budgets are as they were.");
                 return Result.Ok(plan);
             }
 
@@ -201,6 +210,11 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
 
             plan.After = await game.MoveBudgetAsync(value, cancellationToken);
             plan.Applied = true;
+
+            if (plan.After is null)
+            {
+                plan.Notes.Add("The panel closed after the change: read the budgets with get_finances.");
+            }
             return Result.Ok(plan);
         }
         catch (GameUnavailableException exception)
@@ -226,8 +240,12 @@ public class BoardEditingService(IBoardEditorGameClient game, ISaveGuard saveGua
             return number >= 0 && number < card.Lines.Count ? number : null;
         }
 
-        var found = card.Lines.FindIndex(text => text.Contains(line.Trim(), StringComparison.CurrentCultureIgnoreCase));
-        return found >= 0 ? found : null;
+        // A piece held by more than one line names none of them: a wrong line may bind the season.
+        var found = card.Lines
+            .Select((text, index) => (Text: text, Index: index))
+            .Where(item => item.Text.Contains(line.Trim(), StringComparison.CurrentCultureIgnoreCase))
+            .ToList();
+        return found.Count == 1 ? found[0].Index : null;
     }
 
     private static (MenuEntry Entry, int Index)? Pick(List<(MenuEntry Entry, int Index)> choices, string? entry)

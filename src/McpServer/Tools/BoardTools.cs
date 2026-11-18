@@ -81,7 +81,7 @@ public static class BoardTools
                  "default a dry run that returns both budgets as the club's menu sums them up (\"R$30 MI / R$52.5 mil " +
                  "p/s\"); fails when the menu doesn't offer the adjustment now. apply=true without steps opens the " +
                  "panel and returns it (before: slider position, transfer and wage budget, whether the board lets them " +
-                 "move). apply=true with steps moves the split by that many of the game's own increments (positive: " +
+                 "move; applied stays false). apply=true with steps (1 to 20, either sign) moves the split by that many of the game's own increments (positive: " +
                  "transfers to wages, negative: back) and confirms; after holds the panel then. The save is checked " +
                  "(and the real one copied) before any apply. Show the user the plan and ask. Don't run it while a " +
                  "match is being played.")]

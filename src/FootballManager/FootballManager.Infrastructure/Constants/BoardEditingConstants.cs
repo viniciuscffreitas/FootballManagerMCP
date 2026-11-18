@@ -45,13 +45,13 @@ internal static class BoardEditingConstants
 
     public static readonly string[] PanelProperties = [SliderValue, TransferValue, WageValue, CanEdit, CanEditUp, CanEditDown, BoardText];
 
-    // The panel's events (InteropEventIDs). Not yet seen sent by hand: each step sends Adjust with +1 or -1 on the panel's
-    // record, then Confirm with no data, as the game's confirm events usually go. To check in the smoke.
+    // The panel's events (InteropEventIDs), not yet seen sent by a click: each step sends Adjust with +1 or -1 on the
+    // panel's record, then Confirm with no data, as the game's confirm events usually go.
     public const string AdjustEvent = "EventFmxBudgetAdjustmentAdjust";
     public const string ConfirmEvent = "EventFmxBudgetAdjustmentConfirm";
 
     // A talk with the board on screen. The vision and expectations meeting's lines are #SpeakToMeetingAnswerActionButton;
-    // the first SIButton inside one is what takes the click (the inner one does nothing; C:\Code\meeting.py, 16/11). A
+    // the first SIButton inside one is what takes the click (the inner one does nothing). A
     // quick chat card's lines are buttons with the suggestion-button class, as in a player conversation.
     public const string UiPath = "/ui?maxDepth=160";
     public const string MeetingAnswer = "#SpeakToMeetingAnswerActionButton";

@@ -44,10 +44,12 @@ for ($i = 1; $i -le $Repeat; $i++) {
     Check "UC1 dry run #$i" ($r.Status -eq 200 -and -not $r.Json.applied -and $r.Json.menu.Count -ge 2) "offered $($r.Json.offered -join ','); menu $(($r.Json.menu | % label) -join ' | ')"
 
     # EC1: an entry the menu doesn't have.
+    AssertTestSave
     $r = Post '/board/requests?apply=true' @{ action = 'IncreaseBudgets'; entry = 'Comprar um estadio' }
     Check "EC1 unknown entry #$i" ($r.Status -eq 400) $r.Body
 
     # EC2: answering with no talk open.
+    AssertTestSave
     $r = Post '/board/conversation?apply=true' @{ line = '0' }
     Check "EC2 no talk open #$i" ($r.Status -eq 400) $r.Body
 
@@ -57,11 +59,12 @@ for ($i = 1; $i -le $Repeat; $i++) {
 }
 
 # EC3: several entries, none named.
+AssertTestSave
 $r = Post '/board/requests?apply=true' @{ action = 'IncreaseBudgets' }
 Check "EC3 several entries" ($r.Status -eq 400) $r.Body
 
 $after = Board
-Check "get_board unchanged by dry runs" ($after.boardRequests -eq $before.boardRequests) "boardRequests $($after.boardRequests)"
+Check "get_board unchanged by dry runs" (($after | ConvertTo-Json -Depth 6) -eq ($before | ConvertTo-Json -Depth 6)) "boardRequests $($after.boardRequests)"
 
 if ($Apply) {
     for ($i = 1; $i -le $Repeat; $i++) {

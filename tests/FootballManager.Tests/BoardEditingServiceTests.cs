@@ -193,4 +193,40 @@ public class BoardEditingServiceTests
         Assert.True(result.IsFailed);
         await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
     }
+
+    [Fact]
+    public async Task A_piece_of_text_held_by_two_lines_picks_neither()
+    {
+        _game.ReadCardAsync(Arg.Any<CancellationToken>())
+            .Returns(new BoardCard { Lines = ["Melhorar a base", "Melhorar o centro de treino"] });
+
+        var result = await _board.AnswerAsync("melhorar", apply: true);
+
+        Assert.True(result.IsFailed);
+        await _game.DidNotReceiveWithAnyArgs().SayAsync(default);
+    }
+
+    [Fact]
+    public async Task Too_many_budget_steps_fail_before_writing()
+    {
+        _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
+
+        var result = await _board.AdjustBudgetAsync(BoardEditingService.MaxBudgetSteps + 1, apply: true);
+
+        Assert.True(result.IsFailed);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
+
+    [Fact]
+    public async Task Opening_the_budget_panel_reads_it_and_changes_no_budget()
+    {
+        _game.GetBudgetsAsync(Arg.Any<CancellationToken>()).Returns("R$30 MI / R$52.5 mil p/s");
+        _game.OpenBudgetPanelAsync(Arg.Any<CancellationToken>()).Returns(new BudgetPanel { SliderValue = 0.5f, CanEdit = true });
+
+        var plan = (await _board.AdjustBudgetAsync(null, apply: true)).Value;
+
+        Assert.False(plan.Applied);
+        Assert.Equal(0.5f, plan.Before!.SliderValue);
+        await _game.DidNotReceiveWithAnyArgs().MoveBudgetAsync(default);
+    }
 }
