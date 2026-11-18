@@ -90,6 +90,25 @@ public class StaffEditorBridgeClientTests
         await Assert.ThrowsAsync<GameUnavailableException>(() => Client(plugin).GetOfferedActionsAsync(Coach));
     }
 
+    [Fact]
+    public async Task Actions_the_game_failed_to_read_are_unknown_not_none()
+    {
+        var plugin = new MenuPlugin(Course("Licença B", "Licença A"), actions: """{"values":{},"errors":{"Actions":"Reading the value failed"}}""");
+
+        await Assert.ThrowsAsync<GameUnavailableException>(() => Client(plugin).GetOfferedActionsAsync(Coach));
+    }
+
+    [Fact]
+    public async Task An_entry_with_an_event_the_client_doesnt_know_is_refused_and_nothing_is_sent()
+    {
+        var plugin = new MenuPlugin(Course("Licença B", "Licença A", lastEvent: 99));
+
+        await Assert.ThrowsAsync<GameRejectedException>(() =>
+            Client(plugin).RunMenuEntryAsync(Coach, StaffMenuAction.CoachingCourse, [0, 1], LicenceA));
+
+        Assert.Empty(plugin.Writes);
+    }
+
     private static StaffEditorBridgeClient Client(MenuPlugin plugin)
     {
         var factory = Substitute.For<IHttpClientFactory>();
@@ -97,21 +116,21 @@ public class StaffEditorBridgeClientTests
         return new StaffEditorBridgeClient(new GameBridge(factory, NullLogger<GameBridge>.Instance));
     }
 
-    private static string Course(string first, string? second = null, bool lastDisabled = false, bool topDisabled = false)
+    private static string Course(string first, string? second = null, bool lastDisabled = false, bool topDisabled = false, int lastEvent = 44)
     {
-        var levels = new List<string> { Level(first, lastDisabled && second is null) };
+        var levels = new List<string> { Level(first, lastDisabled && second is null, second is null ? lastEvent : 44) };
 
         if (second is not null)
         {
-            levels.Add(Level(second, lastDisabled));
+            levels.Add(Level(second, lastDisabled, lastEvent));
         }
 
         return $$"""[{"Text":"Curso de treinador","Event":0,"Disabled":{{(topDisabled ? "true" : "false")}},"ChildList":[{{string.Join(',', levels)}}]}]""";
     }
 
-    private static string Level(string label, bool disabled)
+    private static string Level(string label, bool disabled, int eventId = 44)
     {
-        return $$$"""{"RowData":{"Text":"{{{label}}}","Event":44,"Disabled":{{{(disabled ? "true" : "false")}}}}}""";
+        return $$$"""{"RowData":{"Text":"{{{label}}}","Event":{{{eventId}}},"Disabled":{{{(disabled ? "true" : "false")}}}}}""";
     }
 
     // The plugin as the client sees it: the coaching course offered on the staff member, with the given entries.

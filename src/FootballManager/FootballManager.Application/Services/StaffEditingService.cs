@@ -34,6 +34,11 @@ public class StaffEditingService(IStaffEditorGameClient game, ISaveGuard saveGua
             return Fail("action", "Name the action to run, e.g. CoachingCourse or AdvertiseCoachingJob.");
         }
 
+        if (entry is not null && entry.Any(string.IsNullOrWhiteSpace))
+        {
+            return Fail("entry", "Each label in entry must be text, as the dry run's menu shows it.");
+        }
+
         if (OnTheClub.Contains(action) && staffId is not null)
         {
             return Fail("staffId", $"{action} runs on the club, not on a staff member: leave staffId out.");

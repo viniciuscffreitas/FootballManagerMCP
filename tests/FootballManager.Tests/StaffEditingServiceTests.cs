@@ -115,6 +115,16 @@ public class StaffEditingServiceTests
     }
 
     [Fact]
+    public async Task An_entry_with_an_empty_label_is_refused_and_sends_nothing()
+    {
+        var result = await _staff.RunActionAsync(Coach, StaffMenuAction.CoachingCourse, [null!], apply: true);
+
+        Assert.Contains("entry", Messages(result));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().RunMenuEntryAsync(default, default, default!, default!);
+    }
+
+    [Fact]
     public async Task Someone_not_on_the_first_teams_staff_is_refused()
     {
         var result = await _staff.RunActionAsync(99, StaffMenuAction.Dismiss, null, apply: false);

@@ -76,9 +76,19 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
                        $"The game's menu for {action} changed since the check: it no longer has " +
                        $"'{string.Join(" > ", labels)}' to pick. Nothing was sent; run the dry run again.");
 
-        // The entry's event, where the game keeps it: on a top entry itself, on one below in its RowData.
+        // The entry's event, where the game keeps it: on a top entry itself, on one below in its RowData. Only the two
+        // the client knows are sent: the plugin reads a missing event as 0, so any other would run as a context action.
+        var eventId = Fields(item).Event;
+
+        if (eventId is not (ScoutingConstants.DoActionEventId or 0))
+        {
+            throw new GameRejectedException(
+                $"The game's entry '{string.Join(" > ", labels)}' sends event {eventId?.ToString(CultureInfo.InvariantCulture) ?? "none"}, " +
+                "which this tool doesn't know how to send. Nothing was sent.");
+        }
+
         var query = OnAction(menu.Record, actionId);
-        var write = Fields(item).Event == ScoutingConstants.DoActionEventId
+        var write = eventId == ScoutingConstants.DoActionEventId
             ? query.ToWrite("/native", ("event", ScoutingConstants.DoActionEvent), ("field", $"Data:{payload}"), ("template", "none"))
             : query.ToWrite(ScoutingConstants.ContextActionEndpoint,
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)), ("field", $"Data:{payload}"));
@@ -162,6 +172,13 @@ internal sealed class StaffEditorBridgeClient(GameBridge bridge) : IStaffEditorG
         if (offered.Pending?.Contains(ScoutingConstants.Actions) == true)
         {
             throw new GameUnavailableException("The game didn't answer which staff actions it offers (it may be busy).");
+        }
+
+        // A read the game failed is unknown too, not an empty menu.
+        if (offered.Errors?.ContainsKey(ScoutingConstants.Actions) == true)
+        {
+            throw new GameUnavailableException(
+                $"The game failed to read which staff actions it offers: {offered.Errors[ScoutingConstants.Actions]}");
         }
 
         return offered.Values.Actions?.Keys.ToHashSet() ?? [];
