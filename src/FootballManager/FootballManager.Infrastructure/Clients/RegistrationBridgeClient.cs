@@ -198,6 +198,29 @@ internal sealed class RegistrationBridgeClient(GameBridge bridge) : IRegistratio
                ?? throw new GameUnavailableException("The game didn't say which players need a squad number.");
     }
 
+    // Null right after the save loads, until the squad numbers screen is opened (seen 18/11/2026): unknown, not "clean".
+    public async Task<bool> HasPendingNumberChangesAsync(CancellationToken cancellationToken = default)
+    {
+        var record = await bridge.GetRecordAsync<BridgeRegistrationDto>(NumbersSession().Props([RegistrationConstants.HasChanges]), cancellationToken);
+        Answered(record, [RegistrationConstants.HasChanges]);
+        return record.Values.HasChanges ?? throw new GameUnavailableException(
+            "The game didn't say whether the squad numbers screen holds numbers not confirmed: open Squad Numbers in the game, then try again.");
+    }
+
+    public async Task<List<RegistrationPlayer>> GetFirstTeamNumbersAsync(CancellationToken cancellationToken = default)
+    {
+        var team = await bridge.GetListAsync<BridgeRegistrationPlayerDto>(
+            BridgeQuery.FromHuman().List(RegistrationConstants.FirstTeamPlayers).WithHumanAndTeam()
+                .Props(RegistrationConstants.PlayerProperties),
+            cancellationToken);
+
+        return team.Items.Select(item =>
+        {
+            Answered(item, [GameConstants.UniqueId, GameConstants.Name, RegistrationConstants.SquadNumber]);
+            return Player(item.Values, RegistrationConstants.FirstTeamPlayers);
+        }).ToList();
+    }
+
     // As the player's dropdown on the squad numbers screen, then the screen's confirm: the game then gives him the
     // number (seen 18/11/2026: João Fernandes -1 → 2 → -1). The dropdown takes the number a moment later than it says.
     public async Task SetSquadNumberAsync(int playerId, int number, CancellationToken cancellationToken = default)

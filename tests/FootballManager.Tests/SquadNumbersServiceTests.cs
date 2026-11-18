@@ -24,7 +24,14 @@ public class SquadNumbersServiceTests
         _game.CountPlayersNeedingNumbersAsync(Arg.Any<CancellationToken>()).Returns(13, 0);
         _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())
             .Returns(Result.Ok(new SaveClearance { SaveName = "MCPFM investigation", IsTestSave = true }));
+        _game.GetFirstTeamNumbersAsync(Arg.Any<CancellationToken>()).Returns(_ => Team(10));
         _numbers = new SquadNumbersService(_game, _saveGuard);
+    }
+
+    // The first team the screen confirms with him: Neymar with the number given.
+    private static List<RegistrationPlayer> Team(int? neymar)
+    {
+        return [new RegistrationPlayer { Id = 1, Name = "Neymar", SquadNumber = neymar }];
     }
 
     // João Fernandes as the squad numbers screen showed him (18/11/2026): no number, 2 and 13 free, 10 Neymar's.
@@ -137,5 +144,43 @@ public class SquadNumbersServiceTests
         var result = await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: false);
 
         Assert.Contains("already", Assert.IsType<ValidationError>(Assert.Single(result.Errors)).ErrorMessages.Single());
+    }
+
+    [Fact]
+    public async Task Numbers_left_on_the_screen_refuse_the_apply_before_the_save_check()
+    {
+        _game.HasPendingNumberChangesAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true);
+
+        Assert.True(result.IsFailed);
+        Assert.IsType<ValidationError>(result.Errors[0]);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetSquadNumberAsync(default, default);
+    }
+
+    [Fact]
+    public async Task A_screen_that_does_not_say_whether_it_holds_numbers_is_unavailable_and_nothing_is_written()
+    {
+        _game.HasPendingNumberChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new GameUnavailableException("not set up"));
+
+        var result = await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true);
+
+        Assert.IsType<GameUnavailableError>(result.Errors[0]);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetSquadNumberAsync(default, default);
+    }
+
+    [Fact]
+    public async Task A_read_back_where_another_number_also_moved_is_not_confirmed()
+    {
+        _game.GetSquadNumberAsync(Reserve, Arg.Any<CancellationToken>()).Returns(Player(null), Player(13));
+        _game.GetFirstTeamNumbersAsync(Arg.Any<CancellationToken>()).Returns(Team(10), Team(null));
+
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true)).Value;
+
+        Assert.True(plan.Applied);
+        Assert.False(plan.Confirmed);
+        Assert.Contains(plan.Warnings, warning => warning.Contains("Neymar 10 → none"));
     }
 }

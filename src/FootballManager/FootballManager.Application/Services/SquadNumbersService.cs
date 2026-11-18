@@ -73,6 +73,15 @@ public class SquadNumbersService(IRegistrationGameClient game, ISaveGuard saveGu
             return Result.Ok(change);
         }
 
+        // Numbers left on the screen (by the user, or a change stopped midway) would go in with this confirm.
+        if (await game.HasPendingNumberChangesAsync(cancellationToken))
+        {
+            return Fail("number", "The game's squad numbers screen holds numbers not confirmed: confirm or undo them in the game first. " +
+                                  "Nothing was written.");
+        }
+
+        var before = await game.GetFirstTeamNumbersAsync(cancellationToken);
+
         if (await ClearAsync(change, cancellationToken) is { } refused)
         {
             return refused;
@@ -93,6 +102,17 @@ public class SquadNumbersService(IRegistrationGameClient game, ISaveGuard saveGu
                 if (change.Confirmed == false)
                 {
                     change.Warnings.Add($"Read back, {player.Name} wears {now?.Number?.ToString() ?? "no number"}, not {number}.");
+                }
+
+                // The confirm sends the whole screen: anyone else whose number moved went in with it.
+                var after = (await game.GetFirstTeamNumbersAsync(cancellationToken)).ToDictionary(p => p.Id, p => p.SquadNumber);
+                var moved = before.Where(p => p.Id != playerId && after.TryGetValue(p.Id, out var wears) && wears != p.SquadNumber).ToList();
+
+                if (moved.Count > 0)
+                {
+                    change.Confirmed = false;
+                    change.Warnings.Add("Other numbers changed with it: " + string.Join(", ", moved.Select(p =>
+                        $"{p.Name} {p.SquadNumber?.ToString() ?? "none"} → {after[p.Id]?.ToString() ?? "none"}")) + ".");
                 }
             }
             catch (GameUnavailableException exception)

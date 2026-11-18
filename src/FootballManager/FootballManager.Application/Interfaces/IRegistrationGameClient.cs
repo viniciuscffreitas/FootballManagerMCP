@@ -41,6 +41,14 @@ public interface IRegistrationGameClient
     /// <summary>How many first-team players have no squad number.</summary>
     Task<int> CountPlayersNeedingNumbersAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Whether the squad numbers screen holds numbers not yet confirmed: the next confirm would send them too.
+    /// </summary>
+    Task<bool> HasPendingNumberChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Each first-team player with the number he wears now.</summary>
+    Task<List<RegistrationPlayer>> GetFirstTeamNumbersAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Gives the player the number, as the squad numbers screen's dropdown does, and confirms it.</summary>
     Task SetSquadNumberAsync(int playerId, int number, CancellationToken cancellationToken = default);
 }
