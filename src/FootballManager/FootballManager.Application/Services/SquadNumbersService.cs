@@ -48,14 +48,14 @@ public class SquadNumbersService(IRegistrationGameClient game, ISaveGuard saveGu
 
         var change = new SquadNumberChange { PlayerId = playerId, PlayerName = player.Name, From = player.Number, To = number };
 
-        if (!player.CanChange)
-        {
-            return Fail("playerId", $"The game doesn't let {player.Name}'s number change now.");
-        }
-
         if (player.Number == number)
         {
             return Fail("number", $"{player.Name} already wears {number}.");
+        }
+
+        if (!player.CanChange)
+        {
+            return Fail("playerId", $"The game doesn't let {player.Name}'s number change now.");
         }
 
         if (player.Options.FirstOrDefault(option => option.Number == number) is not { } offered)
