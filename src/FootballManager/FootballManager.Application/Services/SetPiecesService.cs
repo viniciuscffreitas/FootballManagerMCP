@@ -63,12 +63,12 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
                 return Result.Fail<SetPieceEdit>(new EntityDoesNotExistError());
             }
 
-            var writes = new List<Func<Task>>();
+            var writes = new List<(string Role, Func<Task> Write, Action Written)>();
 
-            foreach (var (player, role, now, offered, write) in new (SetPiecePlayer?, string, SetPiecePlayer?, Func<CaptaincyOffer, bool>, Func<int, Task>)[]
+            foreach (var (player, role, now, offered, write, written) in new (SetPiecePlayer?, string, SetPiecePlayer?, Func<CaptaincyOffer, bool>, Func<int, Task>, Action)[]
                      {
-                         (captain, "captain", before.Captain, offer => offer.MakeCaptain, playerId => game.MakeCaptainAsync(playerId, cancellationToken)),
-                         (vice, "vice-captain", before.ViceCaptain, offer => offer.MakeViceCaptain, playerId => game.MakeViceCaptainAsync(playerId, cancellationToken))
+                         (captain, "captain", before.Captain, offer => offer.MakeCaptain, playerId => game.MakeCaptainAsync(playerId, cancellationToken), () => edit.CaptainWritten = true),
+                         (vice, "vice-captain", before.ViceCaptain, offer => offer.MakeViceCaptain, playerId => game.MakeViceCaptainAsync(playerId, cancellationToken), () => edit.ViceCaptainWritten = true)
                      })
             {
                 if (player is null)
@@ -85,7 +85,7 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
                 if (planned.Value)
                 {
-                    writes.Add(() => write(player.Id));
+                    writes.Add((role, () => write(player.Id), written));
                 }
             }
 
@@ -103,13 +103,24 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
             edit.Notes.Add(SaveNote(clearance.Value));
 
-            foreach (var write in writes)
+            foreach (var (role, write, written) in writes)
             {
-                await write();
+                try
+                {
+                    await write();
+                    written();
+                    edit.Applied = true;
+                }
+                catch (Exception exception) when (edit.Applied && exception is GameRejectedException or GameUnavailableException)
+                {
+                    // An earlier role already went into the game: say what changed instead of failing, so nobody repeats it.
+                    edit.Notes.Add($"Warning: the {role} change was not written ({exception.Message}); " +
+                                   "the earlier change stays in the game.");
+                    break;
+                }
             }
 
-            edit.Applied = true;
-            edit.After = await game.ReadAsync(cancellationToken);
+            await ReadBackAsync(edit, captain, vice, cancellationToken);
             return Result.Ok(edit);
         }
         catch (GameUnavailableException exception)
@@ -142,6 +153,23 @@ public class SetPiecesService(ISetPiecesGameClient game, ISaveGuard saveGuard) :
 
         edit.Steps.Add($"Make {wanted.Name} {role} (now: {now?.Name ?? "none"}).");
         return Result.Ok(true);
+    }
+
+    // Reads the setup after the writes. A read that fails leaves the writes reported: the game holds them whether or not
+    // the read went through.
+    private async Task ReadBackAsync(
+        SetPieceEdit edit, SetPiecePlayer? captain, SetPiecePlayer? vice, CancellationToken cancellationToken)
+    {
+        try
+        {
+            edit.After = await game.ReadAsync(cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            edit.Notes.Add($"Warning: written, but the setup could not be read back ({exception.Message}); " +
+                           "read it again before changing anything.");
+            return;
+        }
     }
 
     private static SetPiecePlayer? Find(SetPieceSetup setup, int playerId)

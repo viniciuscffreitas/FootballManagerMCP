@@ -6,6 +6,12 @@ public class SetPieceEdit
     /// <summary>False for a dry run, which writes nothing.</summary>
     public bool Applied { get; set; }
 
+    /// <summary>True once the game took the captain change; false when none was written.</summary>
+    public bool CaptainWritten { get; set; }
+
+    /// <summary>True once the game took the vice-captain change; false when none was written.</summary>
+    public bool ViceCaptainWritten { get; set; }
+
     /// <summary>The setup as the game held it before the call.</summary>
     public required SetPieceSetup Before { get; set; }
 

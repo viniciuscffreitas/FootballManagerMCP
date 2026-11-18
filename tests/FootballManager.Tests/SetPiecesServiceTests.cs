@@ -29,12 +29,12 @@ public class SetPiecesServiceTests
             .Returns(Result.Ok(new SaveClearance { SaveName = "MCPFM investigation", IsTestSave = true }));
     }
 
-    private static SetPieceSetup Setup()
+    private static SetPieceSetup Setup(SetPiecePlayer? captain = null, SetPiecePlayer? vice = null)
     {
         return new SetPieceSetup
         {
-            Captain = Neymar,
-            ViceCaptain = Gabriel,
+            Captain = captain ?? Neymar,
+            ViceCaptain = vice ?? Gabriel,
             TakerLists = [new SetPieceTakerList { Key = "Penalties", Label = "Penalties", Takers = [Neymar] }],
             Squad = [Neymar, Gabriel, Rollheiser]
         };
@@ -159,6 +159,40 @@ public class SetPiecesServiceTests
         var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, null, apply: false);
 
         Assert.True(result.IsFailed);
+    }
+
+    [Fact]
+    public async Task A_vice_the_game_refuses_after_the_captain_went_through_reports_what_was_written()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(Setup(), Setup(Rollheiser, Gabriel));
+        _game.MakeViceCaptainAsync(Neymar.Id, Arg.Any<CancellationToken>())
+            .Returns(_ => throw new GameRejectedException("The player's menu doesn't offer Make vice-captain."));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Applied);
+        Assert.True(result.Value.CaptainWritten);
+        Assert.False(result.Value.ViceCaptainWritten);
+        Assert.Contains(result.Value.Notes, note => note.Contains("vice-captain") && note.Contains("Make vice-captain"));
+        Assert.Equal(Rollheiser.Id, result.Value.After!.Captain!.Id);
+    }
+
+    [Fact]
+    public async Task A_read_back_that_fails_after_the_writes_still_reports_them_applied()
+    {
+        _game.ReadAsync(Arg.Any<CancellationToken>()).Returns(
+            _ => Setup(),
+            _ => throw new GameUnavailableException("down"));
+
+        var result = await _setPieces.SetCaptainsAsync(Rollheiser.Id, Neymar.Id, apply: true);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Applied);
+        Assert.True(result.Value.CaptainWritten);
+        Assert.True(result.Value.ViceCaptainWritten);
+        Assert.Null(result.Value.After);
+        Assert.Contains(result.Value.Notes, note => note.Contains("read"));
     }
 
     private static string Messages<T>(Result<T> result)
