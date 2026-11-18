@@ -508,6 +508,25 @@ public class ContractActionsServiceTests
         Assert.Equal(AppliedState.Partial, change.Applied);
     }
 
+    // The game takes a release without showing its dialog: it drops the release (and most entries) from his menu at once
+    // and takes him off the squad only on its next day (Andrey Quintino in the test save, 18/11/2026).
+    [Fact]
+    public async Task A_release_his_menu_no_longer_offers_is_confirmed_while_he_is_still_listed()
+    {
+        _editor.GetOfferedActionsAsync(Reserve, Arg.Any<CancellationToken>())
+            .Returns([PlayerMenuAction.ReleaseOnFreeTransfer], [PlayerMenuAction.ReleaseOnFreeTransfer], new HashSet<PlayerMenuAction>());
+        Menu(PlayerMenuAction.ReleaseOnFreeTransfer,
+            new MenuEntry { CanRun = true, Label = "Liberar por transferência livre", Confirmation = Cost });
+        Dialog(DialogState.NotShown, "");
+
+        var change = (await _service.ReleaseAsync(Reserve, ReleaseKind.Free, apply: true, confirmRelease: true, expectedConfirmation: Cost)).Value;
+
+        Assert.True(change.StillInSquad);
+        Assert.True(change.Confirmed);
+        Assert.Equal(AppliedState.Yes, change.Applied);
+        Assert.Contains(change.Notes, note => note.Contains("next day"));
+    }
+
     private void FreeRelease()
     {
         Offered(PlayerMenuAction.ReleaseOnFreeTransfer);

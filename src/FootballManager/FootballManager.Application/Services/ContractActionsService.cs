@@ -342,9 +342,20 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
                 {
                     return;
                 }
+
+                // The game takes a release at once but lists him until its next day: the release drops out of his menu,
+                // where it was right before the pick (test save, 18/11/2026).
+                if (change.Action == PlayerMenuAction.ReleaseOnFreeTransfer
+                    && !(await editor.GetOfferedActionsAsync(change.PlayerId, cancellationToken)).Contains(change.Action))
+                {
+                    change.Confirmed = true;
+                    change.Notes.Add("The game took the release: his menu no longer offers it. The first team lists him until the " +
+                                     "game's next day, when he leaves (get_squad after continuing).");
+                    return;
+                }
             }
         }
-        catch (GameUnavailableException exception)
+        catch (Exception exception) when (exception is GameUnavailableException or GameRejectedException)
         {
             change.Confirmed = null;
             change.Notes.Add($"The change was sent but reading it back failed ({exception.Message}): check get_contracts before sending it again.");

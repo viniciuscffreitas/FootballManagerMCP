@@ -144,11 +144,13 @@ def release_case(player):
     guard()
     status, change = post("release", {"playerId": player, "how": "Free", "expectedConfirmation": agreed},
                           "?apply=true&confirmRelease=true")
-    check(status == 200 and applied(change) and change.get("dialog") == "Answered"
-          and plain(cost.group(0)) in plain(change.get("dialogText")),
-          f"released, dialog with the dry run's cost {cost.group(0)}: {change.get('dialogText')}")
+    # The game may take it without showing its dialog (test save, 18/11): then the release gone from his menu confirms it.
+    answered = change.get("dialog") == "Answered" and plain(cost.group(0)) in plain(change.get("dialogText"))
+    unshown = change.get("dialog") == "NotShown" and change.get("confirmed") is True
+    check(status == 200 and applied(change) and (answered or unshown),
+          f"released, dialog {change.get('dialog')} (cost {cost.group(0)}): {change.get('dialogText')}")
     check(no_dialog(), "no dialog left open")
-    if change.get("confirmed") is not True:
+    if change.get("stillInSquad") is True:
         print(f"PENDING he's still listed: continue one game day and run: smoke-71.py gone {player}")
         sys.exit(2)
     check(not in_squad(player), "he's gone from get_squad")
