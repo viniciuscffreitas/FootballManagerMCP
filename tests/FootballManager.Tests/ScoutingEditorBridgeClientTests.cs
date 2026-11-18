@@ -91,6 +91,19 @@ public class ScoutingEditorBridgeClientTests
         Assert.Contains($"props={ScoutingConstants.MenuItems}", Uri.UnescapeDataString(plugin.Requests[send - 1].RequestUri!.Query));
     }
 
+    [Fact]
+    public async Task A_recalled_player_is_found_again_in_the_squad()
+    {
+        var plugin = new PlayerPlugin("""[{"Text":"Trazer do empréstimo","Event":44,"Disabled":false}]""", outOnLoan: true);
+        var client = await plugin.FoundAsync();
+
+        await client.SendMenuEntryAsync(Player, PlayerMenuAction.RecallFromLoan, [0], ["Trazer do empréstimo"]);
+        var offered = await client.GetOfferedActionsAsync(Player);
+
+        Assert.DoesNotContain(PlayerMenuAction.RecallFromLoan, offered);
+        Assert.Contains(PlayerMenuAction.SetTransferStatus, offered);
+    }
+
     private static string StatusMenu(string first, string? second = null, bool leafDisabled = false, bool topDisabled = false)
     {
         var levels = new List<string> { Level(first, leafDisabled && second is null) };
@@ -108,9 +121,12 @@ public class ScoutingEditorBridgeClientTests
         return $$$"""{"RowData":{"Text":"{{{label}}}","Event":44,"Disabled":{{{(disabled ? "true" : "false")}}}}}""";
     }
 
-    // The plugin as the client sees it: the player in the club's squad, his menu offering the transfer status entries.
-    private sealed class PlayerPlugin(string items) : HttpMessageHandler
+    // The plugin as the client sees it: the player in the club's squad, his menu offering the transfer status entries;
+    // or out on loan, his menu offering the recall, and back in the squad once the recall is sent.
+    private sealed class PlayerPlugin(string items, bool outOnLoan = false) : HttpMessageHandler
     {
+        private bool _outOnLoan = outOnLoan;
+
         public List<Uri> Writes { get; } = [];
         public List<HttpRequestMessage> Requests { get; } = [];
 
@@ -143,10 +159,12 @@ public class ScoutingEditorBridgeClientTests
             if (request.Method == HttpMethod.Post)
             {
                 Writes.Add(request.RequestUri!);
+                _outOnLoan = false;
                 return Answer("{}");
             }
 
             var url = Uri.UnescapeDataString(request.RequestUri!.Query);
+            var squad = $"{TeamConstants.OwnTeam}.{TeamConstants.Players}";
 
             if (url.Contains($"props={ScoutingConstants.MenuItems}"))
             {
@@ -155,11 +173,18 @@ public class ScoutingEditorBridgeClientTests
 
             if (url.Contains($"props={ScoutingConstants.Actions}"))
             {
-                return Answer($"{{\"values\":{{\"Actions\":{{\"#{ScoutingConstants.SetTransferStatusAction}\":{{}}}}}}}}");
+                // A player the list no longer holds isn't there to read.
+                if (url.Contains(YouthConstants.Loans) != _outOnLoan)
+                {
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("No item has that UniqueId") });
+                }
+
+                var action = _outOnLoan ? ScoutingConstants.RecallFromLoanAction : ScoutingConstants.SetTransferStatusAction;
+                return Answer($"{{\"values\":{{\"Actions\":{{\"#{action}\":{{}}}}}}}}");
             }
 
-            // The club's squad holds him; every other list is empty.
-            return url.Contains($"list={TeamConstants.OwnTeam}.{TeamConstants.Players}")
+            // The list that holds him: the club's squad, or its players out on loan; every other list is empty.
+            return url.Contains($"list={(_outOnLoan ? YouthConstants.Loans : squad)}&")
                 ? Answer($$$"""{"count":1,"items":[{"values":{"{{{GameConstants.UniqueId}}}":{{{Player}}},"{{{GameConstants.Name}}}":"Walter"}}]}""")
                 : Answer("""{"count":0,"items":[]}""");
         }

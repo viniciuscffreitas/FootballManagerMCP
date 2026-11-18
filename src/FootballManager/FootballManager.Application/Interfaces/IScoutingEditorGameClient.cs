@@ -28,14 +28,14 @@ public interface IScoutingEditorGameClient
     Task CreateShortlistAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// A player from one of the user's scouting lists (the scouting centre's recommendations, the shortlist, a
-    /// focus's players), or null when none holds him.
+    /// A player from the club's own lists (its squad, its youth team, its players out on loan) or one of the user's
+    /// scouting lists (the scouting centre's recommendations, the shortlist, a focus's players), or null when none holds him.
     /// </summary>
     Task<ScoutedPlayer?> FindPlayerAsync(int playerId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The players of these ids that the player search's listed results, the scouting lists, the club's own squad
-    /// (trialists included) or the game's search box hold, by id; an id none holds is left out. Unlike <see cref="FindPlayerAsync"/>, it doesn't read the whole
+    /// (trialists included), youth team and players out on loan, or the game's search box hold, by id; an id none holds is left out. Unlike <see cref="FindPlayerAsync"/>, it doesn't read the whole
     /// player search: only the places its listed results were seen at.
     /// </summary>
     Task<Dictionary<int, ScoutedPlayer>> FindPlayersAsync(IReadOnlyCollection<int> playerIds, CancellationToken cancellationToken = default);

@@ -41,6 +41,15 @@ internal sealed class ScoutingEditorBridgeClient(
     // with the contexts that list needs.
     private readonly Dictionary<int, PlayerPlace> _players = [];
 
+    // The club's own players: its squad (trialists are in it), its youth team, and those it has out on loan (in neither
+    // while away; a recalled player goes back to one of them).
+    private static readonly (string Path, int? SearchType)[] ClubLists =
+    [
+        ($"{TeamConstants.OwnTeam}.{TeamConstants.Players}", null),
+        (YouthConstants.YouthPlayers, null),
+        (YouthConstants.Loans, null)
+    ];
+
     public async Task<List<ScoutingArea>> GetAreasAsync(CancellationToken cancellationToken = default)
     {
         var areas = await bridge.GetRecordAsync<BridgeAreasDto>(
@@ -160,7 +169,7 @@ internal sealed class ScoutingEditorBridgeClient(
 
     public async Task<ScoutedPlayer?> FindPlayerAsync(int playerId, CancellationToken cancellationToken = default)
     {
-        var lists = await ScoutingListsAsync(cancellationToken);
+        List<(string Path, int? SearchType)> lists = [.. ClubLists, .. await ScoutingListsAsync(cancellationToken)];
 
         // The player search last, and on its own: it can hold a thousand players or more, read in half a minute.
         return (await FindInAsync([playerId], lists, cancellationToken)).GetValueOrDefault(playerId)
@@ -173,15 +182,9 @@ internal sealed class ScoutingEditorBridgeClient(
 
     public async Task<Dictionary<int, ScoutedPlayer>> FindPlayersAsync(IReadOnlyCollection<int> playerIds, CancellationToken cancellationToken = default)
     {
-        // The club's own squad (trialists are in it), the players it has out on loan (not in the squad while away) and
-        // the scouting lists first: they reach a player by his id, where the player search reaches him by his place in
-        // its results, which moves as the game updates them.
-        List<(string Path, int? SearchType)> lists =
-        [
-            ($"{TeamConstants.OwnTeam}.{TeamConstants.Players}", null),
-            (YouthConstants.Loans, null),
-            .. await ScoutingListsAsync(cancellationToken)
-        ];
+        // The club's own players and the scouting lists first: they reach a player by his id, where the player search
+        // reaches him by his place in its results, which moves as the game updates them.
+        List<(string Path, int? SearchType)> lists = [.. ClubLists, .. await ScoutingListsAsync(cancellationToken)];
 
         var found = await FindInAsync(playerIds, lists, cancellationToken);
 
