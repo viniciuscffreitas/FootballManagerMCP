@@ -40,6 +40,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFinancesGameClient, FinancesBridgeClient>();
         services.AddScoped<IBoardGameClient, BoardBridgeClient>();
         services.AddScoped<IStaffGameClient, StaffBridgeClient>();
+        services.AddScoped<IRegistrationGameClient, RegistrationBridgeClient>();
         services.AddScoped<IContractsGameClient, ContractsBridgeClient>();
         services.AddScoped<ISquadDynamicsGameClient, SquadDynamicsBridgeClient>();
         services.AddScoped<IInjuriesGameClient, InjuriesBridgeClient>();
