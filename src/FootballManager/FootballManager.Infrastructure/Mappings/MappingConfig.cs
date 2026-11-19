@@ -1251,10 +1251,12 @@ public class MappingConfig
         return MenuFields(item).ActionData?.ConfirmationDialogData?.IsErrorDialog == true;
     }
 
-    // The dialog's text on one line, as the game words it ("Ask the scouts to watch X? ... travel costs ...").
+    // The dialog's text on one line, as the game words it ("Ask the scouts to watch X? ... travel costs ..."). An entry
+    // that asks nothing may still tell the user something once it ran (the board's "it will get back to you").
     private static string? MenuConfirmation(BridgeMenuItemDto item)
     {
-        var description = Text(MenuFields(item).ActionData?.ConfirmationDialogData?.Description);
+        var data = MenuFields(item).ActionData;
+        var description = Text(data?.ConfirmationDialogData?.Description) ?? Text(data?.OKDialogData?.Description);
 
         return description is null
             ? null

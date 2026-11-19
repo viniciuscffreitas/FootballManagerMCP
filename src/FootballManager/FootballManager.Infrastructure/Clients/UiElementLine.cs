@@ -7,7 +7,8 @@ namespace FootballManager.Infrastructure.Clients;
 /// with its name ("SIButton#buttons-controls-pc-default"), its classes and its text, then its bounds. Listed with hidden
 /// elements too (visibleOnly=false), <see cref="IsShown"/> tells those on screen.
 /// </summary>
-internal sealed record UiElementLine(string Path, string Type, IReadOnlyList<string> Classes, string? Text, bool IsShown = true)
+internal sealed record UiElementLine(
+    string Path, string Type, IReadOnlyList<string> Classes, string? Text, bool IsShown = true, UiBounds? Bounds = null)
 {
     // The game parks closed panels far off screen (@-50000,0) rather than hiding them.
     private const float OffScreen = -10000;
@@ -42,19 +43,21 @@ internal sealed record UiElementLine(string Path, string Type, IReadOnlyList<str
             return null;
         }
 
+        var place = Place(trimmed[(bounds + 2)..]);
+
         return new UiElementLine(tokens[0], tokens[1],
             tokens.Skip(2).Where(token => token.StartsWith('.')).Select(token => token[1..]).ToList(), text,
-            IsOnScreen(trimmed[(bounds + 2)..]));
+            place is { X: > OffScreen, Y: > OffScreen, Width: > 0, Height: > 0 }, place);
     }
 
     // "120,300 400x40": a place on screen and a size.
-    private static bool IsOnScreen(string bounds)
+    private static UiBounds? Place(string bounds)
     {
         var values = bounds.Split([',', ' ', 'x'], StringSplitOptions.RemoveEmptyEntries)
             .Select(part => float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out var value) ? value : float.NaN)
             .ToList();
 
-        return values is [> OffScreen, > OffScreen, > 0, > 0];
+        return values is [var x, var y, var width, var height] && !values.Any(float.IsNaN) ? new UiBounds(x, y, width, height) : null;
     }
 
     /// <summary>Whether this element is <paramref name="ancestor"/> or lies under it.</summary>
