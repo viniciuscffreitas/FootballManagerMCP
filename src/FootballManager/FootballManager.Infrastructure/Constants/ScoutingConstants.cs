@@ -197,6 +197,16 @@ internal static class ScoutingConstants
     public const uint NegotiateContractAction = 2000111204;
     public const string ContextActionEndpoint = "/contextaction";
 
+    // On the club's own player (FM.GamePlugin.ActionID, not yet seen in the game's menu): release on a free transfer
+    // (PersonReleaseClubFreeTransfer), end the contract by mutual consent (PersonMutualTerminationContract), mark him to
+    // leave when it ends (SetForReleasePlayer), his squad status (PersonSetPlayersPlayingTime), and hand his renewal to
+    // the director of football (SetForDofContractRenewalPlayer).
+    public const uint ReleaseOnFreeTransferAction = 1214855239;
+    public const uint MutualTerminationAction = 1632134254;
+    public const uint SetForReleaseAction = 1299390547;
+    public const uint SetPlayingTimeAction = 1714897475;
+    public const uint DofContractRenewalAction = 1819821377;
+
     // Selling and loans out, on one of the club's own players (FM.GamePlugin.ActionID): PersonSetPlayersTransferStatus,
     // PersonRemovePlayersFromTransferList, PersonRemovePlayersFromLoanList, PersonOfferToClubs; on one out on loan,
     // PersonRecallPlayerFromLoan and PersonOfferExtendLoan.
@@ -218,6 +228,11 @@ internal static class ScoutingConstants
             PlayerMenuAction.EndTrial => EndTrialAction,
             PlayerMenuAction.MakeOffer => MakeOfferAction,
             PlayerMenuAction.NegotiateContract => NegotiateContractAction,
+            PlayerMenuAction.ReleaseOnFreeTransfer => ReleaseOnFreeTransferAction,
+            PlayerMenuAction.MutualTermination => MutualTerminationAction,
+            PlayerMenuAction.SetForRelease => SetForReleaseAction,
+            PlayerMenuAction.SetPlayingTime => SetPlayingTimeAction,
+            PlayerMenuAction.DofContractRenewal => DofContractRenewalAction,
             PlayerMenuAction.SetTransferStatus => SetTransferStatusAction,
             PlayerMenuAction.RemoveFromTransferList => RemoveFromTransferListAction,
             PlayerMenuAction.RemoveFromLoanList => RemoveFromLoanListAction,

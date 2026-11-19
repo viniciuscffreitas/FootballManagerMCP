@@ -216,7 +216,7 @@ public class ScoutingEditorBridgeClientTests
 
             return new ScoutingEditorBridgeClient(
                 bridge, scouting, new RemovedFocusLog(), new SearchPositions(), search,
-                new TeamsBridgeClient(bridge, new GameVocabulary(bridge), search), new CompetitionPlaces());
+                new TeamsBridgeClient(bridge, new GameVocabulary(bridge), search), new CompetitionPlaces(), new GameDialogs(bridge));
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

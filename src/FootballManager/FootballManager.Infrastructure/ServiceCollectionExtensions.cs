@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<GameBridge>();
+        services.AddScoped<GameDialogs>();
         services.AddSingleton<RemovedFocusLog>();
         services.AddSingleton<SearchPositions>();
         services.AddSingleton<SearchedRecords>();

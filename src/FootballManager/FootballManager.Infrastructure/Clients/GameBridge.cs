@@ -156,10 +156,12 @@ internal sealed class GameBridge(IHttpClientFactory httpClientFactory, ILogger<G
         }
     }
 
-    private void LogUnanswered<TValues>(IReadOnlyCollection<BridgeRecordDto<TValues>> records) where TValues : new()
+    private void LogUnanswered<TValues>(IReadOnlyCollection<BridgeRecordDto<TValues>?>? records) where TValues : new()
     {
-        var pending = records.SelectMany(r => r.Pending ?? []).Distinct().ToList();
-        var errors = records.SelectMany(r => r.Errors ?? []).Select(e => $"{e.Key}: {e.Value}").Distinct().ToList();
+        // A list or a record the game sent as null is left to the caller, which reads it as a failed read.
+        var answered = (records ?? []).OfType<BridgeRecordDto<TValues>>().ToList();
+        var pending = answered.SelectMany(r => r.Pending ?? []).Distinct().ToList();
+        var errors = answered.SelectMany(r => r.Errors ?? []).Select(e => $"{e.Key}: {e.Value}").Distinct().ToList();
 
         if (pending.Count > 0)
         {

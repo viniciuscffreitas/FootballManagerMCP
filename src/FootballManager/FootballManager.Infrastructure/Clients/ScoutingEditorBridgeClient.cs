@@ -23,7 +23,8 @@ internal sealed class ScoutingEditorBridgeClient(
     SearchPositions searchPositions,
     DatabaseSearchBridgeClient databaseSearch,
     TeamsBridgeClient teams,
-    CompetitionPlaces competitionPlaces)
+    CompetitionPlaces competitionPlaces,
+    GameDialogs dialogs)
     : IScoutingEditorGameClient
 {
     // The game shows a change a frame or more after its event.
@@ -439,11 +440,7 @@ internal sealed class ScoutingEditorBridgeClient(
         }
 
         var player = await PlaceAsync(playerId, cancellationToken);
-
-        // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.
-        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
-                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
-                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
+        var payload = PayloadOf(entry);
 
         await bridge.WriteAsync<JsonElement>(
             OnAction(player, ScoutingConstants.ActionIdOf(action)).ToWrite("/native",
@@ -469,9 +466,7 @@ internal sealed class ScoutingEditorBridgeClient(
         var actionId = ScoutingConstants.ActionIdOf(action);
 
         // Everything the send needs is built first, so the menu read below is the last thing before the send.
-        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
-                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
-                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
+        var payload = PayloadOf(entry);
         var send = OnAction(player, actionId).ToWrite("/native",
             ("event", ScoutingConstants.DoActionEvent), ("field", $"Data:{payload}"), ("template", "none"));
 
@@ -562,6 +557,84 @@ internal sealed class ScoutingEditorBridgeClient(
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)),
                 ("field", $"Data:@{ScoutingConstants.MenuItems}[0].ActionData")),
             cancellationToken);
+    }
+
+    // As the menu's click does: /contextaction runs the entry through PluginContextMenuContributor with the event and the
+    // payload the game built for it. Unlike EventFmxDoAction, a click shows the entry's confirmation dialog, which
+    // AnswerDialogAsync answers once it's checked to be this entry's.
+    public async Task ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        string? confirmation = null, CancellationToken cancellationToken = default)
+    {
+        if (entry.Count == 0 || labels.Count != entry.Count)
+        {
+            throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
+        }
+
+        if (await dialogs.OpenDialogAsync(cancellationToken) is { } open)
+        {
+            throw new GameRejectedException($"A dialog is open in the game ({open}): ask the user to answer it first. Nothing was sent.");
+        }
+
+        var player = await PlaceAsync(playerId, cancellationToken);
+        var actionId = ScoutingConstants.ActionIdOf(action);
+        var payload = PayloadOf(entry);
+
+        if (!(await OfferedAsync(player, cancellationToken)).Contains(ActionKey(actionId)))
+        {
+            throw new GameRejectedException($"The game's menu no longer offers {action} for him. Nothing was sent; run the dry run again.");
+        }
+
+        var menu = await MenuItemsAsync(player, actionId, cancellationToken);
+
+        // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
+        // The entry must still be at that place with those labels, greyed out at no level, and run EventFmxDoAction
+        // (44), the only event a click is sent with here: the plugin reads a missing event as 0, so any other would run
+        // as a context action. A menu the game rebuilds in the few milliseconds before the send isn't caught.
+        if (MenuEntryAt(menu, entry, labels) is not { } item)
+        {
+            throw new GameRejectedException(
+                $"The game's menu for {action} changed since the check: it no longer has '{string.Join(" > ", labels)}' " +
+                "to pick. Nothing was sent; run the dry run again.");
+        }
+
+        // The terms approved in the dry run (for a release, its cost) must still be the ones the entry states now.
+        var now = item.Adapt<MenuEntry>().Confirmation;
+
+        if (confirmation is not null && !ConfirmationText.SameAs(now, confirmation))
+        {
+            throw new GameRejectedException(
+                $"The game's confirmation for '{string.Join(" > ", labels)}' is now \"{now}\", not the one agreed to " +
+                $"(\"{confirmation}\"). Nothing was sent; show the user the new terms and run the dry run again.");
+        }
+
+        try
+        {
+            await bridge.WriteAsync<JsonElement>(
+                OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
+                    ("action", actionId.ToString(CultureInfo.InvariantCulture)),
+                    ("eventId", ScoutingConstants.DoActionEventId.ToString(CultureInfo.InvariantCulture)),
+                    ("field", $"Data:{payload}")),
+                cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            // Sent, but not answered: the game may have taken it.
+            throw new GameAnswerLostException($"The game's answer to the pick of '{string.Join(" > ", labels)}' was lost: {exception.Message}", exception);
+        }
+    }
+
+    public Task<DialogAnswer> AnswerDialogAsync(string confirmation, CancellationToken cancellationToken = default)
+    {
+        return dialogs.AnswerYesAsync(confirmation, cancellationToken);
+    }
+
+    // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.
+    private static string PayloadOf(IReadOnlyList<int> entry)
+    {
+        return $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
+               + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
+               + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
     }
 
     public async Task<TeamPlayers?> GetTeamPlayersAsync(int teamId, CancellationToken cancellationToken = default)

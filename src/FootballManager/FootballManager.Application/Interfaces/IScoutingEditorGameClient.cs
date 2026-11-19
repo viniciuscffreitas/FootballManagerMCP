@@ -81,4 +81,24 @@ public interface IScoutingEditorGameClient
     /// opens a panel with no NewsAction of its own (e.g. a contract negotiation with one of the club's players).
     /// </summary>
     Task RunMenuClickAsync(int playerId, PlayerMenuAction action, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Picks the menu entry at <paramref name="entry"/> (an index per level, from the top) as a click on the menu does.
+    /// The player's menu is read again first: the action must still be offered, and the entry at that place must have
+    /// <paramref name="labels"/> at every level, be greyed out at none, and send an event the client knows. Otherwise,
+    /// or while a dialog is already open in the game, it throws <see cref="Exceptions.GameRejectedException"/> and sends
+    /// nothing. With <paramref name="confirmation"/> (the terms approved in the dry run, e.g. a release's cost), the
+    /// entry's confirmation must also still be it (case and white space aside), or it throws and sends nothing.
+    /// A send the game didn't answer throws <see cref="Exceptions.GameAnswerLostException"/>.
+    /// </summary>
+    Task ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        string? confirmation = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits for the game's confirmation dialog and answers "Yes" to it only when its text is
+    /// <paramref name="confirmation"/> or holds the whole of it (case and white space aside): the dialog of the action
+    /// asked for, not another one. An empty confirmation never answers a dialog: it only reports the one that showed.
+    /// </summary>
+    Task<DialogAnswer> AnswerDialogAsync(string confirmation, CancellationToken cancellationToken = default);
 }
