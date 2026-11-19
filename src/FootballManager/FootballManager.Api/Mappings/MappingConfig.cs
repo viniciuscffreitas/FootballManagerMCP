@@ -81,6 +81,12 @@ public class MappingConfig
         config.NewConfig<BoardConfidence, BoardConfidenceResponse>();
         config.NewConfig<SupporterConfidence, SupporterConfidenceResponse>();
         config.NewConfig<VisionObjective, VisionObjectiveResponse>();
+        config.NewConfig<MenuEntry, BoardMenuEntryResponse>();
+        config.NewConfig<BoardCard, BoardCardResponse>();
+        config.NewConfig<BoardRequest, BoardRequestResponse>();
+        config.NewConfig<BoardAnswer, BoardAnswerResponse>();
+        config.NewConfig<BudgetPanel, BudgetPanelResponse>();
+        config.NewConfig<BudgetAdjustment, BudgetAdjustmentResponse>();
 
         config.NewConfig<TeamStaff, StaffResponse>();
         config.NewConfig<StaffAttribute, StaffAttributeResponse>();
@@ -110,6 +116,7 @@ public class MappingConfig
         config.NewConfig<OppositionReport, OppositionReportResponse>();
         config.NewConfig<ExpectedPlayer, ExpectedPlayerResponse>();
         config.NewConfig<ReportPoint, ReportPointResponse>();
+        config.NewConfig<OppositionInstructionsChange, OppositionInstructionsChangeResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
         config.NewConfig<PlayerTalk, PlayerTalkResponse>()
             .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)
