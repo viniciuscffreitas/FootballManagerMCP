@@ -14,6 +14,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<IBoardEditingService, BoardEditingService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddScoped<ISquadNumbersService, SquadNumbersService>();
+        services.AddScoped<IStaffEditingService, StaffEditingService>();
         services.AddScoped<IContractsService, ContractsService>();
         services.AddScoped<ISquadDynamicsService, SquadDynamicsService>();
         services.AddScoped<IInjuriesService, InjuriesService>();
@@ -36,9 +39,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITrialsService, TrialsService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<ITransferService, TransferService>();
+        services.AddScoped<IPlayerExitService, PlayerExitService>();
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();
         services.AddScoped<ILeagueTableService, LeagueTableService>();
+        services.AddScoped<ISetPiecesService, SetPiecesService>();
         return services;
     }
 }

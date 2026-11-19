@@ -26,6 +26,12 @@ internal static class PlayerMenus
     // "Assign scout > [a scout's name] (Scout) > 1 week", as the game labels each level.
     public static string Label(List<MenuEntry> menu, IReadOnlyList<int> path)
     {
+        return string.Join(Separator, Labels(menu, path));
+    }
+
+    // The label of each level down to the entry at path, as the game labels them.
+    public static List<string> Labels(List<MenuEntry> menu, IReadOnlyList<int> path)
+    {
         var labels = new List<string>();
         var entries = menu;
 
@@ -35,7 +41,7 @@ internal static class PlayerMenus
             entries = entries[index].Children;
         }
 
-        return string.Join(Separator, labels);
+        return labels;
     }
 
     // The game's confirmation for the entry at path. An entry under a named person sits deeper than the plugin expands
