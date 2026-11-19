@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FootballManager.Application.Exceptions;
 using FootballManager.Infrastructure.Clients;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -38,5 +39,36 @@ public class GameBridgeTests
         var request = Assert.Single(_plugin.Requests);
         Assert.Equal(HttpMethod.Get, request.Method);
         Assert.False(request.Headers.ContainsKey("X-MCPFM-Write"));
+    }
+
+    // A 2xx after the POST says the game got the write: an answer it can't parse doesn't say it didn't take it.
+    [Fact]
+    public async Task A_write_answered_with_something_unreadable_is_unavailable_not_a_crash()
+    {
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(GameBridge.HttpClientName)
+            .Returns(_ => new HttpClient(new RecordingHandler("<html>busy</html>")) { BaseAddress = new Uri("http://localhost:5121") });
+        var bridge = new GameBridge(factory, NullLogger<GameBridge>.Instance);
+
+        var exception = await Assert.ThrowsAsync<GameUnavailableException>(() =>
+            bridge.WriteAsync<JsonElement>("/set?path=X&value=1&confirm=true", CancellationToken.None));
+
+        Assert.IsType<JsonException>(exception.InnerException, exactMatch: false);
+    }
+
+    // A read answered with something that isn't JSON is the game being unavailable, not a crash: after a write, the read
+    // back would otherwise turn into a 500 that hides the write.
+    [Fact]
+    public async Task A_read_answered_with_something_unreadable_is_unavailable_not_a_crash()
+    {
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(GameBridge.HttpClientName)
+            .Returns(_ => new HttpClient(new RecordingHandler("<html>busy</html>")) { BaseAddress = new Uri("http://localhost:5121") });
+        var bridge = new GameBridge(factory, NullLogger<GameBridge>.Instance);
+
+        var exception = await Assert.ThrowsAsync<GameUnavailableException>(() =>
+            bridge.GetRecordAsync<Dictionary<string, JsonElement>>(FootballManager.Infrastructure.Clients.BridgeQuery.FromGame().Props(["X"]), CancellationToken.None));
+
+        Assert.IsType<JsonException>(exception.InnerException, exactMatch: false);
     }
 }
