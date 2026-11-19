@@ -406,7 +406,7 @@ public class ContractActionsServiceTests
         Menu(PlayerMenuAction.SetPlayingTime, new MenuEntry
         {
             Label = "Status no elenco",
-            IsDisabled = true,
+            Disabled = true,
             Children = [new MenuEntry { CanRun = true, Label = "Titular" }, new MenuEntry { CanRun = true, Label = "Rotação" }]
         });
 
@@ -432,7 +432,7 @@ public class ContractActionsServiceTests
     public async Task A_greyed_out_entry_is_not_picked()
     {
         Offered(PlayerMenuAction.SetForRelease);
-        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { CanRun = true, Label = "Liberar no fim do contrato", IsDisabled = true });
+        Menu(PlayerMenuAction.SetForRelease, new MenuEntry { CanRun = true, Label = "Liberar no fim do contrato", Disabled = true });
 
         var result = await _service.ReleaseAsync(Reserve, ReleaseKind.EndOfContract, apply: false, confirmRelease: false);
 
@@ -565,7 +565,7 @@ public class ContractActionsServiceTests
             [
                 new MenuEntry { CanRun = true, Label = "Titular" },
                 new MenuEntry { CanRun = true, Label = "Rotação" },
-                new MenuEntry { CanRun = true, Label = "Reserva", IsDisabled = true }
+                new MenuEntry { CanRun = true, Label = "Reserva", Disabled = true }
             ]
         });
     }

@@ -376,7 +376,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
 
     private static string Unpickable(MenuLeaf leaf)
     {
-        return !leaf.IsDisabled ? string.Empty : leaf.Entry.CanRun || leaf.Entry.IsDisabled ? " (greyed out)" : " (can't be picked)";
+        return !leaf.IsDisabled ? string.Empty : leaf.Entry.CanRun || leaf.Entry.Disabled ? " (greyed out)" : " (can't be picked)";
     }
 
     // Every entry that does something rather than open a sub-menu, with its path (an index per level, from the top), its
@@ -387,7 +387,7 @@ public class ContractActionsService(IScoutingEditorGameClient editor, IContracts
         {
             List<int> path = [.. above, i];
             List<string> labels = [.. labelsAbove, entries[i].Label];
-            var disabled = disabledAbove || entries[i].IsDisabled;
+            var disabled = disabledAbove || entries[i].Disabled;
 
             if (entries[i].Children.Count == 0)
             {

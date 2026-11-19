@@ -41,6 +41,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFinancesGameClient, FinancesBridgeClient>();
         services.AddScoped<IBoardGameClient, BoardBridgeClient>();
         services.AddScoped<IStaffGameClient, StaffBridgeClient>();
+        services.AddScoped<IRegistrationGameClient, RegistrationBridgeClient>();
+        services.AddScoped<IStaffEditorGameClient, StaffEditorBridgeClient>();
         services.AddScoped<IContractsGameClient, ContractsBridgeClient>();
         services.AddScoped<ISquadDynamicsGameClient, SquadDynamicsBridgeClient>();
         services.AddScoped<IInjuriesGameClient, InjuriesBridgeClient>();
@@ -61,6 +63,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISaveSessionGameClient, SaveSessionBridgeClient>();
         services.AddScoped<IConversationGameClient, ConversationBridgeClient>();
         services.AddScoped<ITransferGameClient, TransferBridgeClient>();
+        services.AddScoped<ISetPiecesGameClient, SetPiecesBridgeClient>();
         services.AddSingleton<ISaveFiles, LocalSaveFiles>();
         services.AddScoped<ICompetitionsGameClient, CompetitionsBridgeClient>();
         services.AddScoped<DatabaseSearchBridgeClient>();

@@ -1,0 +1,186 @@
+using FluentResults;
+using FootballManager.Application.Exceptions;
+using FootballManager.Application.Interfaces;
+using FootballManager.Application.ResultErrors;
+using FootballManager.Application.Services;
+using FootballManager.Domain.Registration;
+using FootballManager.Domain.Saves;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
+
+namespace FootballManager.Tests;
+
+public class SquadNumbersServiceTests
+{
+    private const int Reserve = 2000125580;
+
+    private readonly IRegistrationGameClient _game = Substitute.For<IRegistrationGameClient>();
+    private readonly ISaveGuard _saveGuard = Substitute.For<ISaveGuard>();
+    private readonly SquadNumbersService _numbers;
+
+    public SquadNumbersServiceTests()
+    {
+        _game.GetSquadNumberAsync(Reserve, Arg.Any<CancellationToken>()).Returns(_ => Player(null));
+        _game.CountPlayersNeedingNumbersAsync(Arg.Any<CancellationToken>()).Returns(13, 0);
+        _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>())
+            .Returns(Result.Ok(new SaveClearance { SaveName = "MCPFM investigation", IsTestSave = true }));
+        _game.GetFirstTeamNumbersAsync(Arg.Any<CancellationToken>()).Returns(_ => Team(10));
+        _numbers = new SquadNumbersService(_game, _saveGuard);
+    }
+
+    // The first team the screen confirms with him: Neymar with the number given.
+    private static List<RegistrationPlayer> Team(int? neymar)
+    {
+        return [new RegistrationPlayer { Id = 1, Name = "Neymar", SquadNumber = neymar }];
+    }
+
+    // João Fernandes as the squad numbers screen showed him (18/11/2026): no number, 2 and 13 free, 10 Neymar's.
+    private static PlayerSquadNumber Player(int? number)
+    {
+        return new PlayerSquadNumber
+        {
+            Id = Reserve, Name = "João Fernandes", Number = number, CanChange = true, Suggested = 58,
+            Options =
+            [
+                new SquadNumberOption { Number = 2, Label = "2" },
+                new SquadNumberOption { Number = 10, Label = "10. Neymar", Taken = true },
+                new SquadNumberOption { Number = 13, Label = "13" }
+            ]
+        };
+    }
+
+    [Fact]
+    public async Task The_dry_run_plans_the_number_and_writes_nothing()
+    {
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: false)).Value;
+
+        Assert.False(plan.Applied);
+        Assert.Equal(("João Fernandes", (int?)null, (int?)13), (plan.PlayerName, plan.From, plan.To));
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetSquadNumberAsync(default, default);
+    }
+
+    [Fact]
+    public async Task Applying_clears_the_save_then_sets_the_number_and_reads_it_back()
+    {
+        _game.GetSquadNumberAsync(Reserve, Arg.Any<CancellationToken>()).Returns(Player(null), Player(13));
+
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true)).Value;
+
+        Received.InOrder(() =>
+        {
+            _saveGuard.PrepareWriteAsync(Arg.Any<CancellationToken>());
+            _game.SetSquadNumberAsync(Reserve, 13, Arg.Any<CancellationToken>());
+        });
+        Assert.True(plan.Applied);
+        Assert.True(plan.Confirmed);
+        Assert.Equal(RegistrationWrite.Written, plan.Write);
+    }
+
+    [Fact]
+    public async Task A_number_the_read_back_does_not_show_is_not_confirmed()
+    {
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true)).Value;
+
+        Assert.False(plan.Confirmed);
+        Assert.NotEmpty(plan.Warnings);
+    }
+
+    [Fact]
+    public async Task A_send_the_game_does_not_answer_is_unknown_and_the_read_back_decides()
+    {
+        _game.GetSquadNumberAsync(Reserve, Arg.Any<CancellationToken>()).Returns(Player(null), Player(13));
+        _game.SetSquadNumberAsync(Reserve, 13, Arg.Any<CancellationToken>()).ThrowsAsync(new GameUnavailableException("timeout"));
+
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true)).Value;
+
+        Assert.Equal(RegistrationWrite.Unknown, plan.Write);
+        Assert.True(plan.Confirmed);
+    }
+
+    [Fact]
+    public async Task A_number_the_game_refuses_is_not_written()
+    {
+        _game.SetSquadNumberAsync(Reserve, 13, Arg.Any<CancellationToken>()).ThrowsAsync(new GameRejectedException("no"));
+
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true)).Value;
+
+        Assert.False(plan.Applied);
+        Assert.Equal(RegistrationWrite.NotWritten, plan.Write);
+    }
+
+    [Fact]
+    public async Task The_assistant_plans_in_a_dry_run_and_an_apply_is_refused_before_the_save_check()
+    {
+        // The screen's assistant events (EventFmxAutoSelect, EventFmxNumberAllPlayers) changed nothing in the test save.
+        var dryRun = (await _numbers.ChangeNumberAsync(null, null, askAssistant: true, apply: false)).Value;
+        var applied = await _numbers.ChangeNumberAsync(null, null, askAssistant: true, apply: true);
+
+        Assert.Equal(13, dryRun.NeedingNumbersBefore);
+        Assert.Equal("askAssistant", Assert.IsType<ValidationError>(Assert.Single(applied.Errors)).PropertyName);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
+
+    [Theory]
+    [InlineData(null, null, false, "number")]
+    [InlineData(Reserve, null, false, "number")]
+    [InlineData(Reserve, 13, true, "askAssistant")]
+    [InlineData(1, 13, false, "playerId")]
+    [InlineData(Reserve, 10, false, "number")]
+    [InlineData(Reserve, 100, false, "number")]
+    public async Task A_request_that_does_not_fit_is_refused(int? playerId, int? number, bool askAssistant, string property)
+    {
+        var result = await _numbers.ChangeNumberAsync(playerId, number, askAssistant, apply: true);
+
+        Assert.Equal(property, Assert.IsType<ValidationError>(Assert.Single(result.Errors)).PropertyName);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+    }
+
+    [Fact]
+    public async Task The_number_he_already_wears_is_refused()
+    {
+        _game.GetSquadNumberAsync(Reserve, Arg.Any<CancellationToken>()).Returns(Player(13));
+
+        var result = await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: false);
+
+        Assert.Contains("already", Assert.IsType<ValidationError>(Assert.Single(result.Errors)).ErrorMessages.Single());
+    }
+
+    [Fact]
+    public async Task Numbers_left_on_the_screen_refuse_the_apply_before_the_save_check()
+    {
+        _game.HasPendingNumberChangesAsync(Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true);
+
+        Assert.True(result.IsFailed);
+        Assert.IsType<ValidationError>(result.Errors[0]);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetSquadNumberAsync(default, default);
+    }
+
+    [Fact]
+    public async Task A_screen_that_does_not_say_whether_it_holds_numbers_is_unavailable_and_nothing_is_written()
+    {
+        _game.HasPendingNumberChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new GameUnavailableException("not set up"));
+
+        var result = await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true);
+
+        Assert.IsType<GameUnavailableError>(result.Errors[0]);
+        await _saveGuard.DidNotReceiveWithAnyArgs().PrepareWriteAsync(default);
+        await _game.DidNotReceiveWithAnyArgs().SetSquadNumberAsync(default, default);
+    }
+
+    [Fact]
+    public async Task A_read_back_where_another_number_also_moved_is_not_confirmed()
+    {
+        _game.GetSquadNumberAsync(Reserve, Arg.Any<CancellationToken>()).Returns(Player(null), Player(13));
+        _game.GetFirstTeamNumbersAsync(Arg.Any<CancellationToken>()).Returns(Team(10), Team(null));
+
+        var plan = (await _numbers.ChangeNumberAsync(Reserve, 13, askAssistant: false, apply: true)).Value;
+
+        Assert.True(plan.Applied);
+        Assert.False(plan.Confirmed);
+        Assert.Contains(plan.Warnings, warning => warning.Contains("Neymar 10 → none"));
+    }
+}

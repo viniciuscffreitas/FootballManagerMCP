@@ -207,6 +207,16 @@ internal static class ScoutingConstants
     public const uint SetPlayingTimeAction = 1714897475;
     public const uint DofContractRenewalAction = 1819821377;
 
+    // Selling and loans out, on one of the club's own players (FM.GamePlugin.ActionID): PersonSetPlayersTransferStatus,
+    // PersonRemovePlayersFromTransferList, PersonRemovePlayersFromLoanList, PersonOfferToClubs; on one out on loan,
+    // PersonRecallPlayerFromLoan and PersonOfferExtendLoan.
+    public const uint SetTransferStatusAction = 1766943801;
+    public const uint RemoveFromTransferListAction = 860959573;
+    public const uint RemoveFromLoanListAction = 862601504;
+    public const uint OfferToClubsAction = 1164992875;
+    public const uint RecallFromLoanAction = 1917875764;
+    public const uint ExtendLoanAction = 1768114263;
+
     public static uint ActionIdOf(PlayerMenuAction action)
     {
         return action switch
@@ -223,6 +233,12 @@ internal static class ScoutingConstants
             PlayerMenuAction.SetForRelease => SetForReleaseAction,
             PlayerMenuAction.SetPlayingTime => SetPlayingTimeAction,
             PlayerMenuAction.DofContractRenewal => DofContractRenewalAction,
+            PlayerMenuAction.SetTransferStatus => SetTransferStatusAction,
+            PlayerMenuAction.RemoveFromTransferList => RemoveFromTransferListAction,
+            PlayerMenuAction.RemoveFromLoanList => RemoveFromLoanListAction,
+            PlayerMenuAction.OfferToClubs => OfferToClubsAction,
+            PlayerMenuAction.RecallFromLoan => RecallFromLoanAction,
+            PlayerMenuAction.ExtendLoan => ExtendLoanAction,
             _ => AssignScoutAction
         };
     }
