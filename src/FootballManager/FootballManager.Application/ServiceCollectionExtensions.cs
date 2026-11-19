@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMatchesService, MatchesService>();
         services.AddScoped<ITeamsService, TeamsService>();
         services.AddScoped<IOppositionService, OppositionService>();
+        services.AddScoped<IOppositionInstructionsService, OppositionInstructionsService>();
         services.AddScoped<IScoutingService, ScoutingService>();
         services.AddScoped<IScoutingEditingService, ScoutingEditingService>();
         services.AddScoped<IPlayerSearchService, PlayerSearchService>();
