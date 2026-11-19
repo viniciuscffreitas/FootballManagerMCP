@@ -23,7 +23,8 @@ internal sealed class ScoutingEditorBridgeClient(
     SearchPositions searchPositions,
     DatabaseSearchBridgeClient databaseSearch,
     TeamsBridgeClient teams,
-    CompetitionPlaces competitionPlaces)
+    CompetitionPlaces competitionPlaces,
+    GameDialogs dialogs)
     : IScoutingEditorGameClient
 {
     // The game shows a change a frame or more after its event.
@@ -40,6 +41,15 @@ internal sealed class ScoutingEditorBridgeClient(
     // competition's stats table), from the user's manager (Human) or, for one found through the game's search, the game;
     // with the contexts that list needs.
     private readonly Dictionary<int, PlayerPlace> _players = [];
+
+    // The club's own players: its squad (trialists are in it), its youth team, and those it has out on loan (in neither
+    // while away; a recalled player goes back to one of them).
+    private static readonly (string Path, int? SearchType)[] ClubLists =
+    [
+        ($"{TeamConstants.OwnTeam}.{TeamConstants.Players}", null),
+        (YouthConstants.YouthPlayers, null),
+        (YouthConstants.Loans, null)
+    ];
 
     public async Task<List<ScoutingArea>> GetAreasAsync(CancellationToken cancellationToken = default)
     {
@@ -160,7 +170,7 @@ internal sealed class ScoutingEditorBridgeClient(
 
     public async Task<ScoutedPlayer?> FindPlayerAsync(int playerId, CancellationToken cancellationToken = default)
     {
-        var lists = await ScoutingListsAsync(cancellationToken);
+        List<(string Path, int? SearchType)> lists = [.. ClubLists, .. await ScoutingListsAsync(cancellationToken)];
 
         // The player search last, and on its own: it can hold a thousand players or more, read in half a minute.
         return (await FindInAsync([playerId], lists, cancellationToken)).GetValueOrDefault(playerId)
@@ -173,10 +183,9 @@ internal sealed class ScoutingEditorBridgeClient(
 
     public async Task<Dictionary<int, ScoutedPlayer>> FindPlayersAsync(IReadOnlyCollection<int> playerIds, CancellationToken cancellationToken = default)
     {
-        // The club's own squad (trialists are in it) and the scouting lists first: they reach a player by his id, where
-        // the player search reaches him by his place in its results, which moves as the game updates them.
-        List<(string Path, int? SearchType)> lists =
-            [($"{TeamConstants.OwnTeam}.{TeamConstants.Players}", null), .. await ScoutingListsAsync(cancellationToken)];
+        // The club's own players and the scouting lists first: they reach a player by his id, where the player search
+        // reaches him by his place in its results, which moves as the game updates them.
+        List<(string Path, int? SearchType)> lists = [.. ClubLists, .. await ScoutingListsAsync(cancellationToken)];
 
         var found = await FindInAsync(playerIds, lists, cancellationToken);
 
@@ -360,8 +369,36 @@ internal sealed class ScoutingEditorBridgeClient(
             return null;
         }
 
+        return (await MenuItemsAsync(player, actionId, cancellationToken)).Adapt<List<MenuEntry>>();
+    }
+
+    // The menu's entries as the game reads them now. Entries it didn't answer, failed to read or left out are unknown,
+    // not an empty menu, and so is a menu with an empty slot at any level.
+    private async Task<List<BridgeMenuItemDto>> MenuItemsAsync(PlayerPlace player, uint actionId, CancellationToken cancellationToken)
+    {
         var menu = await bridge.GetRecordAsync<BridgeMenuDto>(OnAction(player, actionId).Props([ScoutingConstants.MenuItems]), cancellationToken);
-        return menu.Values.Items.Adapt<List<MenuEntry>>();
+
+        if (menu.Pending?.Contains(ScoutingConstants.MenuItems) == true)
+        {
+            throw new GameUnavailableException("The game didn't answer the player's menu in time (it may be busy).");
+        }
+
+        if (menu.Errors?.TryGetValue(ScoutingConstants.MenuItems, out var error) == true)
+        {
+            throw new GameUnavailableException($"The game failed to read the player's menu: {error}");
+        }
+
+        if (menu.Values.Items is not { } items || HasEmptySlot(items))
+        {
+            throw new GameUnavailableException("The game sent the player's menu incomplete.");
+        }
+
+        return items;
+    }
+
+    private static bool HasEmptySlot(IEnumerable<BridgeMenuItemDto?> items)
+    {
+        return items.Any(item => item is null || HasEmptySlot(item.ChildList ?? []) || item.RowData is { ChildList: { } below } && HasEmptySlot(below));
     }
 
     // The menu actions the game offers for the player now, keyed as the game lists them ("#<action id>").
@@ -374,7 +411,19 @@ internal sealed class ScoutingEditorBridgeClient(
                 .Props([ScoutingConstants.Actions]),
             cancellationToken);
 
-        return offered.Values.Actions?.Keys.ToHashSet() ?? [];
+        // Actions the game didn't answer, failed to read or left out are unknown: read as none, the menu would look empty.
+        if (offered.Pending?.Contains(ScoutingConstants.Actions) == true)
+        {
+            throw new GameUnavailableException("The game didn't answer which actions it offers for the player in time (it may be busy).");
+        }
+
+        if (offered.Errors?.TryGetValue(ScoutingConstants.Actions, out var error) == true)
+        {
+            throw new GameUnavailableException($"The game failed to read which actions it offers for the player: {error}");
+        }
+
+        return offered.Values.Actions?.Keys.ToHashSet()
+               ?? throw new GameUnavailableException("The game left out which actions it offers for the player.");
     }
 
     private static string ActionKey(uint actionId)
@@ -391,11 +440,7 @@ internal sealed class ScoutingEditorBridgeClient(
         }
 
         var player = await PlaceAsync(playerId, cancellationToken);
-
-        // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.
-        var payload = $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
-                      + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
-                      + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
+        var payload = PayloadOf(entry);
 
         await bridge.WriteAsync<JsonElement>(
             OnAction(player, ScoutingConstants.ActionIdOf(action)).ToWrite("/native",
@@ -406,6 +451,85 @@ internal sealed class ScoutingEditorBridgeClient(
         // Read where he was found first: looking through every list takes far longer.
         await Task.Delay(SettlePoll, cancellationToken);
         return await ReadAtAsync(playerId, player, cancellationToken) ?? await FindPlayerAsync(playerId, cancellationToken);
+    }
+
+    public async Task SendMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        CancellationToken cancellationToken = default)
+    {
+        if (entry.Count == 0 || labels.Count != entry.Count)
+        {
+            throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
+        }
+
+        var player = await PlaceAsync(playerId, cancellationToken);
+        var actionId = ScoutingConstants.ActionIdOf(action);
+
+        // Everything the send needs is built first, so the menu read below is the last thing before the send.
+        var payload = PayloadOf(entry);
+        var send = OnAction(player, actionId).ToWrite("/native",
+            ("event", ScoutingConstants.DoActionEvent), ("field", $"Data:{payload}"), ("template", "none"));
+
+        if (!(await OfferedAsync(player, cancellationToken)).Contains(ActionKey(actionId)))
+        {
+            throw new GameRejectedException($"The game's menu no longer offers {action}. Nothing was sent; run the dry run again.");
+        }
+
+        var menu = await MenuItemsAsync(player, actionId, cancellationToken);
+
+        // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
+        // The entry must still be at that place with those labels, greyed out at no level, and send the event this
+        // client sends, or nothing is sent. A menu the game rebuilds in the few milliseconds before the send isn't caught.
+        if (MenuEntryAt(menu, entry, labels) is null)
+        {
+            throw new GameRejectedException(
+                $"The game's menu for {action} changed since the check: it no longer has '{string.Join(" > ", labels)}' " +
+                "to pick. Nothing was sent; run the dry run again.");
+        }
+
+        try
+        {
+            await bridge.WriteAsync<JsonElement>(send, cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            // The send went out: a timeout or an error now doesn't say the game didn't take it.
+            _players.Remove(playerId);
+            throw new GameAnswerLostException($"The game's answer to {action} was lost: {exception.Message}", exception);
+        }
+
+        // He's looked for again on the next read: the entry may have moved him (a recalled player leaves the loans list).
+        _players.Remove(playerId);
+    }
+
+    // The entry at that place when each level still has that label (case aside) and isn't greyed out, and the entry
+    // runs the menu's own event and has no sub-entries.
+    private static BridgeMenuItemDto? MenuEntryAt(List<BridgeMenuItemDto>? items, IReadOnlyList<int> entry, IReadOnlyList<string> labels)
+    {
+        BridgeMenuItemDto? item = null;
+        var level = items;
+
+        for (var i = 0; i < entry.Count; i++)
+        {
+            if (level is null || entry[i] < 0 || entry[i] >= level.Count)
+            {
+                return null;
+            }
+
+            item = level[entry[i]];
+            var fields = item.Text is null && item.RowData is not null ? item.RowData : item;
+            var label = (string.IsNullOrWhiteSpace(item.Text) ? item.RowData?.Text : item.Text) ?? string.Empty;
+
+            if (!string.Equals(label.Trim(), labels[i].Trim(), StringComparison.CurrentCultureIgnoreCase) || fields.Disabled == true)
+            {
+                return null;
+            }
+
+            level = item.ChildList;
+        }
+
+        var leaf = item!.Text is null && item.RowData is not null ? item.RowData : item;
+        return item.ChildList is { Count: > 0 } || leaf.Event != ScoutingConstants.DoActionEventId ? null : item;
     }
 
     // An entry that opens a panel sends no event of its own (EventFmxDoAction opens nothing): the plugin's /newsaction
@@ -433,6 +557,84 @@ internal sealed class ScoutingEditorBridgeClient(
                 ("action", actionId.ToString(CultureInfo.InvariantCulture)),
                 ("field", $"Data:@{ScoutingConstants.MenuItems}[0].ActionData")),
             cancellationToken);
+    }
+
+    // As the menu's click does: /contextaction runs the entry through PluginContextMenuContributor with the event and the
+    // payload the game built for it. Unlike EventFmxDoAction, a click shows the entry's confirmation dialog, which
+    // AnswerDialogAsync answers once it's checked to be this entry's.
+    public async Task ClickMenuEntryAsync(
+        int playerId, PlayerMenuAction action, IReadOnlyList<int> entry, IReadOnlyList<string> labels,
+        string? confirmation = null, CancellationToken cancellationToken = default)
+    {
+        if (entry.Count == 0 || labels.Count != entry.Count)
+        {
+            throw new ArgumentException("Name the menu entry to pick, with its label at each level.", nameof(entry));
+        }
+
+        if (await dialogs.OpenDialogAsync(cancellationToken) is { } open)
+        {
+            throw new GameRejectedException($"A dialog is open in the game ({open}): ask the user to answer it first. Nothing was sent.");
+        }
+
+        var player = await PlaceAsync(playerId, cancellationToken);
+        var actionId = ScoutingConstants.ActionIdOf(action);
+        var payload = PayloadOf(entry);
+
+        if (!(await OfferedAsync(player, cancellationToken)).Contains(ActionKey(actionId)))
+        {
+            throw new GameRejectedException($"The game's menu no longer offers {action} for him. Nothing was sent; run the dry run again.");
+        }
+
+        var menu = await MenuItemsAsync(player, actionId, cancellationToken);
+
+        // The menu is read again here, after the save check: the game may have changed it since the entry was picked.
+        // The entry must still be at that place with those labels, greyed out at no level, and run EventFmxDoAction
+        // (44), the only event a click is sent with here: the plugin reads a missing event as 0, so any other would run
+        // as a context action. A menu the game rebuilds in the few milliseconds before the send isn't caught.
+        if (MenuEntryAt(menu, entry, labels) is not { } item)
+        {
+            throw new GameRejectedException(
+                $"The game's menu for {action} changed since the check: it no longer has '{string.Join(" > ", labels)}' " +
+                "to pick. Nothing was sent; run the dry run again.");
+        }
+
+        // The terms approved in the dry run (for a release, its cost) must still be the ones the entry states now.
+        var now = item.Adapt<MenuEntry>().Confirmation;
+
+        if (confirmation is not null && !ConfirmationText.SameAs(now, confirmation))
+        {
+            throw new GameRejectedException(
+                $"The game's confirmation for '{string.Join(" > ", labels)}' is now \"{now}\", not the one agreed to " +
+                $"(\"{confirmation}\"). Nothing was sent; show the user the new terms and run the dry run again.");
+        }
+
+        try
+        {
+            await bridge.WriteAsync<JsonElement>(
+                OnAction(player, actionId).ToWrite(ScoutingConstants.ContextActionEndpoint,
+                    ("action", actionId.ToString(CultureInfo.InvariantCulture)),
+                    ("eventId", ScoutingConstants.DoActionEventId.ToString(CultureInfo.InvariantCulture)),
+                    ("field", $"Data:{payload}")),
+                cancellationToken);
+        }
+        catch (GameUnavailableException exception)
+        {
+            // Sent, but not answered: the game may have taken it.
+            throw new GameAnswerLostException($"The game's answer to the pick of '{string.Join(" > ", labels)}' was lost: {exception.Message}", exception);
+        }
+    }
+
+    public Task<DialogAnswer> AnswerDialogAsync(string confirmation, CancellationToken cancellationToken = default)
+    {
+        return dialogs.AnswerYesAsync(confirmation, cancellationToken);
+    }
+
+    // The payload of the entry, where the game keeps it: on a top entry itself, on one below in its RowData.
+    private static string PayloadOf(IReadOnlyList<int> entry)
+    {
+        return $"@{ScoutingConstants.MenuItems}[{Format(entry[0])}]"
+               + string.Concat(entry.Skip(1).Select(index => $".ChildList.{Format(index)}"))
+               + (entry.Count > 1 ? ".RowData.ActionData" : ".ActionData");
     }
 
     public async Task<TeamPlayers?> GetTeamPlayersAsync(int teamId, CancellationToken cancellationToken = default)

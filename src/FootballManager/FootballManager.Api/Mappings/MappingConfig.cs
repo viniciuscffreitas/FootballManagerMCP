@@ -8,6 +8,7 @@ using FootballManager.Api.Responses.Opposition;
 using FootballManager.Api.Responses.Rotation;
 using FootballManager.Api.Responses.Competitions;
 using FootballManager.Api.Responses.Conversations;
+using FootballManager.Api.Responses.SetPieces;
 using FootballManager.Api.Responses.Transfers;
 using FootballManager.Api.Requests.Tactics.Editing;
 using FootballManager.Api.Requests.Training;
@@ -32,6 +33,7 @@ using FootballManager.Domain.Opposition;
 using FootballManager.Domain.Rotation;
 using FootballManager.Domain.Competitions;
 using FootballManager.Domain.Conversations;
+using FootballManager.Domain.SetPieces;
 using FootballManager.Domain.Transfers;
 using FootballManager.Domain.Database;
 using FootballManager.Domain.Finances;
@@ -79,6 +81,12 @@ public class MappingConfig
         config.NewConfig<BoardConfidence, BoardConfidenceResponse>();
         config.NewConfig<SupporterConfidence, SupporterConfidenceResponse>();
         config.NewConfig<VisionObjective, VisionObjectiveResponse>();
+        config.NewConfig<MenuEntry, BoardMenuEntryResponse>();
+        config.NewConfig<BoardCard, BoardCardResponse>();
+        config.NewConfig<BoardRequest, BoardRequestResponse>();
+        config.NewConfig<BoardAnswer, BoardAnswerResponse>();
+        config.NewConfig<BudgetPanel, BudgetPanelResponse>();
+        config.NewConfig<BudgetAdjustment, BudgetAdjustmentResponse>();
 
         config.NewConfig<TeamStaff, StaffResponse>();
         config.NewConfig<StaffAttribute, StaffAttributeResponse>();
@@ -87,6 +95,7 @@ public class MappingConfig
             .Map(dest => dest.MedicalAttributes, src => src.MedicalAttributes.Count > 0 ? src.MedicalAttributes : null);
 
         config.NewConfig<SquadPlayerContract, SquadPlayerContractResponse>();
+        config.NewConfig<ContractChange, ContractChangeResponse>();
 
         config.NewConfig<SquadDynamics, SquadDynamicsResponse>();
         config.NewConfig<PlayerDynamics, PlayerDynamicsResponse>()
@@ -107,10 +116,18 @@ public class MappingConfig
         config.NewConfig<OppositionReport, OppositionReportResponse>();
         config.NewConfig<ExpectedPlayer, ExpectedPlayerResponse>();
         config.NewConfig<ReportPoint, ReportPointResponse>();
+        config.NewConfig<OppositionInstructionsChange, OppositionInstructionsChangeResponse>();
         config.NewConfig<RotationSwap, RotationSwapResponse>();
         config.NewConfig<PlayerTalk, PlayerTalkResponse>()
             .Map(dest => dest.Rounds, src => src.Rounds.Count > 0 ? src.Rounds : null)
             .Map(dest => dest.Lines, src => src.Lines.Count > 0 ? src.Lines : null)
+            .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
+        config.NewConfig<SetPiecePlayer, SetPiecePlayerResponse>();
+        config.NewConfig<SetPieceTakerList, SetPieceTakerListResponse>();
+        config.NewConfig<SetPieceSetup, SetPieceSetupResponse>()
+            .Map(dest => dest.CaptainStandIns, src => src.CaptainStandIns.Count > 0 ? src.CaptainStandIns : null);
+        config.NewConfig<SetPieceEdit, SetPieceEditResponse>()
+            .Map(dest => dest.Steps, src => src.Steps.Count > 0 ? src.Steps : null)
             .Map(dest => dest.Notes, src => src.Notes.Count > 0 ? src.Notes : null);
         config.NewConfig<TransferOffer, TransferOfferResponse>()
             .Map(dest => dest.Advice, src => src.Advice.Count > 0 ? src.Advice : null)

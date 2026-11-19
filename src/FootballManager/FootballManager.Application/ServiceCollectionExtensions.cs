@@ -12,7 +12,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAvailabilityService, AvailabilityService>();
         services.AddScoped<IFinancesService, FinancesService>();
         services.AddScoped<IBoardService, BoardService>();
+        services.AddScoped<IBoardEditingService, BoardEditingService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddScoped<ISquadNumbersService, SquadNumbersService>();
+        services.AddScoped<IStaffEditingService, StaffEditingService>();
         services.AddScoped<IContractsService, ContractsService>();
         services.AddScoped<ISquadDynamicsService, SquadDynamicsService>();
         services.AddScoped<IInjuriesService, InjuriesService>();
@@ -26,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMatchesService, MatchesService>();
         services.AddScoped<ITeamsService, TeamsService>();
         services.AddScoped<IOppositionService, OppositionService>();
+        services.AddScoped<IOppositionInstructionsService, OppositionInstructionsService>();
         services.AddScoped<IScoutingService, ScoutingService>();
         services.AddScoped<IScoutingEditingService, ScoutingEditingService>();
         services.AddScoped<IPlayerSearchService, PlayerSearchService>();
@@ -33,12 +38,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INewsService, NewsService>();
         services.AddScoped<IDatabaseSearchService, DatabaseSearchService>();
         services.AddScoped<ITrialsService, TrialsService>();
+        services.AddScoped<IContractActionsService, ContractActionsService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<ITransferService, TransferService>();
         services.AddScoped<ITransferTargetService, TransferTargetService>();
+        services.AddScoped<IPlayerExitService, PlayerExitService>();
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();
         services.AddScoped<ILeagueTableService, LeagueTableService>();
+        services.AddScoped<ISetPiecesService, SetPiecesService>();
         return services;
     }
 }

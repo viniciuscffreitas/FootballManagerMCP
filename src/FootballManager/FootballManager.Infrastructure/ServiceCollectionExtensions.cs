@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<GameBridge>();
+        services.AddScoped<GameDialogs>();
         services.AddSingleton<RemovedFocusLog>();
         services.AddSingleton<SearchPositions>();
         services.AddSingleton<SearchedRecords>();
@@ -39,7 +40,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILeagueTableGameClient, LeagueTableBridgeClient>();
         services.AddScoped<IFinancesGameClient, FinancesBridgeClient>();
         services.AddScoped<IBoardGameClient, BoardBridgeClient>();
+        services.AddScoped<IBoardEditorGameClient, BoardEditorBridgeClient>();
         services.AddScoped<IStaffGameClient, StaffBridgeClient>();
+        services.AddScoped<IRegistrationGameClient, RegistrationBridgeClient>();
+        services.AddScoped<IStaffEditorGameClient, StaffEditorBridgeClient>();
         services.AddScoped<IContractsGameClient, ContractsBridgeClient>();
         services.AddScoped<ISquadDynamicsGameClient, SquadDynamicsBridgeClient>();
         services.AddScoped<IInjuriesGameClient, InjuriesBridgeClient>();
@@ -51,6 +55,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<TeamsBridgeClient>();
         services.AddScoped<ITeamsGameClient>(provider => provider.GetRequiredService<TeamsBridgeClient>());
         services.AddScoped<IOppositionGameClient, OppositionBridgeClient>();
+        services.AddScoped<IOppositionInstructionsGameClient, OppositionInstructionsBridgeClient>();
         services.AddScoped<IScoutingGameClient, ScoutingBridgeClient>();
         services.AddScoped<IScoutingEditorGameClient, ScoutingEditorBridgeClient>();
         services.AddScoped<IPlayerSearchGameClient, PlayerSearchBridgeClient>();
@@ -60,6 +65,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISaveSessionGameClient, SaveSessionBridgeClient>();
         services.AddScoped<IConversationGameClient, ConversationBridgeClient>();
         services.AddScoped<ITransferGameClient, TransferBridgeClient>();
+        services.AddScoped<ISetPiecesGameClient, SetPiecesBridgeClient>();
         services.AddSingleton<ISaveFiles, LocalSaveFiles>();
         services.AddScoped<ICompetitionsGameClient, CompetitionsBridgeClient>();
         services.AddScoped<DatabaseSearchBridgeClient>();

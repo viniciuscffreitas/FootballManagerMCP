@@ -13,7 +13,7 @@ namespace FootballManager.Api.Controllers;
 [ApiController]
 [ApiVersion(Versions.V1)]
 [Route("api/v{version:apiVersion}/[controller]")]
-public class TransfersController(ITransferService transferService) : ControllerBase
+public class TransfersController(ITransferService transferService, IPlayerExitService exitService) : ControllerBase
 {
     /// <summary>
     /// Makes a transfer offer for a player through the game's offer panel, its fee moved to exactly the one asked; only
@@ -42,5 +42,20 @@ public class TransfersController(ITransferService transferService) : ControllerB
         var result = await transferService.NegotiateContractAsync(request.PlayerId, apply, cancellationToken);
         return result.ToGetResult<ContractNegotiation, ContractNegotiationResponse>(
             negotiation => negotiation.Adapt<ContractNegotiationResponse>());
+    }
+
+    /// <summary>
+    /// Changes how one of the club's own players may leave through his menu in the game: his transfer status, taking
+    /// him off the transfer or loan list, offering him to clubs, recalling or extending a loan. Only with apply=true; a
+    /// dry run lists the menu's entries and where he stands.
+    /// </summary>
+    [HttpPost("exit")]
+    public async Task<Results<Ok<PlayerExitResponse>, BadRequest, NotFound, ProblemHttpResult>> ChangeExitAsync(
+        [FromBody] PlayerExitRequest request,
+        [FromQuery] bool apply = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await exitService.ChangeAsync(request.PlayerId, request.Action, request.Choice, apply, cancellationToken);
+        return result.ToGetResult<PlayerExit, PlayerExitResponse>(exit => exit.Adapt<PlayerExitResponse>());
     }
 }

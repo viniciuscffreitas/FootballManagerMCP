@@ -56,7 +56,11 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 |---|---|---|
 | Squad | `get_squad` | Your first team: positions, condition, morale, season numbers; attributes on request |
 | | `get_availability` | Who can play the next match: the injured and their time out, the suspended (scope, matches left, reason), the match's registration and squad size rules, and every player's condition and sharpness |
+| | `get_squad_registration` | Each competition's registration: window and deadline, rules with the squad's value against each, who is registered and who could be |
+| | `register_players` | Registers or unregisters players in one competition while its window is open; the dry run warns of each rule the change breaks (squad size, goalkeepers) |
+| | `set_squad_number` | Gives a player a free squad number; asking the assistant to number everyone is a dry run only for now |
 | | `get_staff` | Your first team's staff: job, coaching style, coaching and medical attributes, wage and contract end, with the club's staff counts and open jobs |
+| | `manage_staff` | Runs a staff action from the game's own menu: sack or mutual termination, coaching or leadership course, new contract on a staff member; job adverts (any, coaching, scouting, medical) on the club |
 | | `get_contracts` | Your first team's contracts: wage, end date and time left, type, agreed playing time, release clause, clauses, renewal offer and the staff's advice; optionally only those ending by a date |
 | | `get_squad_dynamics` | The dressing room: the hierarchy by level, the club atmosphere and its reasons, open happiness issues (player, severity), the manager's promises, and each player's level and reasons to be happy or unhappy |
 | | `get_injuries` | The medical centre: each player's injury history, injuries this season and injury risk in the game's words, and the season summary with who's expected back for the next match; one player on request |
@@ -75,6 +79,7 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | League | `get_league_table` | Your league's table: every team's position, games, wins, draws, losses, goals, goal difference and points, your line marked, and where the press expects you to finish |
 | Opponents | `get_team` | A scouting report on any team: record, style home and away, usual shapes and starters, squad |
 | | `get_opposition_report` | The game's own opposition report: expected formation and eleven with positions and roles, its tactic summary, the analysis' points, and the threat level of your next opponent |
+| | `set_opposition_instructions` | The instructions against your next opponent's players (tight marking, pressing, tackling, the foot to show them onto) and the staff's suggestions for them; sets or clears them on one player, or applies the staff's suggestions |
 | Scouting | `get_scouting` | Your recruitment set-up: scouts, focuses, budget |
 | | `get_scouted_players` | Players from a scouting list (recommendations, shortlist, a focus, the player search) |
 | | `run_player_search` | Runs the game's player search with filters (age, positions, grade, quick filters, interest) |
@@ -88,10 +93,16 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `end_trials` | Ends trials, or withdraws offers not yet answered, for up to 50 players at once |
 | Transfers | `make_transfer_offer` | Bids a fee for a player through the game's offer panel, its fee moved with the panel's +/− buttons to exactly the one asked; the club's answer comes in the inbox |
 | | `negotiate_contract` | Once the club accepts, opens the contract negotiation from its message, agrees to the agent's promises, shows the contract's salary and length, and offers the deal at them on a second call |
+| | `release_player` | Lets one of your players go from his menu: free release (contract paid off), mutual termination or leave at the contract's end; the dry run shows the game's cost, applying needs `confirmRelease` and that cost sent back as `expectedConfirmation` (refused when the menu now shows another or none) and answers only the game's dialog that holds it; `applied` is `Partial` when the game is left waiting on the user |
+| | `set_squad_status` | Changes a player's squad status (promised playing time) to one his menu offers, and reads it back from his contract (`confirmed` is true only for the status asked for) |
+| | `hand_renewal_to_dof` | Hands a player's contract renewal to the director of football from his menu |
+| | `manage_player_exit` | Sets one of the club's players' transfer status, takes him off the transfer or loan list, offers him to clubs, recalls or extends a loan, each through his own menu in the game |
 | | `manage_transfer_target` | Withdraws the offer made for a player of another club, or marks or unmarks him as a director of football's transfer target, through his menu; confirms it by the menu read back |
 | | `get_transfer_activity` | Your transfers under way and the offers received, as the transfer activity screen shows them: the counts, what the deals would spend and bring in, and each offer's player, other club, type, fee and status, those awaiting your answer first |
 | Conversations | `get_player_conversations` | The one-to-one conversations a player's menu offers now: praise or criticise his training, performances or conduct |
 | | `talk_to_player` | Opens one, says the chosen line of each round (a criticism's second round included), and returns his reaction and body language |
+| Set pieces | `get_set_pieces` | The captain, the vice, who takes the armband after them, and each set piece taker list (penalties, corners, free kicks) in order |
+| | `set_captains` | Makes a player captain and/or another vice-captain |
 | Training | `get_training` | This week's and next week's sessions, and each player's training position, role, additional focus, intensity and rating |
 | | `set_training` | Changes players' additional focus and intensity (or rests them), and sessions of the schedule |
 | Database | `search_database` | The game's search box: any player, staff member, club, competition or nation in the world |
@@ -99,6 +110,9 @@ Everything runs on your PC. Nothing is sent anywhere, except what your AI client
 | | `get_message_options` | The answers a message offers, without opening it, and how many answers still hold up Continue |
 | | `reply_to_message` | Answers a message with one of its plain replies (accept, decline, ask the staff to choose) |
 | Board | `get_board` | The board's and the supporters' confidence (grade and texts, the board's praise and criticism), the club vision's objectives, each side's culture, requests to the board and promises made to it |
+| | `request_from_board` | Asks the board through the club's menu: a bigger wage or transfer budget, a new contract for the user, an affiliate (pitched in the board meeting). Dry run by default |
+| | `answer_board` | Says a line in the talk with the board on screen: a request's, or the club vision and season expectations meeting's. Dry run by default |
+| | `adjust_budget` | Moves money between the transfer and the wage budget with the game's budget panel, in the game's own steps. Dry run by default |
 | News | `get_news` | The newest stories about your club and your league from the news portal (date, title, club, source), their text on request |
 | Saves | `list_save_backups` | The copies of your career save in the backup folder, newest first, with club and game date |
 | | `restore_save` | Puts a copy back over your career save, once you've closed it in the game, keeping the save as it was first |
@@ -119,7 +133,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   `create_recruitment_focus`, `remove_recruitment_focus`, `scout_player`, `scout_team`, `shortlist_player`,
   `create_shortlist`, `offer_trials`, `end_trials`, `set_training`, `restore_save`, `release_game_version`,
   `suggest_rotation`, `talk_to_player`, `reply_to_message`, `create_tactic`, `make_transfer_offer`,
-  `negotiate_contract`, `manage_transfer_target`) only check and describe the change unless they're called with `apply: true`. Their
+  `negotiate_contract`, `set_opposition_instructions`, `manage_player_exit`, `register_players`, `set_squad_number`, `manage_staff`, `release_player`, `set_squad_status`, `hand_renewal_to_dof`, `manage_transfer_target`) only check and describe the change unless they're called with `apply: true`. Their
   descriptions tell the AI to ask you before applying.
 - **Scouting shows its cost first.** Scouting has no price up front: it costs travel and expenses as the scout works.
   The dry runs of `scout_player` and `scout_team` show the season's scouting budget (spent and left) and the game's own
@@ -140,7 +154,7 @@ review and a match plan with these tools (see [step 8](#8-optional-install-the-t
   that opens a panel, a conversation or the tutorial is refused with what it opens; do that one in the game, or, for
   the contract negotiation of an accepted offer, with `negotiate_contract`.
 - **Your career is checked and copied before a change.** Before any change to your career applies (`set_tactic`,
-  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`, `manage_transfer_target`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
+  `suggest_rotation`, `create_tactic`, `talk_to_player`, `reply_to_message`, `make_transfer_offer`, `negotiate_contract`, `set_opposition_instructions`, `register_players`, `set_squad_number`, `set_captains`, `release_player`, `set_squad_status`, `hand_renewal_to_dof`, `manage_transfer_target`), the API checks the open save against the one in `SaveGuard__Save` and `SaveGuard__Club`, reads the game's date, and checks
   the game's version against the released one. If anything doesn't match, nothing is sent and the answer says why.
   Then it copies the save to `SaveGuard__BackupFolder` as `<club>-<yyyyMMdd-HHmm>-jogo-<game date>.fm` and keeps that
   club's two newest such copies; files named any other way are never removed. A new game version (Game Pass updates on

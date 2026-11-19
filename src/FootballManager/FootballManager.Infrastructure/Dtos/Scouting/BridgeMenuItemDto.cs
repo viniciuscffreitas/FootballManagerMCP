@@ -16,6 +16,9 @@ internal sealed class BridgeMenuItemDto
     public int? Event { get; set; }
 
     public bool? Disabled { get; set; }
+
+    /// <summary>The entry's second line, e.g. the board's budget adjustment sums up both budgets in it.</summary>
+    public string? SecondaryText { get; set; }
     public BridgeActionDataDto? ActionData { get; set; }
     public BridgeMenuItemDto? RowData { get; set; }
 
