@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IContractActionsService, ContractActionsService>();
         services.AddScoped<IConversationService, ConversationService>();
         services.AddScoped<ITransferService, TransferService>();
+        services.AddScoped<ITransferTargetService, TransferTargetService>();
         services.AddScoped<IPlayerExitService, PlayerExitService>();
         services.AddScoped<ITrainingService, TrainingService>();
         services.AddScoped<ICompetitionsService, CompetitionsService>();

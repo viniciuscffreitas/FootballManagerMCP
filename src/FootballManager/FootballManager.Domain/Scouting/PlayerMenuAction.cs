@@ -54,5 +54,11 @@ public enum PlayerMenuAction
     RecallFromLoan,
 
     /// <summary>Offer to extend the loan of a player the club has out on loan.</summary>
-    ExtendLoan
+    ExtendLoan,
+
+    /// <summary>Mark a player of another club as a transfer target of the director of football.</summary>
+    MarkDofTarget,
+
+    /// <summary>Take a player off the director of football's transfer targets.</summary>
+    UnmarkDofTarget
 }
